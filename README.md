@@ -7,7 +7,7 @@
 - **Frontend:** React 18 · Vite · TypeScript · Tailwind CSS · خط IBM Plex Sans Arabic
 - **الملفات:** Cloudinary (صور، فيديو، PDF)
 - **واتساب:** روابط `wa.me` جاهزة افتراضيًا + إرسال تلقائي اختياري عبر WhatsApp Cloud API
-- **المصادقة:** JWT داخل httpOnly cookie — دور `ADMIN` (و`STAFF`) للوحة التحكم ودور `CUSTOMER` للعملاء
+- **المصادقة:** جلسة JWT موحّدة داخل httpOnly cookie (`vj_session`، 30 يومًا مع تجديد تلقائي) — دور `ADMIN` (و`STAFF`) للوحة التحكم ودور `CUSTOMER` للعملاء، وحماية CSRF بفحص الـ Origin
 
 ---
 
@@ -52,7 +52,8 @@ npm run dev
 
 - الموقع: http://localhost:5173
 - لوحة التحكم: http://localhost:5173/admin — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا `admin@verjar.jo` / `Verjar@2026`)
-- حساب عميل تجريبي: http://localhost:5173/account/login — الهاتف `0791234567` ورقم المرجع `B-DEMO01`
+- حساب عميل: أنشئه من http://localhost:5173/register ثم ادخل من http://localhost:5173/login (بالهاتف أو البريد + كلمة المرور)
+- حجز تجريبي بدون حساب: http://localhost:5173/account/login — الهاتف `0791234567` ورقم المرجع `B-DEMO01`
 
 في التطوير يمرر Vite الطلبات من `/api` و `/uploads` إلى السيرفر (راجع `client/vite.config.ts`)، ولا حاجة لإعداد `VITE_API_URL`.
 بدون `CLOUDINARY_URL` تُحفظ الملفات المرفوعة في `server/uploads`، وهذا للتطوير فقط.
@@ -154,6 +155,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 1. في **verjar-web ← Redirects/Rewrites** عدّل وجهة `/api/*` إلى `https://<اسم-خدمة-api>.onrender.com/api/*`.
 2. في **verjar-api ← Environment** عدّل `CLIENT_URL` و `PUBLIC_API_URL`.
+   مهم: `CLIENT_URL` يجب أن يحتوي رابط الواجهة الفعلي (وأي دومين خاص، مفصولة بفاصلة)، لأن الـ API يرفض طلبات POST/PUT/PATCH/DELETE القادمة من مصدر غير موجود فيه (حماية CSRF). عند الرفض يُطبع في سجل السيرفر سطر يبدأ بـ `[csrf]` ويذكر المصدر المرفوض.
 3. أعد النشر (Manual Deploy).
 
 ### 6. التحقق
@@ -215,7 +217,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 ## توثيق الـ API
 
-الأساس: `/api/v1`. كل استجابة بالشكل:
+الأساس: `/api/v1` (والمسارات نفسها متاحة أيضًا تحت `/api` مباشرة، مثل `/api/auth/me`). كل استجابة بالشكل:
 
 ```json
 { "ok": true, "data": { }, "error": null }
@@ -254,9 +256,17 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 ### المصادقة
 
+الجلسة في كوكي واحد `vj_session` (httpOnly، `Secure` في الإنتاج، `SameSite` حسب `COOKIE_SAMESITE`) لمدة 30 يومًا، ويُعاد إصداره تلقائيًا بعد يوم من آخر إصدار. لا يُخزَّن أي توكن في localStorage.
+أي طلب يغيّر البيانات من متصفح يجب أن يأتي من `CLIENT_URL` أو من دومين الـ API نفسه (فحص `Origin`/`Referer`).
+
 | Method | المسار | الوصف |
 |---|---|---|
-| POST | `/auth/admin/login` | `{ email, password }` ويضبط كوكي `vj_admin` |
+| GET | `/auth/me` | المستخدم الحالي `{ role: CUSTOMER\|ADMIN\|STAFF, id, name, ... }` أو 401 |
+| POST | `/auth/logout` | يمسح الجلسة |
+| POST | `/auth/register` | تسجيل عميل `{ name, phone (07XXXXXXXX), email?, password (8+), ref? }`. إن كان للرقم حجوزات سابقة كضيف يُعاد `409 CLAIM_REQUIRED` ويُطلب `ref` (رقم مرجع أحدها) لإثبات ملكية الرقم |
+| POST | `/auth/login` | دخول العميل `{ identifier, password }` حيث `identifier` رقم الهاتف أو البريد |
+| PATCH | `/auth/profile` | تعديل `{ name?, email? }` للعميل |
+| POST | `/auth/admin/login` | `{ email, password }` — حسابات الأدمن تُنشأ من الـ seed فقط |
 | POST | `/auth/admin/logout` | |
 | GET | `/auth/admin/me` | |
 | POST | `/auth/admin/password` | `{ current, next }` |
@@ -268,13 +278,13 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 | GET | `/auth/customer/me` | |
 | POST | `/auth/customer/password` | `{ password }` تعيين كلمة مرور |
 
-### العميل (كوكي `vj_customer`)
+### العميل (جلسة بدور `CUSTOMER`)
 
 | Method | المسار | الوصف |
 |---|---|---|
 | GET | `/account/overview` | الحجوزات، الطلبات، طلبات الشركات، العقود، الملفات (عروض الأسعار/التقييم)، الدفعات، والملخص المالي |
 
-### الأدمن (كوكي `vj_admin`) — تحت `/admin`
+### الأدمن (جلسة بدور `ADMIN` أو `STAFF`) — تحت `/admin`
 
 | المسار | العمليات |
 |---|---|

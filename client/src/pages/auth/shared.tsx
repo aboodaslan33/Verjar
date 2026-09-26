@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
-import { Input } from '../../components/ui';
-import type { InputHTMLAttributes } from 'react';
+import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { FieldShell } from '../../components/ui';
+import { cx } from '../../lib/format';
 
 /** يقبل فقط مسارات داخلية لتجنب إعادة التوجيه لمواقع خارجية */
 export function safeNext(next: string | null, fallback = '/account') {
@@ -20,20 +20,39 @@ export function AuthShell({ eyebrow, title, subtitle, children, footer }: { eyeb
 }
 
 /** حقل كلمة مرور مع زر إظهار/إخفاء نصي */
-export function PasswordInput({ label, error, hint, ...rest }: { label: string; error?: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
+export function PasswordInput({
+  label,
+  error,
+  hint,
+  id,
+  className,
+  ...rest
+}: { label: string; error?: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
   const [show, setShow] = useState(false);
+  const autoId = useId();
+  const fid = id ?? autoId;
   return (
-    <div className="relative">
-      <Input label={label} type={show ? 'text' : 'password'} dir="ltr" className="pl-16 text-end" error={error} hint={hint} {...rest} />
-      <button
-        type="button"
-        onClick={() => setShow((v) => !v)}
-        className="absolute end-2 top-[2.1rem] rounded-md px-2 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink"
-        aria-label={show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-      >
-        {show ? 'إخفاء' : 'إظهار'}
-      </button>
-    </div>
+    <FieldShell label={label} error={error} hint={hint} id={fid}>
+      <div className="relative">
+        <input
+          id={fid}
+          type={show ? 'text' : 'password'}
+          dir="ltr"
+          className={cx('input pl-16 text-end', error && 'input-error', className)}
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? `${fid}-error` : hint ? `${fid}-hint` : undefined}
+          {...rest}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          className="absolute end-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink"
+          aria-label={show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+        >
+          {show ? 'إخفاء' : 'إظهار'}
+        </button>
+      </div>
+    </FieldShell>
   );
 }
 

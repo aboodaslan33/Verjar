@@ -8,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { api, ApiError } from '../../lib/api';
 import type { AdminMe } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
+import { PasswordInput } from '../auth/shared';
 
 export default function Login() {
   useDocumentTitle('دخول لوحة التحكم');
@@ -19,7 +20,6 @@ export default function Login() {
   const from = (location.state as { from?: string } | null)?.from || '/admin';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -86,25 +86,13 @@ export default function Login() {
                 error={fields.email}
                 autoFocus
               />
-              <div className="relative">
-                <Input
-                  label="كلمة المرور"
-                  type={showPw ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  dir="ltr"
-                  className="pl-16 text-start"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  error={fields.password}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  className="absolute end-2 top-[2.1rem] rounded-md px-2 py-1.5 text-xs font-medium text-muted hover:bg-subtle"
-                >
-                  {showPw ? 'إخفاء' : 'إظهار'}
-                </button>
-              </div>
+              <PasswordInput
+                label="كلمة المرور"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={fields.password}
+              />
               <Button type="submit" block loading={loading}>
                 دخول
               </Button>
