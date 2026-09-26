@@ -11,7 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "start:render": "prisma migrate deploy && tsx prisma/seed.ts && node dist/index.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

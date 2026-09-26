@@ -1,0 +1,326 @@
+# فيرجار (Verjar)
+
+منصة شركة فيرجار: حجوزات خدمات البناء والصيانة والدهان والأعمال المعدنية، طلبات وعقود صيانة الشركات، متجر منتجات، صفحة للعميل، ولوحة تحكم كاملة للإدارة.
+الواجهة بالعربية (RTL) بالكامل، والمشروع جاهز للنشر على Render.
+
+- **Backend:** Node.js 20+ · Express · TypeScript · Prisma · PostgreSQL
+- **Frontend:** React 18 · Vite · TypeScript · Tailwind CSS · خط IBM Plex Sans Arabic
+- **الملفات:** Cloudinary (صور، فيديو، PDF)
+- **واتساب:** روابط `wa.me` جاهزة افتراضيًا + إرسال تلقائي اختياري عبر WhatsApp Cloud API
+- **المصادقة:** JWT داخل httpOnly cookie — دور `ADMIN` (و`STAFF`) للوحة التحكم ودور `CUSTOMER` للعملاء
+
+---
+
+## المحتويات
+
+1. [التشغيل محليًا](#التشغيل-محليًا)
+2. [متغيرات البيئة](#متغيرات-البيئة)
+3. [النشر على Render خطوة بخطوة](#النشر-على-render-خطوة-بخطوة)
+4. [واتساب](#واتساب)
+5. [قواعد العمل](#قواعد-العمل)
+6. [توثيق الـ API](#توثيق-الـ-api)
+7. [الاختبارات](#الاختبارات)
+8. [هيكل المشروع](#هيكل-المشروع)
+
+---
+
+## التشغيل محليًا
+
+المتطلبات: Node.js 20 أو أحدث، و PostgreSQL 14 أو أحدث.
+
+```bash
+# 1) تثبيت الحزم
+npm install            # يثبّت concurrently في الجذر
+npm run install:all    # يثبّت server و client
+
+# 2) قاعدة البيانات
+createdb verjar
+createdb verjar_test   # للاختبارات فقط
+
+# 3) إعداد البيئة
+cp server/.env.example server/.env    # عدّل DATABASE_URL و JWT_SECRET
+
+# 4) إنشاء الجداول والبيانات الأولية
+cd server
+npx prisma migrate dev     # يطبّق الـ migrations
+npm run seed               # أدمن + تصنيفات + خدمات الشركات + منتجات وحجز تجريبي
+cd ..
+
+# 5) التشغيل (السيرفر على 4000 والواجهة على 5173)
+npm run dev
+```
+
+- الموقع: http://localhost:5173
+- لوحة التحكم: http://localhost:5173/admin — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا `admin@verjar.jo` / `Verjar@2026`)
+- حساب عميل تجريبي: http://localhost:5173/account/login — الهاتف `0791234567` ورقم المرجع `B-DEMO01`
+
+في التطوير يمرر Vite الطلبات من `/api` و `/uploads` إلى السيرفر (راجع `client/vite.config.ts`)، ولا حاجة لإعداد `VITE_API_URL`.
+بدون `CLOUDINARY_URL` تُحفظ الملفات المرفوعة في `server/uploads`، وهذا للتطوير فقط.
+
+### أوامر مفيدة
+
+| الأمر | المكان | الوصف |
+|---|---|---|
+| `npm run dev` | الجذر | تشغيل السيرفر والواجهة معًا |
+| `npm run build` | الجذر | بناء السيرفر والواجهة |
+| `npm test` | الجذر أو `server/` | اختبارات الـ API |
+| `npm run prisma:migrate` | `server/` | إنشاء migration جديدة بعد تعديل `schema.prisma` |
+| `npm run seed` | `server/` | البيانات الأولية (آمن للتكرار) |
+| `npm run typecheck` | `server/` أو `client/` | فحص الأنواع |
+
+---
+
+## متغيرات البيئة
+
+### السيرفر (`server/.env`)
+
+| المتغير | مطلوب | الوصف |
+|---|---|---|
+| `DATABASE_URL` | ✔ | رابط PostgreSQL |
+| `JWT_SECRET` | ✔ | نص عشوائي طويل (16 حرفًا على الأقل) لتوقيع الجلسات |
+| `NODE_ENV` | | `development` أو `production` |
+| `PORT` | | منفذ السيرفر (Render يضبطه تلقائيًا) |
+| `CLIENT_URL` | ✔ إنتاج | رابط الواجهة للـ CORS، ويمكن وضع أكثر من رابط مفصولة بفاصلة |
+| `PUBLIC_API_URL` | | رابط الـ API العام، ويُستخدم لروابط الملفات المحلية فقط |
+| `COOKIE_SAMESITE` | | `lax` (الافتراضي، عندما تمرر الواجهة `/api` عبر rewrite)، أو `none` إذا كانت الواجهة والـ API على دومينين مختلفين |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | seed | بيانات حساب الأدمن الأولي، ويُنشأ مرة واحدة فقط |
+| `SEED_DEMO` | | `false` لتخطي البيانات التجريبية |
+| `ADMIN_WHATSAPP` | | رقم واتساب الإدارة الافتراضي بصيغة دولية بدون `+` (`962780192930`)، ويمكن تغييره من الإعدادات |
+| `CLOUDINARY_URL` | ✔ إنتاج | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
+| `CLOUDINARY_FOLDER` | | المجلد في Cloudinary (افتراضي `verjar`) |
+| `WA_TOKEN` / `WA_PHONE_ID` | اختياري | لتفعيل الإرسال التلقائي عبر WhatsApp Cloud API |
+| `WA_API_VERSION` | | إصدار Graph API (افتراضي `v21.0`) |
+| `TEST_DATABASE_URL` | اختبارات | قاعدة بيانات الاختبار، ويجب أن يحتوي اسمها على `test` |
+
+### الواجهة (`client/.env`)
+
+| المتغير | الوصف |
+|---|---|
+| `VITE_API_URL` | اتركه فارغًا عند تمرير `/api` على نفس الدومين (الإعداد الموصى به). ضع رابط السيرفر فقط إذا كانت الواجهة على دومين مختلف، ويلزم حينها `COOKIE_SAMESITE=none` |
+
+---
+
+## النشر على Render خطوة بخطوة
+
+الملف `render.yaml` (Blueprint) يعرّف ثلاث خدمات:
+
+- **verjar-db**: قاعدة PostgreSQL
+- **verjar-api**: Web Service للسيرفر
+- **verjar-web**: Static Site للواجهة، مع rewrite يمرر `/api/*` إلى السيرفر، فتكون الكوكيز من نفس الدومين وتعمل على كل المتصفحات بما فيها Safari
+
+### 1. تجهيز Cloudinary
+
+1. أنشئ حسابًا مجانيًا على cloudinary.com.
+2. من Dashboard انسخ **API Environment variable**، وشكله `cloudinary://123:abc@cloud-name`.
+3. (مهم لملفات PDF) من Settings ← Security فعّل **Allow delivery of PDF and ZIP files**.
+
+### 2. رفع المشروع إلى GitHub
+
+```bash
+git push origin main
+```
+
+### 3. إنشاء الخدمات من الـ Blueprint
+
+1. في Render Dashboard اختر **New ← Blueprint**.
+2. اربط المستودع. سيقرأ Render ملف `render.yaml` ويعرض الخدمات الثلاث.
+3. سيطلب قيم المتغيرات المعلّمة `sync: false`:
+   - `ADMIN_PASSWORD`: كلمة مرور قوية لحساب الأدمن الأول
+   - `CLOUDINARY_URL`: القيمة من الخطوة 1
+   - `WA_TOKEN` و `WA_PHONE_ID`: اتركهما فارغين إذا لم تفعّل Cloud API
+4. اضغط **Apply**. سيُنشئ Render قاعدة البيانات ويربط `DATABASE_URL` بالسيرفر تلقائيًا، ويولّد `JWT_SECRET`.
+
+### 4. تشغيل الـ migrations
+
+لا تحتاج لخطوة يدوية. أمر التشغيل `npm run start:render` ينفّذ عند كل نشر:
+
+```
+prisma migrate deploy   →  يطبّق أي migration جديدة
+tsx prisma/seed.ts      →  ينشئ الأدمن والتصنيفات وخدمات الشركات إن لم تكن موجودة (لا يغيّر بياناتك)
+node dist/index.js      →  يشغّل السيرفر
+```
+
+لتشغيلها يدويًا من جهازك على قاعدة Render: انسخ **External Database URL** من صفحة verjar-db ثم:
+
+```bash
+cd server
+DATABASE_URL="<External Database URL>" npx prisma migrate deploy
+DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
+```
+
+### 5. مطابقة الروابط
+
+إذا أعطاك Render أسماء مختلفة عن `verjar-api` و `verjar-web` (عندما يكون الاسم محجوزًا):
+
+1. في **verjar-web ← Redirects/Rewrites** عدّل وجهة `/api/*` إلى `https://<اسم-خدمة-api>.onrender.com/api/*`.
+2. في **verjar-api ← Environment** عدّل `CLIENT_URL` و `PUBLIC_API_URL`.
+3. أعد النشر (Manual Deploy).
+
+### 6. التحقق
+
+- `https://verjar-api.onrender.com/health` يجب أن يعيد `{"ok":true,...}`.
+- افتح `https://verjar-web.onrender.com/admin` وادخل بـ `admin@verjar.jo` وكلمة المرور التي اخترتها.
+- من **الإعدادات** في لوحة التحكم راجع رقم الواتساب ورسوم الكشف وساعات العمل ومحتوى "نبذة عنا".
+
+### 7. دومين خاص (اختياري)
+
+أضف الدومين في verjar-web ← Settings ← Custom Domains، ثم أضفه إلى `CLIENT_URL` في verjar-api (مثال: `https://verjar.jo,https://verjar-web.onrender.com`).
+
+> **ملاحظات Render:**
+> - الخطة المجانية للـ Web Service تتوقف بعد فترة خمول، وأول طلب بعدها يأخذ ~30–50 ثانية. للاستخدام الفعلي اختر خطة Starter.
+> - قاعدة Postgres المجانية تنتهي بعد مدة محدودة. للإنتاج اختر خطة مدفوعة واحتفظ بنسخ احتياطية.
+> - قرص Render مؤقت، ولهذا تُرفع كل الملفات إلى Cloudinary.
+
+---
+
+## واتساب
+
+الخدمة `server/src/services/whatsapp.service.ts` لها واجهة واحدة (`sendWhatsApp` / `notifyAdmin` / `notifyCustomer`) تعمل بحالتين:
+
+1. **الافتراضي، بدون API:** بعد كل حجز أو طلب أو طلب شركة يولّد السيرفر رسالة مرتبة ويعيد رابط `https://wa.me/<رقم الإدارة>?text=<الرسالة>`، فتعرض الواجهة زر **"إرسال عبر واتساب"**. في لوحة التحكم، عند تغيير الحالة أو رفع عرض سعر، يظهر للأدمن زر يفتح واتساب برسالة جاهزة للعميل.
+2. **WhatsApp Cloud API (اختياري):** عند ضبط `WA_TOKEN` و `WA_PHONE_ID` يرسل السيرفر الرسالة تلقائيًا للإدارة وللعميل، ويبقى رابط wa.me كنسخة احتياطية. رموز الدخول (OTP) تُرسل بهذه الطريقة.
+
+كل رسالة تُسجّل في جدول `WhatsAppLog` وتظهر في **لوحة التحكم ← السجلات**.
+
+> تنبيه: سياسة Meta لا تسمح بإرسال رسائل نصية حرة لعميل لم يراسلك خلال آخر 24 ساعة، ويلزم حينها **قالب رسالة معتمد (Template)**. التأكيدات والإشعارات الفورية بعد الطلب تعمل غالبًا لأن العميل يبدأ المحادثة بزر wa.me. لرسائل المتابعة المتأخرة (تذكير عقد، عرض سعر بعد أيام) أنشئ قوالب في WhatsApp Manager.
+
+مثال رسالة طلب المتجر:
+
+```
+طلب جديد #1042 — فيرجار
+العميل: سارة خليل  الهاتف: 0771234567
+العنوان: عمّان — عبدون
+المنتجات:
+- كرسي حديقة حديد مشغول × 2 = 90 د.أ (بعد خصم 10%)
+المجموع قبل الخصم: 100 د.أ
+الخصم: 10 د.أ
+الإجمالي: 90 د.أ
+المرجع: O-7K3M9Q
+```
+
+---
+
+## قواعد العمل
+
+- **المواعيد:** لا يُقبل حجزان بفارق أقل من `bookingGapHours` (افتراضي 3 ساعات) على مستوى الشركة. الأوقات المحجوزة تظهر معطّلة. التحقق النهائي يتم داخل معاملة مع قفل `pg_advisory_xact_lock`، فلا ينجح حجزان متزامنان لنفس الفترة. أيام وساعات العمل وطول الفترة تُضبط من الإعدادات. التوقيت دائمًا بتوقيت عمّان (`Asia/Amman`).
+- **رسوم الكشف:** 15 دينار داخل عمّان و25 خارجها، والطلب الطارئ له رسوم منفصلة. كل الرسوم قابلة للتعديل من الإعدادات، وتُعرض للعميل قبل التأكيد وتُحسب في السيرفر.
+- **الأسعار:** يُحسب السعر النهائي بعد الخصم في السيرفر عند حفظ المنتج (`finalPrice`)، ويُعاد حسابه عند الطلب من قاعدة البيانات وليس من المتصفح. المخزون يُخصم داخل المعاملة ويرجع عند إلغاء الطلب.
+- **الملفات:** يُفحص نوع الملف من محتواه الفعلي (magic bytes) وليس من الامتداد. الحدود: صور الحجز حتى 5 صور بحد 5MB لكل صورة، ملفات التصميم والسجل التجاري صور أو PDF حتى 10MB، ملفات عروض الأسعار PDF حتى 15MB، ووسائط المنتجات صور حتى 8MB وفيديو واحد حتى 60MB.
+- **العملاء:** يُنشأ حساب العميل تلقائيًا من رقم هاتفه عند أول حجز أو طلب. يدخل العميل برقم الهاتف مع **رقم المرجع** لأي حجز أو طلب (يظهر في شاشة التأكيد ورسالة واتساب)، أو بكلمة مرور يعيّنها من صفحته، أو برمز OTP عبر واتساب عند تفعيل Cloud API.
+- **العقود:** يرسل السيرفر تذكيرًا واتساب للإدارة قبل انتهاء العقد بعدد الأيام المحدد، مرة واحدة لكل عقد، ويحوّل العقود المنتهية إلى `EXPIRED` تلقائيًا.
+- **الحذف:** كل الحذف في لوحة التحكم حذف منطقي (`deletedAt`)، وكل تعديلات الأدمن تُسجل في `AuditLog`.
+- **الأمان:** Helmet، CORS مقيد بـ `CLIENT_URL`، rate limiting (20 نموذجًا لكل 15 دقيقة لكل IP، و10 محاولات دخول)، تحقق Zod من كل المدخلات برسائل عربية، كوكيز httpOnly.
+
+---
+
+## توثيق الـ API
+
+الأساس: `/api/v1`. كل استجابة بالشكل:
+
+```json
+{ "ok": true, "data": { }, "error": null }
+{ "ok": false, "data": null, "error": { "code": "VALIDATION", "message": "رقم الهاتف غير صحيح", "fields": { "phone": "..." } } }
+```
+
+القوائم المرقّمة تقبل `?page=1&pageSize=20` وتعيد `{ items, total, page, pageSize, pages }`.
+
+### عام
+
+| Method | المسار | الوصف |
+|---|---|---|
+| GET | `/site/settings` | الإعدادات العامة (التواصل، الرسوم، أيام العمل، المحتوى) |
+| GET | `/bookings/slots?date=YYYY-MM-DD` | أوقات اليوم: `{ open, reason, gapHours, slots:[{time, available, reason}] }` |
+| POST | `/bookings` | إنشاء حجز. `multipart/form-data`: `data` (JSON) + `photos[]` (حتى 5) + `designFiles[]`، أو JSON بدون ملفات |
+| GET | `/store/categories` | التصنيفات مع عدد المنتجات |
+| GET | `/store/products?category=&q=&featured=&sort=new\|price_asc\|price_desc\|discount` | المنتجات |
+| GET | `/store/products/:slug` | منتج + منتجات مشابهة |
+| POST | `/store/orders` | `{ name, phone, address, notes?, items:[{productId, quantity}] }` |
+| GET | `/corporate/services` | خدمات الشركات (ANNUAL / URGENT) |
+| POST | `/corporate/requests` | طلب شركة. `multipart`: `data` (JSON) + `commercialRegister` + `license` |
+
+**جسم الحجز (`data`)**: الحقول المشتركة هي `type, name, phone, locationText, lat?, lng?, floor?, date, time, notes?` إضافة إلى `details` حسب النوع:
+
+| type | حقول إضافية |
+|---|---|
+| `INSPECTION` | `zone: INSIDE_AMMAN\|OUTSIDE_AMMAN`, `urgency: NORMAL\|EMERGENCY`, `details: { faultType, description }` |
+| `PAINTING` | `details: { paintType, jobKind: NEW\|RENEW, rooms, area, colors?, decorations }` |
+| `CONSTRUCTION` | `lat, lng` مطلوبة، `details: { tiles, buildingType: HOUSE\|APARTMENT\|VILLA\|COMMERCIAL, landArea, buildArea, floors, hasDesign }` + `designFiles` عند `hasDesign` |
+| `METALWORK` | `details: { workType, hasDesign, dimensions, quantity }` + `designFiles` عند `hasDesign` |
+| `GENERAL` | `details: { description }` |
+
+**جسم طلب الشركة**: `type: ANNUAL|URGENT, companyName, contactName, managerPhone, maintenancePhone, locationText, lat?, lng?, services: [key], notes?`، ويضيف `URGENT` الحقول `workLocation, productionImpact: NO_STOP_NEEDED|CANNOT_STOP|PARTIAL_STOP, productionLineAffected, urgencyLevel: LOW|MEDIUM|HIGH|CRITICAL`.
+
+استجابة الإنشاء (حجز / طلب / طلب شركة): `{ id, number, ref, status, message, whatsapp: { link, sent }, ... }`.
+
+### المصادقة
+
+| Method | المسار | الوصف |
+|---|---|---|
+| POST | `/auth/admin/login` | `{ email, password }` ويضبط كوكي `vj_admin` |
+| POST | `/auth/admin/logout` | |
+| GET | `/auth/admin/me` | |
+| POST | `/auth/admin/password` | `{ current, next }` |
+| GET | `/auth/customer/methods` | طرق الدخول المتاحة |
+| POST | `/auth/customer/login` | `{ phone, secret }`، حيث `secret` هو كلمة المرور أو رقم مرجع حجز/طلب |
+| POST | `/auth/customer/otp/request` | `{ phone }`، ويُرسل الرمز عبر واتساب Cloud API. في التطوير يُعاد `devCode` |
+| POST | `/auth/customer/otp/verify` | `{ phone, code }` |
+| POST | `/auth/customer/logout` | |
+| GET | `/auth/customer/me` | |
+| POST | `/auth/customer/password` | `{ password }` تعيين كلمة مرور |
+
+### العميل (كوكي `vj_customer`)
+
+| Method | المسار | الوصف |
+|---|---|---|
+| GET | `/account/overview` | الحجوزات، الطلبات، طلبات الشركات، العقود، الملفات (عروض الأسعار/التقييم)، الدفعات، والملخص المالي |
+
+### الأدمن (كوكي `vj_admin`) — تحت `/admin`
+
+| المسار | العمليات |
+|---|---|
+| `/dashboard/stats` | GET: إحصائيات اليوم والشهر وآخر النشاطات |
+| `/dashboard/events` | GET: بث لحظي SSE (`event: activity`) للطلبات الجديدة |
+| `/bookings` | GET: قائمة بفلاتر `status, type, urgency, technicianId, from, to, q` |
+| `/bookings/calendar?month=YYYY-MM` | GET: حجوزات الشهر للتقويم |
+| `/bookings/slots?date=&exclude=` | GET: أوقات متاحة لإعادة الجدولة |
+| `/bookings/:id` | GET / PATCH (`status, technicianId, date+time, overrideHours, quotedAmount, adminNotes, urgency, notify`) / DELETE |
+| `/bookings/:id/whatsapp` | POST `{ to: admin\|customer }`: إعادة إرسال |
+| `/technicians` | GET / POST، و `/technicians/:id` PATCH |
+| `/orders` | GET بفلاتر `status, q, from, to`، و `/orders/:id` GET / PATCH (`status, notify`) / DELETE |
+| `/orders/:id/whatsapp` | POST: إعادة إرسال واتساب |
+| `/store/categories` | GET / POST، و `/:id` PATCH / DELETE |
+| `/store/products` | GET / POST، و `/:id` GET / PATCH / DELETE |
+| `/store/products/:id/media` | POST `multipart files[]`، و `/:mediaId` DELETE، و `/order` PUT `{ ids }` |
+| `/corporate/requests` | GET، و `/:id` GET / PATCH، و `/:id/whatsapp` POST |
+| `/corporate/requests/:id/contract` | POST `{ title, startDate, endDate, value, reminderDays?, notes? }`: تحويل إلى عقد نشط |
+| `/corporate/contracts` | GET (`status, expiring=true`)، و `/:id` PATCH / DELETE |
+| `/files` | POST `multipart`: `file` (PDF) + `kind, title, amount?, notify` + أحد `customerId, bookingId, orderId, corporateRequestId, contractId`. يظهر الملف في صفحة العميل ويُرسل رابطه عبر واتساب |
+| `/finance/customers` | GET: لكل عميل المطلوب والمدفوع والمتبقي (`q, due=true`) مع الإجماليات |
+| `/finance/customers/:id` | GET: الملخص وسجل الدفعات |
+| `/finance/payments` | POST: إضافة دفعة يدويًا، و `/:id` DELETE |
+| `/finance/export?kind=customers\|payments` | GET: تصدير CSV (UTF-8 مع BOM ليفتح في Excel) |
+| `/customers` | GET، و `/:id` GET (السجل الكامل) / PATCH |
+| `/settings` | GET / PUT (الحقول المتغيرة فقط) |
+| `/logs/whatsapp`، `/logs/audit` | GET |
+
+---
+
+## الاختبارات
+
+اختبارات Jest + Supertest لمسارات الحجز والطلب والشركات، وتشمل قاعدة الساعات الثلاث والحجز المتزامن وحساب الرسوم ورسالة واتساب وخصم المخزون وإرجاعه والملفات والمالية ودخول العميل.
+
+```bash
+createdb verjar_test
+cd server
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/verjar_test npm test
+```
+
+تطبّق الاختبارات الـ migrations على قاعدة الاختبار وتفرّغ جداولها قبل كل اختبار، ولهذا ترفض أي رابط لا يحتوي اسمه على `test`.
+
+---
+
+## هيكل المشروع
+
+```
+PROJECT_TREE
+```
