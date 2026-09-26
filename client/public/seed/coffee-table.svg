@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>طاولة قهوة</title><rect width="800" height="600" fill="#efe6d3"/><rect y="440" width="800" height="160" fill="#e4d7bb"/>
+<ellipse cx="400" cy="472" rx="250" ry="18" fill="#cdbd9b"/>
+<rect x="150" y="300" width="500" height="28" rx="8" fill="#a8754a"/>
+<rect x="150" y="320" width="500" height="10" fill="#8c5f3a"/>
+<g fill="#2b2f2d"><path d="M190 330h18l-26 136h-16z"/><path d="M610 330h-18l26 136h16z"/><path d="M270 330h14l-14 120h-12z"/><path d="M530 330h-14l14 120h12z"/></g>
+<rect x="210" y="400" width="380" height="14" rx="4" fill="#8c5f3a"/>
+<rect x="250" y="376" width="110" height="24" rx="3" fill="#1f3a2e"/><rect x="262" y="360" width="90" height="16" rx="3" fill="#caa96a"/>
+<path d="M420 300c0-40 60-40 60 0z" fill="#33684b"/><rect x="470" y="262" width="60" height="38" rx="8" fill="#f7f1e3"/><rect x="526" y="272" width="16" height="16" rx="8" fill="none" stroke="#f7f1e3" stroke-width="6"/>
+</svg>

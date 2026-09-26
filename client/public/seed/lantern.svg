@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>فانوس معدني</title><rect width="800" height="600" fill="#efe6d3"/><rect y="440" width="800" height="160" fill="#e4d7bb"/>
+<ellipse cx="400" cy="486" rx="150" ry="14" fill="#cdbd9b"/>
+<circle cx="400" cy="92" r="22" fill="none" stroke="#2b2f2d" stroke-width="10"/>
+<path d="M330 150h140l-40-40h-60z" fill="#2b2f2d"/><rect x="320" y="150" width="160" height="16" fill="#1f3a2e"/>
+<rect x="336" y="166" width="128" height="260" fill="#f3e2b6"/>
+<circle cx="400" cy="300" r="70" fill="#f7ecd0"/>
+<path d="M400 250c-22 30-18 60 0 70 18-10 22-40 0-70z" fill="#caa96a"/><rect x="392" y="318" width="16" height="50" fill="#f7f1e3"/>
+<g fill="#1f3a2e"><rect x="330" y="166" width="12" height="260"/><rect x="458" y="166" width="12" height="260"/><rect x="394" y="166" width="12" height="80"/><rect x="336" y="240" width="128" height="6"/></g>
+<rect x="316" y="426" width="168" height="22" fill="#1f3a2e"/><rect x="336" y="448" width="128" height="30" fill="#2b2f2d"/>
+</svg>

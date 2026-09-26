@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>لوحة جدارية معدنية</title><rect width="800" height="600" fill="#efe6d3"/><rect y="500" width="800" height="100" fill="#e4d7bb"/>
+<rect x="170" y="90" width="460" height="330" fill="#2b2f2d"/><rect x="186" y="106" width="428" height="298" fill="#f7f1e3"/>
+<circle cx="500" cy="190" r="44" fill="#caa96a"/>
+<path d="M186 404 330 230l90 100 60-60 134 134z" fill="#1f3a2e"/>
+<path d="M330 230l50 56-40 28-60-24z" fill="#33684b"/>
+<path d="M186 404h428v-40c-80-30-160 10-230-4s-120 10-198 20z" fill="#a8754a" opacity=".85"/>
+<rect x="394" y="60" width="12" height="30" fill="#2b2f2d"/><circle cx="400" cy="56" r="8" fill="#2b2f2d"/>
+<rect x="300" y="440" width="200" height="60" fill="#e4d7bb"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>أحواض زراعة</title><rect width="800" height="600" fill="#efe6d3"/><rect y="440" width="800" height="160" fill="#e4d7bb"/>
+<ellipse cx="400" cy="480" rx="300" ry="16" fill="#cdbd9b"/>
+<g fill="#27533c"><path d="M230 300c-40-80-10-150 0-170 10 20 40 90 0 170z"/><path d="M220 300c-70-40-90-100-90-120 30 10 90 40 90 120z"/><path d="M240 300c70-40 90-100 90-120-30 10-90 40-90 120z"/></g>
+<path d="M150 300h160l-20 180H170z" fill="#2b2f2d"/><rect x="144" y="292" width="172" height="18" fill="#3d4441"/>
+<g fill="#33684b"><circle cx="420" cy="310" r="40"/><circle cx="380" cy="330" r="30"/><circle cx="460" cy="334" r="30"/></g>
+<rect x="360" y="340" width="120" height="140" fill="#a8754a"/><rect x="352" y="332" width="136" height="16" fill="#8c5f3a"/>
+<g fill="#1f3a2e"><rect x="596" y="200" width="8" height="160"/><ellipse cx="578" cy="240" rx="22" ry="10" transform="rotate(-30 578 240)"/><ellipse cx="622" cy="270" rx="22" ry="10" transform="rotate(30 622 270)"/><ellipse cx="578" cy="300" rx="22" ry="10" transform="rotate(-30 578 300)"/><ellipse cx="600" cy="196" rx="10" ry="20"/></g>
+<rect x="540" y="360" width="120" height="120" fill="#33684b"/><rect x="532" y="352" width="136" height="16" fill="#1f3a2e"/>
+</svg>

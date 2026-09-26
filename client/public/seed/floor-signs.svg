@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>ملصقات أرضية إرشادية</title><rect width="800" height="600" fill="#e4d7bb"/>
+<path d="M0 360h800v60H0z" fill="#caa96a"/>
+<g fill="#2b2f2d"><path d="M40 360h50l-40 60H0v-10zM150 360h60l-40 60h-60zM270 360h60l-40 60h-60zM390 360h60l-40 60h-60zM510 360h60l-40 60h-60zM630 360h60l-40 60h-60zM750 360h50v10l-30 50h-60z"/></g>
+<circle cx="220" cy="190" r="110" fill="#1f3a2e"/><circle cx="220" cy="190" r="92" fill="#f7f1e3"/>
+<path d="M170 190h70v-36l52 36-52 36v-36h-70z" fill="#1f3a2e" transform="rotate(180 220 190)"/>
+<rect x="400" y="80" width="340" height="220" rx="12" fill="#33684b"/>
+<rect x="420" y="100" width="300" height="180" rx="8" fill="none" stroke="#f7f1e3" stroke-width="8"/>
+<circle cx="520" cy="160" r="20" fill="#f7f1e3"/><path d="M504 188h32l14 60h-20l-10-36-10 36h-20z" fill="#f7f1e3"/>
+<path d="M590 190h80v-24l40 40-40 40v-24h-80z" fill="#f7f1e3"/>
+<g fill="#33684b" opacity=".5"><rect x="40" y="480" width="120" height="30" rx="4"/><rect x="220" y="480" width="120" height="30" rx="4"/><rect x="400" y="480" width="120" height="30" rx="4"/><rect x="580" y="480" width="120" height="30" rx="4"/></g>
+</svg>

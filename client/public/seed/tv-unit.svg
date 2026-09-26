@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>وحدة تلفاز</title><rect width="800" height="600" fill="#efe6d3"/><rect y="440" width="800" height="160" fill="#e4d7bb"/>
+<ellipse cx="400" cy="478" rx="280" ry="14" fill="#cdbd9b"/>
+<rect x="240" y="80" width="320" height="190" rx="8" fill="#2b2f2d"/><rect x="252" y="92" width="296" height="166" fill="#3d4441"/>
+<path d="M252 92h120l-80 166h-40z" fill="#474f4b"/>
+<rect x="130" y="330" width="540" height="130" rx="6" fill="#a8754a"/>
+<rect x="130" y="330" width="540" height="12" fill="#8c5f3a"/>
+<g fill="#8c5f3a"><rect x="148" y="356" width="160" height="88"/><rect x="492" y="356" width="160" height="88"/></g>
+<rect x="320" y="356" width="160" height="88" fill="#1f3a2e"/><rect x="336" y="410" width="60" height="24" rx="3" fill="#33684b"/><rect x="410" y="400" width="54" height="34" rx="3" fill="#caa96a"/>
+<g fill="#f7f1e3"><rect x="220" y="396" width="24" height="6" rx="3"/><rect x="556" y="396" width="24" height="6" rx="3"/></g>
+<g fill="#2b2f2d"><rect x="150" y="460" width="12" height="20"/><rect x="638" y="460" width="12" height="20"/></g>
+<rect x="580" y="282" width="32" height="48" rx="4" fill="#33684b"/><path d="M596 282c-20-30 0-50 0-50s20 20 0 50z" fill="#27533c"/>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600"><title>طاولة عمل صناعية</title><rect width="800" height="600" fill="#efe6d3"/><rect y="440" width="800" height="160" fill="#e4d7bb"/>
+<ellipse cx="400" cy="484" rx="300" ry="14" fill="#cdbd9b"/>
+<rect x="130" y="90" width="540" height="170" fill="#3d4441"/>
+<g fill="#2b2f2d"><circle cx="170" cy="120" r="4"/><circle cx="210" cy="120" r="4"/><circle cx="250" cy="120" r="4"/><circle cx="170" cy="160" r="4"/><circle cx="210" cy="160" r="4"/><circle cx="250" cy="160" r="4"/></g>
+<g fill="#caa96a"><rect x="300" y="120" width="10" height="90" rx="3"/><rect x="340" y="120" width="10" height="70" rx="3"/><rect x="376" y="124" width="60" height="16" rx="3"/><rect x="398" y="140" width="16" height="70" rx="3"/></g>
+<path d="M480 120h60v24h-20v70h-20v-70h-20z" fill="#f7f1e3"/><circle cx="600" cy="170" r="30" fill="none" stroke="#caa96a" stroke-width="10"/>
+<rect x="110" y="280" width="580" height="30" fill="#a8754a"/><rect x="110" y="310" width="580" height="10" fill="#8c5f3a"/>
+<rect x="130" y="320" width="540" height="160" fill="#1f3a2e"/>
+<g fill="#33684b"><rect x="146" y="336" width="240" height="60"/><rect x="146" y="404" width="240" height="60"/><rect x="402" y="336" width="252" height="128"/></g>
+<g fill="#caa96a"><rect x="240" y="360" width="50" height="10" rx="5"/><rect x="240" y="428" width="50" height="10" rx="5"/><rect x="424" y="392" width="10" height="40" rx="5"/></g>
+<rect x="590" y="248" width="70" height="32" rx="4" fill="#2b2f2d"/>
+</svg>
