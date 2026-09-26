@@ -98,6 +98,7 @@ export type BookingRow = {
   technicianId: string | null;
   adminNotes: string | null;
   createdAt: string;
+  updatedAt: string;
   technician: { id: string; name: string } | null;
   _count?: { media: number };
 };
@@ -150,6 +151,7 @@ export type OrderRow = {
   discountTotal: number;
   total: number;
   createdAt: string;
+  updatedAt: string;
   _count?: { items: number };
 };
 
@@ -245,6 +247,7 @@ export type CorporateRow = {
   adminNotes: string | null;
   quotedAmount: number | null;
   createdAt: string;
+  updatedAt: string;
   services: { id?: string; name: string }[];
   _count?: { contracts: number };
 };

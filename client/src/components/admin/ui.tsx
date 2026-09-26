@@ -123,7 +123,7 @@ export function StatTile({
 }
 
 /** قائمة مفتاح/قيمة */
-export function DefList({ items, cols = 2 }: { items: ([ReactNode, ReactNode] | null | false)[]; cols?: 1 | 2 | 3 }) {
+export function DefList({ items, cols = 2 }: { items: ([ReactNode, ReactNode] | null | false | undefined | '' | 0)[]; cols?: 1 | 2 | 3 }) {
   return (
     <dl
       className={cx(
