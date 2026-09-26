@@ -182,12 +182,12 @@ export default function Home() {
             </ul>
           </div>
           <div className="flex flex-col gap-3 md:col-span-5 md:items-end">
-            <ButtonLink to="/corporate" size="lg" className="w-full md:w-auto">
-              اطلب عقد صيانة
+            <ButtonLink to="/corporate/annual" size="lg" className="w-full md:w-auto">
+              اطلب عقد صيانة سنوي
             </ButtonLink>
-            <ButtonA href={`tel:${settings.phone}`} variant="outline" size="lg" className="w-full md:w-auto">
-              <Icon name="phone" className="h-4 w-4" /> عطل عاجل؟ اتصل مباشرة
-            </ButtonA>
+            <ButtonLink to="/corporate/urgent" variant="outline" size="lg" className="w-full md:w-auto">
+              طلب صيانة عاجل لمنشأة
+            </ButtonLink>
           </div>
         </div>
       </section>
