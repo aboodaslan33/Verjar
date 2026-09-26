@@ -4,7 +4,7 @@ import { homeFor, useAuth } from '../../context/Auth';
 import { useCart } from '../../context/CartContext';
 import { useSite } from '../../context/SiteContext';
 import { useTheme } from '../../context/ThemeContext';
-import { cx, displayPhone } from '../../lib/format';
+import { cx } from '../../lib/format';
 import { Icon } from '../ui';
 import { Logo } from './Logo';
 
@@ -178,19 +178,6 @@ export function SiteHeader() {
                   </Link>
                 </div>
               )}
-            </li>
-            <li className="grid grid-cols-2 gap-2 pt-2">
-              <a href={`tel:${settings.phone}`} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-line font-medium">
-                <Icon name="phone" className="h-4 w-4" /> <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
-              </a>
-              <a
-                href={`https://wa.me/${settings.whatsappNumber}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1f7a4d] font-medium text-white"
-              >
-                <Icon name="whatsapp" className="h-4 w-4" /> واتساب
-              </a>
             </li>
           </ul>
         </nav>

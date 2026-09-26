@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -151,8 +151,6 @@ export default function Account() {
 }
 
 function AccountView({ customer }: { customer: CustomerMe }) {
-  const { logout } = useCustomer();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const tab = (TABS.find((t) => t.key === params.get('tab'))?.key ?? 'bookings') as TabKey;
   const { data, error, loading, reload } = useAsync(() => api.get<Overview>('/account/overview'), [customer.id]);
@@ -164,11 +162,6 @@ function AccountView({ customer }: { customer: CustomerMe }) {
     files: data?.files.length ?? 0,
     payments: data?.payments.length ?? 0,
   };
-
-  async function onLogout() {
-    await logout();
-    navigate('/login', { replace: true });
-  }
 
   return (
     <>
@@ -182,9 +175,6 @@ function AccountView({ customer }: { customer: CustomerMe }) {
               {customer.companyName && <span> · {customer.companyName}</span>}
             </p>
           </div>
-          <Button variant="outline" onClick={onLogout}>
-            <Icon name="logout" className="h-4 w-4" /> تسجيل الخروج
-          </Button>
         </div>
       </header>
 
