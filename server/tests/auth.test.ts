@@ -144,6 +144,17 @@ describe('الصلاحيات', () => {
     expect((await admin.get('/api/account/overview')).status).toBe(403);
   });
 
+  it('بريد الأدمن في صفحة الدخول العامة يُدخل للوحة التحكم', async () => {
+    await createAdmin();
+    const agent = request.agent(app);
+    const wrong = await agent.post('/api/auth/login').send({ identifier: 'admin@test.jo', password: 'wrong-pass' });
+    expect(wrong.status).toBe(401);
+    const res = await agent.post('/api/auth/login').send({ identifier: 'ADMIN@test.jo', password: 'Admin@12345' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.role).toBe('ADMIN');
+    expect((await agent.get('/api/admin/customers')).status).toBe(200);
+  });
+
   it('الأدمن الموقوف يفقد الوصول فورًا', async () => {
     const admin = await createAdmin();
     await prisma.user.updateMany({ data: { active: false } });

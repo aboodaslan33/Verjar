@@ -168,7 +168,10 @@ authRouter.post(
   }),
 );
 
-/** دخول العميل برقم الهاتف أو البريد + كلمة المرور */
+/**
+ * دخول برقم الهاتف أو البريد + كلمة المرور.
+ * بريد حساب إدارة (غير مستخدم لعميل) يُدخل للوحة التحكم مباشرة.
+ */
 authRouter.post(
   '/login',
   authLimiter,
@@ -191,6 +194,16 @@ authRouter.post(
     }
 
     const invalid = () => unauthorized('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة');
+    if ((!customer || customer.deletedAt) && identifier.includes('@')) {
+      const user = await prisma.user.findUnique({ where: { email: identifier.toLowerCase() } });
+      if (user) {
+        if (!user.active || !(await bcrypt.compare(password, user.passwordHash))) throw invalid();
+        const updatedUser = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+        setAuthCookie(res, principalOf(updatedUser));
+        await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });
+        return ok(res, adminPublic(updatedUser));
+      }
+    }
     if (!customer || customer.deletedAt) {
       await bcrypt.compare(password, DUMMY_HASH);
       throw invalid();
@@ -206,7 +219,7 @@ authRouter.post(
 
     const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
     setAuthCookie(res, principalOf(updated));
-    ok(res, customerPublic(updated));
+    return ok(res, customerPublic(updated));
   }),
 );
 

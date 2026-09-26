@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, Button, Input, PageLoader } from '../../components/ui';
 import { homeFor, useAuth } from '../../context/Auth';
 import { ApiError, api } from '../../lib/api';
-import type { CustomerMe } from '../../lib/types';
+import type { SessionUser } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 import { AuthShell, PasswordInput, linkClass, safeNext } from './shared';
 
@@ -36,9 +36,9 @@ export default function Login() {
     if (f.password) return;
     setBusy(true);
     try {
-      const me = await api.post<CustomerMe>('/auth/login', { identifier: identifier.trim(), password });
+      const me = await api.post<SessionUser>('/auth/login', { identifier: identifier.trim(), password });
       setUser(me);
-      navigate(next, { replace: true });
+      navigate(me.role === 'CUSTOMER' ? next : homeFor(me), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'NO_PASSWORD') setError({ message: err.message, noPassword: true });
