@@ -613,6 +613,7 @@ function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent
   const { refresh } = useCustomer();
   const { toast } = useToast();
   const [open, setOpen] = useState(Boolean(prominent));
+  const [current, setCurrent] = useState('');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [touched, setTouched] = useState(false);
@@ -621,23 +622,25 @@ function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent
 
   const e1 = pw.length < 8 ? 'كلمة المرور 8 أحرف على الأقل' : pw.length > 100 ? 'كلمة المرور طويلة جدًا' : undefined;
   const e2 = pw2 !== pw ? 'كلمتا المرور غير متطابقتين' : undefined;
+  const e0 = customer.hasPassword && !current ? 'أدخل كلمة المرور الحالية' : undefined;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setTouched(true);
     setServerErr(null);
-    if (e1 || e2) return;
+    if (e0 || e1 || e2) return;
     setBusy(true);
     try {
-      await api.post('/auth/customer/password', { password: pw });
+      await api.post('/auth/customer/password', { password: pw, ...(customer.hasPassword ? { current } : {}) });
       toast(customer.hasPassword ? 'تم تغيير كلمة المرور' : 'تم حفظ كلمة المرور');
+      setCurrent('');
       setPw('');
       setPw2('');
       setTouched(false);
       setOpen(false);
       await refresh();
     } catch (err) {
-      setServerErr(err instanceof ApiError ? err.fields.password ?? err.message : 'تعذر الحفظ');
+      setServerErr(err instanceof ApiError ? err.fields.password ?? err.fields.current ?? err.message : 'تعذر الحفظ');
     } finally {
       setBusy(false);
     }
@@ -668,7 +671,21 @@ function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent
           </button>
         )}
       </div>
-      <form noValidate onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
+      <form
+        noValidate
+        onSubmit={submit}
+        className={cx('mt-4 grid gap-3 sm:items-start', customer.hasPassword ? 'sm:grid-cols-[1fr_1fr_1fr_auto]' : 'sm:grid-cols-[1fr_1fr_auto]')}
+      >
+        {customer.hasPassword && (
+          <Input
+            label="كلمة المرور الحالية"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            error={touched ? e0 : undefined}
+          />
+        )}
         <Input label="كلمة المرور الجديدة" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} onBlur={() => pw && setTouched(true)} error={touched ? e1 : undefined} />
         <Input label="تأكيد كلمة المرور" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} error={touched ? e2 : undefined} />
         <Button type="submit" loading={busy} className="h-[50px] sm:mt-[1.875rem]">

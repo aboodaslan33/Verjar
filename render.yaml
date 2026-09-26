@@ -1,4 +1,4 @@
-# Render Blueprint — مجموعة فرجا (Farja Group)
+# Render Blueprint — فرجار قروب (Farjar Group)
 # الاستخدام: Render Dashboard → New → Blueprint → اختر هذا المستودع
 # بعد الإنشاء راجع قسم "النشر على Render" في README.md
 
@@ -49,7 +49,7 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_NAME
-        value: إدارة مجموعة فرجا
+        value: إدارة فرجار قروب
       # لا تُنشأ بيانات تجريبية في الإنتاج
       - key: SEED_DEMO
         value: "false"
@@ -91,6 +91,13 @@ services:
       - path: /*
         name: X-Frame-Options
         value: DENY
+      # أمان إضافي: HTTPS دائمًا، وتقييد صلاحيات المتصفح (الموقع يحتاج الموقع الجغرافي فقط)
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: Permissions-Policy
+        value: geolocation=(self), camera=(), microphone=(), payment=(), usb=()
     routes:
       # تمرير الـ API للسيرفر (نفس الدومين → كوكيز httpOnly تعمل على كل المتصفحات)
       # عدّل الرابط إن كان اسم خدمة الـ API مختلفًا

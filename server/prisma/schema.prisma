@@ -1,4 +1,4 @@
-// مجموعة فرجا (Farja Group) — مخطط قاعدة البيانات
+// فرجار قروب (Farjar Group) — مخطط قاعدة البيانات
 // PostgreSQL + Prisma
 
 generator client {

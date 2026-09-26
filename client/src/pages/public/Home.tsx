@@ -50,7 +50,7 @@ export default function Home() {
       <section className="border-b border-line bg-surface">
         <div className="container grid gap-10 py-14 md:py-20 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-7">
-            <p className="eyebrow">مجموعة فرجا — مقاولات وصيانة</p>
+            <p className="eyebrow">فرجار قروب — مقاولات وصيانة</p>
             <h1 className="mt-3 text-3xl leading-tight sm:text-4xl md:text-5xl md:leading-tight">
               {settings.heroTitle}
             </h1>

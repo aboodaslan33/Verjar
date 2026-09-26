@@ -6,7 +6,7 @@ import { prisma } from './lib/prisma';
 const app = createApp();
 
 const server = app.listen(env.PORT, () => {
-  console.log(`مجموعة فرجا API يعمل على المنفذ ${env.PORT} (${env.NODE_ENV})`);
+  console.log(`فرجار قروب API يعمل على المنفذ ${env.PORT} (${env.NODE_ENV})`);
   console.log(`واتساب: ${env.waCloudEnabled ? 'Cloud API' : 'روابط wa.me'} | الملفات: ${env.cloudinaryEnabled ? 'Cloudinary' : 'محلي'}`);
   if (env.isProd && !env.cloudinaryEnabled) {
     console.warn('تحذير: CLOUDINARY_URL غير مضبوط — الملفات المرفوعة ستضيع عند إعادة تشغيل الخدمة على Render');

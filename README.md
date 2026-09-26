@@ -1,6 +1,6 @@
-# مجموعة فرجا (Farja Group)
+# فرجار قروب (Farjar Group)
 
-منصة مجموعة فرجا: حجوزات خدمات البناء والصيانة والدهان والأعمال المعدنية، طلبات وعقود صيانة الشركات، متجر منتجات، صفحة للعميل، ولوحة تحكم كاملة للإدارة.
+منصة فرجار قروب: حجوزات خدمات البناء والصيانة والدهان والأعمال المعدنية، طلبات وعقود صيانة الشركات، متجر منتجات، صفحة للعميل، ولوحة تحكم كاملة للإدارة.
 الواجهة بالعربية (RTL) بالكامل، والمشروع جاهز للنشر على Render.
 
 - **Backend:** Node.js 20+ · Express · TypeScript · Prisma · PostgreSQL
@@ -51,7 +51,7 @@ npm run dev
 ```
 
 - الموقع: http://localhost:5173
-- لوحة التحكم: http://localhost:5173/admin/login — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا في التطوير `farjarweb@gmail.com` / `FarjaGroup@2026`)
+- لوحة التحكم: http://localhost:5173/admin/login — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا في التطوير `farjarweb@gmail.com` / `FarjarGroup@2026`)
 - حساب عميل: أنشئه من http://localhost:5173/register ثم ادخل من http://localhost:5173/login (بالهاتف أو البريد + كلمة المرور)
 - عميل تجريبي (من `npm run seed`): الهاتف `0791234567` وكلمة المرور `Demo@12345`
 
@@ -86,6 +86,7 @@ npm run dev
 | `COOKIE_SAMESITE` | | `lax` (الافتراضي، عندما تمرر الواجهة `/api` عبر rewrite)، أو `none` إذا كانت الواجهة والـ API على دومينين مختلفين |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | ✔ في الإنتاج | حساب الأدمن. عند كل تشغيل للـ seed: يُنشأ إن لم يوجد، وتُحدَّث كلمة المرور إن تغيّرت. `ADMIN_EMAIL` افتراضيًا `farjarweb@gmail.com`. في الإنتاج بدون `ADMIN_PASSWORD` لا يُنشأ الحساب |
 | `SEED_DEMO` | | `false` لتخطي البيانات التجريبية |
+| `TRUST_PROXY` | | عدد البروكسيات أمام السيرفر (افتراضي `1` على Render). إذا ظهرت رسالة "محاولات كثيرة" لكل المستخدمين معًا فالقيمة أقل من اللازم |
 | `ADMIN_WHATSAPP` | | رقم واتساب الإدارة الافتراضي بصيغة دولية بدون `+` (`962780192930`)، ويمكن تغييره من الإعدادات |
 | `CLOUDINARY_URL` | ✔ إنتاج | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
 | `CLOUDINARY_FOLDER` | | المجلد في Cloudinary (افتراضي `verjar`) |
@@ -190,7 +191,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 مثال رسالة طلب المتجر:
 
 ```
-طلب جديد #1042 — مجموعة فرجا
+طلب جديد #1042 — فرجار قروب
 العميل: سارة خليل  الهاتف: 0771234567
 العنوان: عمّان — عبدون
 المنتجات:
@@ -259,6 +260,8 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 الجلسة في كوكي واحد `vj_session` (httpOnly، `Secure` في الإنتاج، `SameSite` حسب `COOKIE_SAMESITE`) لمدة 30 يومًا، ويُعاد إصداره تلقائيًا بعد يوم من آخر إصدار. لا يُخزَّن أي توكن في localStorage.
 أي طلب يغيّر البيانات من متصفح يجب أن يأتي من `CLIENT_URL` أو من دومين الـ API نفسه (فحص `Origin`/`Referer`).
+الجلسة تحمل بصمة كلمة المرور وتُتحقق من قاعدة البيانات مع كل طلب: تغيير كلمة المرور أو إعادة تعيينها أو إيقاف الحساب يُنهي كل الجلسات الأخرى فورًا.
+حدود الدخول: 10 محاولات كل 15 دقيقة لكل IP، و10 محاولات فاشلة كل 15 دقيقة لكل حساب (هاتف/بريد).
 
 | Method | المسار | الوصف |
 |---|---|---|
@@ -273,7 +276,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 | POST | `/auth/admin/password` | `{ current, next }` |
 | POST | `/auth/customer/logout` | |
 | GET | `/auth/customer/me` | |
-| POST | `/auth/customer/password` | `{ password }` تغيير كلمة المرور |
+| POST | `/auth/customer/password` | `{ current, password }` تغيير كلمة المرور (الحالية مطلوبة) |
 
 ### العميل (جلسة بدور `CUSTOMER`)
 

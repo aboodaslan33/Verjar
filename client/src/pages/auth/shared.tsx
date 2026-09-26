@@ -4,7 +4,9 @@ import { cx } from '../../lib/format';
 
 /** يقبل فقط مسارات داخلية لتجنب إعادة التوجيه لمواقع خارجية */
 export function safeNext(next: string | null, fallback = '/account') {
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/admin') ? next : fallback;
+  // يرفض // و /\ (تُعامل كرابط خارجي في المتصفح) وأي محارف تحكم
+  if (!next || !next.startsWith('/') || /^\/[\/\\]/.test(next) || /[\\\u0000-\u001f]/.test(next)) return fallback;
+  return next.startsWith('/admin') ? fallback : next;
 }
 
 export function AuthShell({ eyebrow, title, subtitle, children, footer }: { eyebrow: string; title: string; subtitle?: string; children: ReactNode; footer?: ReactNode }) {

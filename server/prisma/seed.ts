@@ -178,7 +178,7 @@ const PRODUCTS: {
 ];
 
 const DEFAULT_ADMIN_EMAIL = 'farjarweb@gmail.com';
-const DEV_ADMIN_PASSWORD = 'FarjaGroup@2026';
+const DEV_ADMIN_PASSWORD = 'FarjarGroup@2026';
 
 /**
  * حساب الأدمن من متغيرات البيئة عند كل تشغيل:
@@ -198,12 +198,15 @@ async function syncAdmin() {
     console.warn('! ADMIN_PASSWORD أقصر من 8 أحرف — لم يُحدَّث حساب الأدمن.');
     return;
   }
-  const name = process.env.ADMIN_NAME || 'إدارة مجموعة فرجا';
+  const name = process.env.ADMIN_NAME || 'إدارة فرجار قروب';
   const existing = await prisma.user.findUnique({ where: { email } });
   if (!existing) {
     await prisma.user.create({ data: { email, name, passwordHash: await bcrypt.hash(password, 11), role: 'ADMIN' } });
     console.log(`✓ أُنشئ حساب الأدمن: ${email}`);
     return;
+  }
+  if (existing.name !== name) {
+    await prisma.user.update({ where: { id: existing.id }, data: { name } });
   }
   if (!(await bcrypt.compare(password, existing.passwordHash))) {
     await prisma.user.update({
@@ -223,7 +226,8 @@ async function syncAdmin() {
 async function migrateBrandSettings() {
   const updates: [string, string, string][] = [
     ['email', 'info@verjar.jo', 'farjarweb@gmail.com'],
-    ['aboutTitle', 'فيرجار للمقاولات والصيانة', 'مجموعة فرجا للمقاولات والصيانة'],
+    ['aboutTitle', 'فيرجار للمقاولات والصيانة', 'فرجار قروب للمقاولات والصيانة'],
+    ['aboutTitle', 'مجموعة فرجا للمقاولات والصيانة', 'فرجار قروب للمقاولات والصيانة'],
   ];
   for (const [key, from, to] of updates) {
     const row = await prisma.setting.findUnique({ where: { key } });

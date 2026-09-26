@@ -36,7 +36,7 @@ describe('POST /api/v1/store/orders', () => {
     expect(d.subtotal).toBe(100);
     expect(d.discountTotal).toBe(10);
     expect(d.total).toBe(90);
-    expect(d.message).toContain(`طلب جديد #${d.number} — مجموعة فرجا`);
+    expect(d.message).toContain(`طلب جديد #${d.number} — فرجار قروب`);
     expect(d.message).toContain('- كرسي حديقة × 2 = 90 د.أ (بعد خصم 10%)');
     expect(d.message).toContain('المجموع قبل الخصم: 100 د.أ');
     expect(d.message).toContain('الخصم: 10 د.أ');

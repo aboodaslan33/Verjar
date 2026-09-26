@@ -18,7 +18,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   workEnd: '18:00',
   bookingGapHours: 3,
   maxDaysAhead: 60,
-  aboutTitle: 'مجموعة فرجا للمقاولات والصيانة',
+  aboutTitle: 'فرجار قروب للمقاولات والصيانة',
   aboutContent: '',
   heroTitle: 'صيانة وبناء ودهان في عمّان وكل المحافظات',
   heroSubtitle: 'احجز كشفًا على موقعك، واستلم سعرًا واضحًا قبل البدء.',

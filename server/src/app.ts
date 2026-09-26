@@ -22,7 +22,7 @@ import { LOCAL_UPLOAD_DIR } from './services/upload.service';
 
 export function createApp() {
   const app = express();
-  app.set('trust proxy', 1);
+  app.set('trust proxy', env.TRUST_PROXY);
   app.disable('x-powered-by');
 
   app.use(

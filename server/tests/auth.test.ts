@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
+import { passwordFingerprint } from '../src/middleware/auth';
 import { app, createAdmin, nextWorkingDate, prisma, resetDb } from './helpers';
 
 const account = { name: 'سارة خليل', phone: '0791112233', email: 'Sara@Example.com', password: 'Pass@1234' };
@@ -184,8 +185,15 @@ describe('ربط الحجز بالحساب', () => {
 describe('الجلسة', () => {
   it('تتجدد تلقائيًا بعد يوم من إصدارها', async () => {
     const reg = await request(app).post('/api/auth/register').send(account);
+    const row = await prisma.customer.findUniqueOrThrow({ where: { id: reg.body.data.id } });
     const old = jwt.sign(
-      { sub: reg.body.data.id, role: 'CUSTOMER', name: account.name, iat: Math.floor(Date.now() / 1000) - 2 * 86400 },
+      {
+        sub: reg.body.data.id,
+        role: 'CUSTOMER',
+        name: account.name,
+        pv: passwordFingerprint(row.passwordHash),
+        iat: Math.floor(Date.now() / 1000) - 2 * 86400,
+      },
       process.env.JWT_SECRET!,
       { expiresIn: '28d' },
     );
@@ -223,5 +231,72 @@ describe('CSRF (فحص المصدر)', () => {
     // القراءة لا تتأثر
     const get = await request(app).get('/api/site/settings').set('Origin', 'https://evil.example');
     expect(get.status).not.toBe(403);
+  });
+});
+
+describe('أمان الجلسات وكلمات المرور', () => {
+  it('تغيير كلمة المرور يتطلب الحالية ويُنهي الجلسات الأخرى ويُبقي الحالية', async () => {
+    const a = request.agent(app);
+    const b = request.agent(app);
+    await a.post('/api/auth/register').send(account);
+    await b.post('/api/auth/login').send({ identifier: account.phone, password: account.password });
+    expect((await b.get('/api/auth/me')).status).toBe(200);
+
+    const noCurrent = await a.post('/api/auth/customer/password').send({ password: 'NewPass@2027' });
+    expect(noCurrent.status).toBe(400);
+    const wrong = await a.post('/api/auth/customer/password').send({ current: 'nope-nope', password: 'NewPass@2027' });
+    expect(wrong.status).toBe(400);
+    const ok = await a.post('/api/auth/customer/password').send({ current: account.password, password: 'NewPass@2027' });
+    expect(ok.status).toBe(200);
+
+    expect((await a.get('/api/auth/me')).status).toBe(200);
+    expect((await b.get('/api/auth/me')).status).toBe(401);
+    const relog = await request(app).post('/api/auth/login').send({ identifier: account.phone, password: 'NewPass@2027' });
+    expect(relog.status).toBe(200);
+  });
+
+  it('إعادة تعيين كلمة المرور من الأدمن تُنهي جلسة العميل', async () => {
+    const c = request.agent(app);
+    const reg = await c.post('/api/auth/register').send(account);
+    const admin = await createAdmin();
+    await admin.patch(`/api/admin/customers/${reg.body.data.id}`).send({ resetPassword: true });
+    expect((await c.get('/api/account/overview')).status).toBe(401);
+  });
+
+  it('التوكن بخوارزمية none أو بدون بصمة كلمة المرور لا يُقبل', async () => {
+    const reg = await request(app).post('/api/auth/register').send(account);
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const body = Buffer.from(JSON.stringify({ sub: reg.body.data.id, role: 'CUSTOMER', name: 'x', exp: 9999999999 })).toString('base64url');
+    expect((await request(app).get('/api/auth/me').set('Cookie', `vj_session=${header}.${body}.`)).status).toBe(401);
+    const noPv = jwt.sign({ sub: reg.body.data.id, role: 'CUSTOMER', name: 'x' }, process.env.JWT_SECRET!, { expiresIn: '1d' });
+    expect((await request(app).get('/api/auth/me').set('Cookie', `vj_session=${noPv}`)).status).toBe(401);
+  });
+
+  it('تصدير CSV محمي من حقن الصيغ', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/register').send({ ...account, name: '=HYPERLINK("http://evil","x")' });
+    const admin = await createAdmin();
+    const csv = await admin.get('/api/admin/finance/export').query({ kind: 'customers' });
+    expect(csv.text).toContain(`"'=HYPERLINK(""http://evil"",""x"")"`);
+    expect(csv.text).not.toMatch(/(^|,)=HYPERLINK/m);
+  });
+});
+
+describe('الإعدادات', () => {
+  it('ترفض روابط غير https وقيمة قديمة غير صالحة لا تُسقط باقي الإعدادات', async () => {
+    const admin = await createAdmin();
+    const bad = await admin.put('/api/admin/settings').send({ mapUrl: 'javascript:alert(1)' });
+    expect(bad.status).toBe(400);
+    const badFb = await admin.put('/api/admin/settings').send({ facebook: 'http://facebook.com/x' });
+    expect(badFb.status).toBe(400);
+    const good = await admin.put('/api/admin/settings').send({ mapUrl: 'https://www.google.com/maps/embed?pb=abc', inspectionFeeInside: 17 });
+    expect(good.status).toBe(200);
+
+    await prisma.setting.update({ where: { key: 'mapUrl' }, data: { value: 'javascript:alert(1)' } });
+    const { invalidateSettingsCache } = await import('../src/services/settings.service');
+    invalidateSettingsCache();
+    const pub = await request(app).get('/api/site/settings');
+    expect(pub.body.data.mapUrl).toBe('');
+    expect(pub.body.data.inspectionFeeInside).toBe(17);
   });
 });

@@ -14,7 +14,9 @@ export const optionalDate = z
   .optional();
 
 export function csvEscape(v: unknown): string {
-  const s = v === null || v === undefined ? '' : String(v);
+  let s = v === null || v === undefined ? '' : String(v);
+  // حماية من حقن الصيغ في Excel (اسم عميل مثل =HYPERLINK(...)): تُعامل كنص. الأرقام السالبة تبقى أرقامًا
+  if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

@@ -38,6 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.post('/auth/logout').catch(() => undefined);
+    // مسودات النماذج تحوي بيانات شخصية (الاسم والهاتف والعنوان) — تُمسح عند الخروج
+    try {
+      for (const k of Object.keys(sessionStorage)) if (/^vj-(booking|corporate)-draft/.test(k)) sessionStorage.removeItem(k);
+    } catch {
+      // التخزين غير متاح
+    }
     setUser(null);
   }, []);
 

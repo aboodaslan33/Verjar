@@ -1,7 +1,8 @@
+import { createHmac } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
-import { HttpError, forbidden, unauthorized } from '../lib/http';
+import { forbidden, unauthorized } from '../lib/http';
 import { prisma } from '../lib/prisma';
 
 export type Role = 'ADMIN' | 'STAFF' | 'CUSTOMER';
@@ -38,8 +39,26 @@ function cookieOptions(maxAgeS: number) {
   } as const;
 }
 
-export function setAuthCookie(res: Response, payload: AuthPayload) {
-  const token = jwt.sign({ sub: payload.sub, role: payload.role, name: payload.name }, env.JWT_SECRET, {
+/**
+ * بصمة كلمة المرور داخل التوكن: عند تغيير كلمة المرور أو إعادة تعيينها
+ * تتغير البصمة فتُلغى كل الجلسات الأخرى فورًا.
+ */
+export function passwordFingerprint(passwordHash: string | null | undefined) {
+  return createHmac('sha256', env.JWT_SECRET).update(`pv:${passwordHash ?? ''}`).digest('base64url').slice(0, 16);
+}
+
+/** صاحب الجلسة كما في قاعدة البيانات */
+export type Principal = AuthPayload & { pv: string };
+
+export function principalOf(
+  row: { id: string; name: string; passwordHash: string | null } & ({ role: 'ADMIN' | 'STAFF' } | { role?: undefined }),
+): Principal {
+  return { sub: row.id, role: row.role ?? 'CUSTOMER', name: row.name, pv: passwordFingerprint(row.passwordHash) };
+}
+
+export function setAuthCookie(res: Response, p: Principal) {
+  const token = jwt.sign({ sub: p.sub, role: p.role, name: p.name, pv: p.pv }, env.JWT_SECRET, {
+    algorithm: 'HS256',
     expiresIn: SESSION_TTL_S,
   });
   res.cookie(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_S));
@@ -50,12 +69,12 @@ export function clearAuthCookie(res: Response) {
   for (const name of [SESSION_COOKIE, ADMIN_COOKIE, CUSTOMER_COOKIE]) res.clearCookie(name, opts);
 }
 
-type Decoded = AuthPayload & { iat: number; exp: number };
+type Decoded = AuthPayload & { pv?: string; iat: number; exp: number };
 
 function verify(token: string | undefined): Decoded | null {
   if (!token) return null;
   try {
-    const p = jwt.verify(token, env.JWT_SECRET) as Decoded;
+    const p = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as Decoded;
     return p && typeof p.sub === 'string' && ['ADMIN', 'STAFF', 'CUSTOMER'].includes(p.role) ? p : null;
   } catch {
     return null;
@@ -63,18 +82,25 @@ function verify(token: string | undefined): Decoded | null {
 }
 
 /** يتأكد أن صاحب الجلسة ما زال موجودًا ومفعّلًا، ويعيد بياناته الحالية */
-export async function loadPrincipal(p: Pick<AuthPayload, 'sub' | 'role'>): Promise<AuthPayload | null> {
+export async function loadPrincipal(p: Pick<AuthPayload, 'sub' | 'role'>): Promise<Principal | null> {
   if (p.role === 'CUSTOMER') {
-    const c = await prisma.customer.findUnique({ where: { id: p.sub }, select: { id: true, name: true, deletedAt: true } });
-    return c && !c.deletedAt ? { sub: c.id, role: 'CUSTOMER', name: c.name } : null;
+    const c = await prisma.customer.findUnique({
+      where: { id: p.sub },
+      select: { id: true, name: true, passwordHash: true, deletedAt: true },
+    });
+    return c && !c.deletedAt ? principalOf(c) : null;
   }
-  const u = await prisma.user.findUnique({ where: { id: p.sub }, select: { id: true, name: true, role: true, active: true } });
-  return u && u.active ? { sub: u.id, role: u.role, name: u.name } : null;
+  const u = await prisma.user.findUnique({
+    where: { id: p.sub },
+    select: { id: true, name: true, role: true, active: true, passwordHash: true },
+  });
+  return u && u.active ? principalOf(u) : null;
 }
 
 /**
  * يقرأ الجلسة من الكوكي (إن وُجدت) ويضعها في req.auth — لا يرفض الطلب أبدًا.
- * التجديد التلقائي: بعد يوم من إصدار التوكن يُتحقق من الحساب ويُصدر توكن جديد لمدة 30 يومًا.
+ * - يتحقق من الحساب في قاعدة البيانات مع كل طلب: الحساب المحذوف أو الموقوف أو الذي تغيّرت كلمة مروره تنتهي جلسته فورًا
+ * - التجديد التلقائي: بعد يوم من إصدار التوكن يُصدر توكن جديد لمدة 30 يومًا
  */
 export async function attachSession(req: Request, res: Response, next: NextFunction) {
   try {
@@ -89,19 +115,16 @@ export async function attachSession(req: Request, res: Response, next: NextFunct
       if (cookies[SESSION_COOKIE] || cookies[ADMIN_COOKIE] || cookies[CUSTOMER_COOKIE]) clearAuthCookie(res);
       return next();
     }
-    const age = Math.floor(Date.now() / 1000) - p.iat;
-    if (legacy || age > REFRESH_AFTER_S) {
-      const fresh = await loadPrincipal(p);
-      if (!fresh) {
-        clearAuthCookie(res);
-        return next();
-      }
-      if (legacy) clearAuthCookie(res);
-      setAuthCookie(res, fresh);
-      req.auth = fresh;
-    } else {
-      req.auth = { sub: p.sub, role: p.role, name: p.name };
+    const fresh = await loadPrincipal(p);
+    // الكوكيز القديمة لا تحمل بصمة كلمة المرور — تُقبل مرة واحدة وتُستبدل
+    if (!fresh || fresh.role !== p.role || (!legacy && p.pv !== fresh.pv)) {
+      clearAuthCookie(res);
+      return next();
     }
+    const age = Math.floor(Date.now() / 1000) - p.iat;
+    if (legacy) clearAuthCookie(res);
+    if (legacy || age > REFRESH_AFTER_S || fresh.name !== p.name) setAuthCookie(res, fresh);
+    req.auth = { sub: fresh.sub, role: fresh.role, name: fresh.name };
     next();
   } catch (e) {
     next(e);
@@ -114,36 +137,16 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
-/** لوحة التحكم: الأدمن والموظفون فقط، مع التأكد أن الحساب ما زال مفعّلًا */
-export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  try {
-    if (!req.auth) return next(unauthorized());
-    if (!isAdminRole(req.auth.role)) return next(forbidden('هذه الصفحة للإدارة فقط'));
-    const fresh = await loadPrincipal(req.auth);
-    if (!fresh) {
-      clearAuthCookie(res);
-      return next(new HttpError(401, 'انتهت الجلسة أو تم إيقاف الحساب، سجّل الدخول مجددًا', 'UNAUTHORIZED'));
-    }
-    req.auth = fresh;
-    next();
-  } catch (e) {
-    next(e);
-  }
+/** لوحة التحكم: الأدمن والموظفون فقط (الحساب تم التحقق منه في attachSession) */
+export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
+  if (!req.auth) return next(unauthorized());
+  if (!isAdminRole(req.auth.role)) return next(forbidden('هذه الصفحة للإدارة فقط'));
+  next();
 }
 
 /** صفحات العميل: كل عميل يرى بياناته فقط (req.auth.sub = معرّف العميل) */
-export async function requireCustomer(req: Request, res: Response, next: NextFunction) {
-  try {
-    if (!req.auth) return next(unauthorized());
-    if (req.auth.role !== 'CUSTOMER') return next(forbidden('هذه الصفحة لحسابات العملاء'));
-    const fresh = await loadPrincipal(req.auth);
-    if (!fresh) {
-      clearAuthCookie(res);
-      return next(new HttpError(401, 'انتهت الجلسة، سجّل الدخول مجددًا', 'UNAUTHORIZED'));
-    }
-    req.auth = fresh;
-    next();
-  } catch (e) {
-    next(e);
-  }
+export function requireCustomer(req: Request, _res: Response, next: NextFunction) {
+  if (!req.auth) return next(unauthorized());
+  if (req.auth.role !== 'CUSTOMER') return next(forbidden('هذه الصفحة لحسابات العملاء'));
+  next();
 }

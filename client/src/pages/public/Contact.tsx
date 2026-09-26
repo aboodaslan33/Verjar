@@ -131,13 +131,14 @@ export default function Contact() {
             </Button>
           </form>
 
-          {settings.mapUrl.trim() && (
+          {settings.mapUrl.trim().startsWith('https://') && (
             <div className="card overflow-hidden">
               <iframe
                 src={settings.mapUrl}
                 title="موقعنا على الخريطة"
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
+                sandbox="allow-scripts allow-same-origin allow-popups"
                 className="block aspect-[4/3] w-full border-0 sm:aspect-[16/9]"
               />
             </div>

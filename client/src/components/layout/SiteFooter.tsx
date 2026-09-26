@@ -62,7 +62,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-white/10">
         <div className="container flex flex-col gap-2 py-5 text-xs text-inverse-fg/60 sm:flex-row sm:items-center sm:justify-between">
-          <span>© {year} مجموعة فرجا (Farja Group). جميع الحقوق محفوظة.</span>
+          <span>© {year} فرجار قروب (Farjar Group). جميع الحقوق محفوظة.</span>
           <span className="flex gap-4">
             <Link to="/account" className="hover:text-primary">حسابي</Link>
             <Link to="/contact" className="hover:text-primary">تواصل</Link>

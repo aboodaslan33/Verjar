@@ -9,6 +9,8 @@ const schema = z.object({
   CLIENT_URL: z.string().default('http://localhost:5173'),
   PUBLIC_API_URL: z.string().default('http://localhost:4000'),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  /** عدد البروكسيات أمام السيرفر (لمعرفة IP العميل الحقيقي في حدود المحاولات) */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
   ADMIN_WHATSAPP: z.string().default('962780192930'),
   WA_TOKEN: z.string().optional().default(''),
   WA_PHONE_ID: z.string().optional().default(''),

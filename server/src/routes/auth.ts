@@ -5,8 +5,8 @@ import { audit } from '../lib/audit';
 import { HttpError, asyncHandler, badRequest, conflict, ok, unauthorized } from '../lib/http';
 import { normalizePhone } from '../lib/phone';
 import { prisma } from '../lib/prisma';
-import { clearAuthCookie, isAdminRole, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
-import { authLimiter } from '../middleware/rateLimit';
+import { clearAuthCookie, isAdminRole, principalOf, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
+import { accountLimiter, authLimiter } from '../middleware/rateLimit';
 import { nameField } from '../validators/common';
 
 export const authRouter = Router();
@@ -37,7 +37,7 @@ function adminPublic(u: { id: string; name: string; email: string; role: 'ADMIN'
 }
 
 /** هاش ثابت للمقارنة عند عدم وجود الحساب (زمن استجابة متقارب) */
-const DUMMY_HASH = bcrypt.hashSync('farja-dummy-password', 10);
+const DUMMY_HASH = bcrypt.hashSync('farjar-dummy-password', 10);
 const BCRYPT_ROUNDS = 11;
 
 /** رقم هاتف أردني فقط: 07XXXXXXXX (يقبل الأرقام العربية و +962) */
@@ -95,6 +95,7 @@ authRouter.post('/logout', (_req, res) => {
 authRouter.post(
   '/register',
   authLimiter,
+  accountLimiter('phone'),
   asyncHandler(async (req, res) => {
     const input = z
       .object({
@@ -161,7 +162,7 @@ authRouter.post(
         })
       : await prisma.customer.create({ data: { ...data, phone: input.phone } });
 
-    setAuthCookie(res, { sub: customer.id, role: 'CUSTOMER', name: customer.name });
+    setAuthCookie(res, principalOf(customer));
     await audit({ actorType: 'customer', action: existing ? 'register_claim' : 'register', entity: 'customer', entityId: customer.id });
     ok(res, customerPublic(customer), 201);
   }),
@@ -171,6 +172,7 @@ authRouter.post(
 authRouter.post(
   '/login',
   authLimiter,
+  accountLimiter('identifier'),
   asyncHandler(async (req, res) => {
     const { identifier, password } = z
       .object({
@@ -203,7 +205,7 @@ authRouter.post(
     if (!(await bcrypt.compare(password, customer.passwordHash))) throw invalid();
 
     const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
-    setAuthCookie(res, { sub: updated.id, role: 'CUSTOMER', name: updated.name });
+    setAuthCookie(res, principalOf(updated));
     ok(res, customerPublic(updated));
   }),
 );
@@ -228,7 +230,7 @@ authRouter.patch(
       if (other && other.id !== req.auth!.sub) throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email' });
     }
     const c = await prisma.customer.update({ where: { id: req.auth!.sub }, data: input });
-    if (input.name) setAuthCookie(res, { sub: c.id, role: 'CUSTOMER', name: c.name });
+    if (input.name) setAuthCookie(res, principalOf(c));
     ok(res, customerPublic(c));
   }),
 );
@@ -238,16 +240,17 @@ authRouter.patch(
 authRouter.post(
   '/admin/login',
   authLimiter,
+  accountLimiter('email'),
   asyncHandler(async (req, res) => {
     const { email, password } = z
-      .object({ email: z.string().trim().toLowerCase().email('بريد غير صالح'), password: z.string().min(1, 'كلمة المرور مطلوبة') })
+      .object({ email: z.string().trim().toLowerCase().email('بريد غير صالح'), password: z.string().min(1, 'كلمة المرور مطلوبة').max(100) })
       .parse(req.body);
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.active || !(await bcrypt.compare(password, user.passwordHash))) {
       throw unauthorized('البريد أو كلمة المرور غير صحيحة');
     }
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    setAuthCookie(res, { sub: user.id, role: user.role, name: user.name });
+    setAuthCookie(res, principalOf(user));
     await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });
     ok(res, adminPublic(user));
   }),
@@ -273,11 +276,14 @@ authRouter.post(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const { current, next } = z
-      .object({ current: z.string().min(1), next: z.string().min(8, 'كلمة المرور 8 أحرف على الأقل') })
+      .object({ current: z.string().min(1, 'أدخل كلمة المرور الحالية').max(100), next: passwordField })
       .parse(req.body);
     const user = await prisma.user.findUniqueOrThrow({ where: { id: req.auth!.sub } });
-    if (!(await bcrypt.compare(current, user.passwordHash))) throw badRequest('كلمة المرور الحالية غير صحيحة');
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(next, 11) } });
+    if (!(await bcrypt.compare(current, user.passwordHash))) throw badRequest('كلمة المرور الحالية غير صحيحة', { field: 'current' });
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(next, BCRYPT_ROUNDS) } });
+    // الجلسات الأخرى تنتهي (تغيّرت بصمة كلمة المرور) — الجلسة الحالية تُجدَّد
+    setAuthCookie(res, principalOf(updated));
+    await audit({ actorId: user.id, actorType: 'admin', action: 'password_change', entity: 'user', entityId: user.id });
     ok(res, { updated: true });
   }),
 );
@@ -303,8 +309,17 @@ authRouter.post(
   '/customer/password',
   requireCustomer,
   asyncHandler(async (req, res) => {
-    const { password } = z.object({ password: passwordField }).parse(req.body);
-    await prisma.customer.update({ where: { id: req.auth!.sub }, data: { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) } });
+    const { current, password } = z
+      .object({ current: z.string().max(100).optional(), password: passwordField })
+      .parse(req.body);
+    const c = await prisma.customer.findUniqueOrThrow({ where: { id: req.auth!.sub } });
+    // تغيير كلمة مرور موجودة يتطلب الحالية (حماية من جلسة مسروقة)
+    if (c.passwordHash && !(current && (await bcrypt.compare(current, c.passwordHash)))) {
+      throw badRequest('كلمة المرور الحالية غير صحيحة', { field: 'current' });
+    }
+    const updated = await prisma.customer.update({ where: { id: c.id }, data: { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) } });
+    setAuthCookie(res, principalOf(updated));
+    await audit({ actorType: 'customer', action: 'password_change', entity: 'customer', entityId: c.id });
     ok(res, { updated: true });
   }),
 );

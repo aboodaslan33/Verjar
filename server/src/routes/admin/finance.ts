@@ -202,7 +202,7 @@ financeRouter.get(
     }
     const date = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="farja-group-${kind}-${date}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="farjar-group-${kind}-${date}.csv"`);
     res.send(csv);
   }),
 );

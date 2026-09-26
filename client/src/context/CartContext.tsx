@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Product } from '../lib/types';
+import { useAuth } from './Auth';
 
 /** عنصر السلة — نسخة مختصرة من المنتج لعرضها دون طلب إضافي. الأسعار النهائية يحسبها السيرفر */
 export type CartItem = {
@@ -39,8 +40,27 @@ function load(): CartItem[] {
   }
 }
 
+const OWNER_KEY = 'vj-cart-owner';
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(load);
+  const { user, loading } = useAuth();
+
+  // السلة تخص حساب العميل: تُفرَّغ عند الخروج أو عند الدخول بحساب آخر (أجهزة مشتركة)
+  useEffect(() => {
+    if (loading) return;
+    const current = user?.role === 'CUSTOMER' ? user.id : null;
+    let owner: string | null = null;
+    try {
+      owner = localStorage.getItem(OWNER_KEY);
+      if (current) localStorage.setItem(OWNER_KEY, current);
+      else localStorage.removeItem(OWNER_KEY);
+    } catch {
+      // التخزين غير متاح
+    }
+    // سلة بدون مالك (من قبل هذا التحديث) تُنسب للعميل الحالي
+    if (owner && owner !== current) setItems([]);
+  }, [user, loading]);
 
   useEffect(() => {
     try {
