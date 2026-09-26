@@ -78,16 +78,21 @@ export default function Home() {
 
           <aside className="lg:col-span-5" aria-label="رسوم الكشف">
             <div className="card p-6">
-              <h2 className="text-base font-semibold">رسوم الكشف على الموقع</h2>
-              <dl className="mt-4 divide-y divide-line">
-                <div className="flex items-baseline justify-between py-3">
-                  <dt className="text-muted">داخل عمّان</dt>
-                  <dd className="text-2xl font-bold text-ink">{formatJOD(settings.inspectionFeeInside)}</dd>
-                </div>
-                <div className="flex items-baseline justify-between py-3">
-                  <dt className="text-muted">خارج عمّان</dt>
-                  <dd className="text-2xl font-bold text-ink">{formatJOD(settings.inspectionFeeOutside)}</dd>
-                </div>
+              <h2 className="text-base font-semibold">رسوم الكشف الفني</h2>
+              <p className="mt-1 text-sm text-muted">ثابتة لكل المحافظات</p>
+              <dl className="mt-3 divide-y divide-line">
+                {(
+                  [
+                    ['عادي', settings.inspectionFeeNormal],
+                    ['عاجل', settings.inspectionFeeUrgent],
+                    ['طارئ', settings.inspectionFeeEmergency],
+                  ] as const
+                ).map(([label, fee]) => (
+                  <div key={label} className="flex items-baseline justify-between py-3">
+                    <dt className="text-muted">{label}</dt>
+                    <dd className="text-2xl font-bold text-ink">{formatJOD(fee)}</dd>
+                  </div>
+                ))}
               </dl>
               <p className="mt-3 text-sm leading-relaxed text-muted">
                 تدفع رسوم الكشف مرة واحدة، وتستلم بعدها عرض سعر مكتوبًا للعمل كاملًا. لا يبدأ أي عمل قبل موافقتك.
@@ -105,7 +110,7 @@ export default function Home() {
             {[
               {
                 t: 'كشف على الموقع',
-                d: `فني يزورك في الموعد الذي تختاره ويعاين المشكلة. الرسوم ${formatJOD(settings.inspectionFeeInside)} داخل عمّان و${formatJOD(settings.inspectionFeeOutside)} خارجها.`,
+                d: `فني يزورك في الموعد الذي تختاره ويعاين المشكلة. رسوم الكشف الفني ${formatJOD(settings.inspectionFeeNormal)} في كل المحافظات، والكشف على الدهان ${formatJOD(settings.paintingFeeInside)} داخل عمّان.`,
               },
               { t: 'عرض سعر مكتوب', d: 'تستلم السعر وتفاصيل العمل والمواد على صفحتك في الموقع وعلى واتساب، قبل أي التزام.' },
               { t: 'تنفيذ بمواعيد', d: 'بعد موافقتك نحدد تاريخ البدء والتسليم، ومسؤول واحد يتابع معك حتى نهاية العمل.' },

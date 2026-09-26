@@ -7,6 +7,7 @@ import { useCart } from '../../context/CartContext';
 import { ApiError, api } from '../../lib/api';
 import { formatJOD, isValidPhone } from '../../lib/format';
 import type { OrderCreated } from '../../lib/types';
+import { prepareWhatsAppWindow } from '../../lib/whatsapp';
 import { useDocumentTitle } from '../../lib/useAsync';
 
 type Form = { name: string; phone: string; address: string; notes: string };
@@ -91,6 +92,7 @@ export default function Checkout() {
     }
 
     setSubmitting(true);
+    const wa = prepareWhatsAppWindow();
     try {
       const data = await api.post<OrderCreated>('/store/orders', {
         name: form.name.trim(),
@@ -102,7 +104,9 @@ export default function Checkout() {
       setResult(data);
       cart.clear();
       window.scrollTo({ top: 0 });
+      wa.open(data.whatsapp.link);
     } catch (err) {
+      wa.cancel();
       if (err instanceof ApiError) {
         const fe: Partial<Record<Field, string>> = {};
         for (const [k, msg] of Object.entries(err.fields)) {

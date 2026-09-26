@@ -75,6 +75,7 @@ export default function BookingDetail() {
         <>
           <StatusBadge status={b.status} />
           {b.urgency === 'EMERGENCY' && <Tag tone="danger">طارئ</Tag>}
+          {b.urgency === 'URGENT' && <Tag tone="brand">عاجل</Tag>}
           <span className="text-xs text-muted">
             المرجع <span className="ltr">{b.ref}</span> · أُنشئ {formatDate(b.createdAt, true)}
           </span>
@@ -283,6 +284,7 @@ function ManagePanel({ booking: b, techs, onSaved }: { booking: Booking; techs: 
         </Select>
         <Select label="الأولوية" value={urgency} onChange={(e) => setUrgency(e.target.value as Booking['urgency'])}>
           <option value="NORMAL">عادي</option>
+          <option value="URGENT">عاجل</option>
           <option value="EMERGENCY">طارئ</option>
         </Select>
         <Input

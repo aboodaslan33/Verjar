@@ -121,6 +121,7 @@ export default function Dashboard() {
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <StatusBadge status={b.status} />
                           {b.urgency === 'EMERGENCY' && <Tag tone="danger">{URGENCY_LABEL.EMERGENCY}</Tag>}
+                          {b.urgency === 'URGENT' && <Tag tone="brand">{URGENCY_LABEL.URGENT}</Tag>}
                         </div>
                       </Link>
                     </li>

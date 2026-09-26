@@ -18,7 +18,7 @@ export default function About() {
     },
     {
       t: 'نكشف على الموقع',
-      d: `فني مختص يعاين المشكلة ويأخذ القياسات. رسوم الكشف ${formatJOD(settings.inspectionFeeInside)} داخل عمّان و${formatJOD(settings.inspectionFeeOutside)} خارجها.`,
+      d: `فني مختص يعاين المشكلة ويأخذ القياسات. رسوم الكشف الفني ${formatJOD(settings.inspectionFeeNormal)} لكل المحافظات، و${formatJOD(settings.inspectionFeeUrgent)} للعاجل و${formatJOD(settings.inspectionFeeEmergency)} للطارئ.`,
     },
     {
       t: 'تستلم عرض سعر مكتوبًا',
@@ -71,10 +71,11 @@ export default function About() {
           <div className="md:col-span-8">
             <h2 className="text-2xl">أين نعمل</h2>
             <p className="mt-3 max-w-prose text-muted">
-              مقرنا في عمّان، ونخدم كل المحافظات. رسوم الكشف خارج عمّان أعلى لتغطية التنقل:{' '}
-              <span className="ltr">{formatJOD(settings.inspectionFeeOutside)}</span> بدل{' '}
-              <span className="ltr">{formatJOD(settings.inspectionFeeInside)}</span>. أما سعر العمل نفسه فيُحدد بعد الكشف حسب
-              حجمه والمواد المطلوبة.
+              مقرنا في عمّان، ونخدم كل المحافظات. رسوم الكشف الفني ثابتة لكل المحافظات:{' '}
+              <span className="ltr">{formatJOD(settings.inspectionFeeNormal)}</span>. والكشف على أعمال الدهان{' '}
+              <span className="ltr">{formatJOD(settings.paintingFeeInside)}</span> داخل عمّان و
+              <span className="ltr">{formatJOD(settings.paintingFeeOutside)}</span> خارجها. أما سعر العمل نفسه فيُحدد بعد الكشف
+              حسب حجمه والمواد المطلوبة.
             </p>
             <p className="mt-3 text-muted">ساعات العمل: {settings.workingHoursText}</p>
           </div>

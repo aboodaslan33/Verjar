@@ -300,7 +300,7 @@ describe('الإعدادات', () => {
     expect(bad.status).toBe(400);
     const badFb = await admin.put('/api/admin/settings').send({ facebook: 'http://facebook.com/x' });
     expect(badFb.status).toBe(400);
-    const good = await admin.put('/api/admin/settings').send({ mapUrl: 'https://www.google.com/maps/embed?pb=abc', inspectionFeeInside: 17 });
+    const good = await admin.put('/api/admin/settings').send({ mapUrl: 'https://www.google.com/maps/embed?pb=abc', inspectionFeeNormal: 17 });
     expect(good.status).toBe(200);
 
     await prisma.setting.update({ where: { key: 'mapUrl' }, data: { value: 'javascript:alert(1)' } });
@@ -308,6 +308,6 @@ describe('الإعدادات', () => {
     invalidateSettingsCache();
     const pub = await request(app).get('/api/site/settings');
     expect(pub.body.data.mapUrl).toBe('');
-    expect(pub.body.data.inspectionFeeInside).toBe(17);
+    expect(pub.body.data.inspectionFeeNormal).toBe(17);
   });
 });

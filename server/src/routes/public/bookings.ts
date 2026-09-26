@@ -12,7 +12,7 @@ import { formLimiter } from '../../middleware/rateLimit';
 import { memoryUpload, uploadGuard } from '../../middleware/upload';
 import { accountCustomer } from '../../services/customer.service';
 import { bookingMessage, customerConfirmationMessage } from '../../services/messages';
-import { assertSlotAvailable, getDaySlots, inspectionFee } from '../../services/schedule.service';
+import { assertSlotAvailable, bookingFee, getDaySlots } from '../../services/schedule.service';
 import { getSettings } from '../../services/settings.service';
 import { POLICIES, validateFile, validateAndStore } from '../../services/upload.service';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
@@ -113,8 +113,11 @@ bookingsRouter.post(
       validateAndStore(designFiles, POLICIES.designFiles, 'bookings/designs'),
     ]);
 
-    const fee =
-      input.type === 'INSPECTION' ? inspectionFee(settings, input.zone, input.urgency) : null;
+    const fee = bookingFee(settings, {
+      type: input.type,
+      urgency: input.type === 'INSPECTION' ? input.urgency : 'NORMAL',
+      zone: input.type === 'PAINTING' ? input.zone : null,
+    });
 
     const booking = await prisma.$transaction(
       async (tx) => {
@@ -134,7 +137,7 @@ bookingsRouter.post(
             scheduledAt,
             notes: input.notes ?? null,
             urgency: input.type === 'INSPECTION' ? input.urgency : 'NORMAL',
-            zone: input.type === 'INSPECTION' ? input.zone : null,
+            zone: input.type === 'PAINTING' ? input.zone : null,
             inspectionFee: fee != null ? new Prisma.Decimal(fee) : null,
             details: input.details as Prisma.InputJsonValue,
             whatsappText: '',

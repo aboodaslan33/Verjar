@@ -39,7 +39,7 @@ export function orderMessage(order: Order & { items: OrderItem[] }): string {
 
 export function bookingMessage(b: Booking, mediaCount = 0): string {
   const lines: string[] = [];
-  const urgent = b.urgency === 'EMERGENCY' ? ' — طارئ' : '';
+  const urgent = b.urgency === 'EMERGENCY' ? ' — طارئ' : b.urgency === 'URGENT' ? ' — عاجل' : '';
   lines.push(`حجز جديد #${b.number} — ${BOOKING_TYPE_AR[b.type]}${urgent}`);
   lines.push(`العميل: ${b.name}  الهاتف: ${displayPhone(b.phone)}`);
   lines.push(`الموعد: ${formatAmman(b.scheduledAt)}`);

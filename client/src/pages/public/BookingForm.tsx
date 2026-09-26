@@ -32,6 +32,7 @@ import {
   isValidPhone,
 } from '../../lib/format';
 import type { BookingCreated, BookingType, SiteSettings } from '../../lib/types';
+import { prepareWhatsAppWindow } from '../../lib/whatsapp';
 import { useDocumentTitle } from '../../lib/useAsync';
 
 // ───────────── الثوابت ─────────────
@@ -82,7 +83,7 @@ type Vals = {
   time: string;
   notes: string;
   zone: '' | 'INSIDE_AMMAN' | 'OUTSIDE_AMMAN';
-  urgency: 'NORMAL' | 'EMERGENCY';
+  urgency: 'NORMAL' | 'URGENT' | 'EMERGENCY';
   faultChoice: string;
   faultOther: string;
   description: string;
@@ -123,12 +124,18 @@ const ERROR_KEY: Partial<Record<keyof Vals, string>> = {
 
 const pick = (choice: string, other: string) => (choice === OTHER ? other.trim() : choice);
 
+/** مطابق لحساب السيرفر (bookingFee) */
 function computeFee(type: BookingType, v: Vals, s: SiteSettings): number | null {
-  if (type !== 'INSPECTION' || !v.zone) return null;
-  const inside = v.zone === 'INSIDE_AMMAN';
-  if (v.urgency === 'EMERGENCY') return inside ? s.emergencyFeeInside : s.emergencyFeeOutside;
-  return inside ? s.inspectionFeeInside : s.inspectionFeeOutside;
+  if (type === 'INSPECTION') {
+    if (v.urgency === 'EMERGENCY') return s.inspectionFeeEmergency;
+    if (v.urgency === 'URGENT') return s.inspectionFeeUrgent;
+    return s.inspectionFeeNormal;
+  }
+  if (type === 'PAINTING' && v.zone) return v.zone === 'INSIDE_AMMAN' ? s.paintingFeeInside : s.paintingFeeOutside;
+  return null;
 }
+
+const URGENCY_AR = { NORMAL: 'عادي', URGENT: 'عاجل', EMERGENCY: 'طارئ' } as const;
 
 // ───────────── التحقق (مطابق لقواعد السيرفر) ─────────────
 
@@ -140,9 +147,9 @@ function validate(type: BookingType, v: Vals, photos: File[], designFiles: File[
   if (type === 'INSPECTION') {
     e.faultType = choiceText('نوع العطل', v.faultChoice, v.faultOther);
     e.description = checkText('وصف العطل', v.description, 2000);
-    e.zone = v.zone ? undefined : 'حدد إن كان الموقع داخل عمّان أو خارجها';
   }
   if (type === 'PAINTING') {
+    e.zone = v.zone ? undefined : 'حدد إن كان الموقع داخل عمّان أو خارجها';
     e.paintType = choiceText('نوعية الدهان', v.paintChoice, v.paintOther);
     e.jobKind = v.jobKind ? undefined : 'اختر دهان جديد أم تجديد';
     e.rooms = checkInt('عدد الغرف', v.rooms, 100);
@@ -326,18 +333,22 @@ function BookingWizard({ type }: { type: BookingType }) {
       date: v.date,
       time: v.time,
       notes: v.notes.trim() || undefined,
-      ...(type === 'INSPECTION' ? { zone: v.zone, urgency: v.urgency } : {}),
+      ...(type === 'INSPECTION' ? { urgency: v.urgency } : {}),
+      ...(type === 'PAINTING' ? { zone: v.zone } : {}),
       details: buildDetails(type, v),
     };
     const files = {
       photos: type === 'CONSTRUCTION' ? [] : photos,
       designFiles: (type === 'CONSTRUCTION' || type === 'METALWORK') && v.hasDesign ? designFiles : [],
     };
+    const wa = prepareWhatsAppWindow();
     try {
       const res = await api.post<BookingCreated>('/bookings', toFormData(payload, files));
       clearDraft(draftKey);
       setDone(res);
+      wa.open(res.whatsapp.link);
     } catch (e) {
+      wa.cancel();
       handleError(e);
     } finally {
       setSubmitting(false);
@@ -489,31 +500,21 @@ function BookingWizard({ type }: { type: BookingType }) {
                         error={err('description')}
                       />
                     </Field>
-                    <ChoiceField field="zone">
-                      <ChoiceGroup
-                        label="مكان الموقع"
-                        value={v.zone || undefined}
-                        onChange={(x) => choose('zone', x)}
-                        options={[
-                          { value: 'INSIDE_AMMAN' as const, label: 'داخل عمّان' },
-                          { value: 'OUTSIDE_AMMAN' as const, label: 'خارج عمّان' },
-                        ]}
-                        error={err('zone')}
-                      />
-                    </ChoiceField>
                     <ChoiceField field="urgency">
                       <ChoiceGroup
                         label="تصنيف الطلب"
                         value={v.urgency}
                         onChange={(x) => choose('urgency', x)}
+                        columns={3}
                         options={[
-                          { value: 'NORMAL' as const, label: 'عادي', description: 'موعد حسب الجدول' },
-                          { value: 'EMERGENCY' as const, label: 'طارئ', description: 'أولوية في الجدولة' },
+                          { value: 'NORMAL' as const, label: 'عادي', description: `${formatJOD(settings.inspectionFeeNormal)} — حسب الجدول` },
+                          { value: 'URGENT' as const, label: 'عاجل', description: `${formatJOD(settings.inspectionFeeUrgent)} — أقرب موعد` },
+                          { value: 'EMERGENCY' as const, label: 'طارئ', description: `${formatJOD(settings.inspectionFeeEmergency)} — أولوية قصوى` },
                         ]}
                         hint={v.urgency === 'EMERGENCY' && settings.emergencyNote ? settings.emergencyNote : undefined}
                       />
                     </ChoiceField>
-                    <FeeBox fee={fee} urgency={v.urgency} settings={settings} />
+                    <FeeBox fee={fee} label={`رسوم الكشف الفني (${URGENCY_AR[v.urgency]})`} note="ثابتة لكل المحافظات. تُدفع عند الزيارة، وتشمل تشخيص العطل وتقدير سعر الإصلاح." />
                   </>
                 )}
 
@@ -562,6 +563,24 @@ function BookingWizard({ type }: { type: BookingType }) {
                     <ChoiceField field="decorations">
                       <ChoiceGroup label="هل تريد ديكورات؟" value={v.decorations} onChange={(x) => choose('decorations', x)} options={YES_NO} error={err('decorations')} />
                     </ChoiceField>
+                    <ChoiceField field="zone">
+                      <ChoiceGroup
+                        label="مكان الموقع"
+                        value={v.zone || undefined}
+                        onChange={(x) => choose('zone', x)}
+                        options={[
+                          { value: 'INSIDE_AMMAN' as const, label: 'داخل عمّان', description: `كشف ${formatJOD(settings.paintingFeeInside)}` },
+                          { value: 'OUTSIDE_AMMAN' as const, label: 'خارج عمّان', description: `كشف ${formatJOD(settings.paintingFeeOutside)}` },
+                        ]}
+                        error={err('zone')}
+                      />
+                    </ChoiceField>
+                    <FeeBox
+                      fee={fee}
+                      label="رسوم الكشف على أعمال الدهان"
+                      note="تُدفع عند الزيارة، ونعطيك بعدها سعر العمل كاملًا."
+                      pending={`رسوم الكشف: ${formatJOD(settings.paintingFeeInside)} داخل عمّان، ${formatJOD(settings.paintingFeeOutside)} خارجها. حدد مكان الموقع لرؤية المبلغ.`}
+                    />
                   </>
                 )}
 
@@ -799,12 +818,8 @@ function BookingWizard({ type }: { type: BookingType }) {
                     ...Object.entries(buildDetails(type, v))
                       .filter(([, val]) => val !== undefined && val !== '')
                       .map(([k, val]) => [DETAIL_LABELS[k] ?? k, formatDetail(k, val)] as [string, ReactNode]),
-                    ...(type === 'INSPECTION'
-                      ? ([
-                          ['مكان الموقع', v.zone === 'INSIDE_AMMAN' ? 'داخل عمّان' : 'خارج عمّان'],
-                          ['تصنيف الطلب', v.urgency === 'EMERGENCY' ? 'طارئ' : 'عادي'],
-                        ] as [string, ReactNode][])
-                      : []),
+                    ...(type === 'INSPECTION' ? ([['تصنيف الطلب', URGENCY_AR[v.urgency]]] as [string, ReactNode][]) : []),
+                    ...(type === 'PAINTING' ? ([['مكان الموقع', v.zone === 'INSIDE_AMMAN' ? 'داخل عمّان' : 'خارج عمّان']] as [string, ReactNode][]) : []),
                     ['الصور', showsPhotos ? (photos.length ? <><span className="ltr">{photos.length}</span> صور</> : 'بدون صور') : null],
                     ['ملفات التصميم', showsDesign && v.hasDesign ? designFiles.map((f) => f.name).join('، ') : null],
                   ]}
@@ -838,7 +853,7 @@ function BookingWizard({ type }: { type: BookingType }) {
                     ['ملاحظات', v.notes],
                   ]}
                 />
-                {type === 'INSPECTION' && fee != null && (
+                {fee != null && (
                   <div className="flex items-center justify-between rounded-xl border border-brand-300 bg-brand-50 px-4 py-4 text-ink dark:border-brand-600 dark:bg-brand-500/10">
                     <div>
                       <p className="font-semibold">رسوم الكشف</p>
@@ -921,23 +936,19 @@ function NumberField({
   );
 }
 
-function FeeBox({ fee, urgency, settings }: { fee: number | null; urgency: 'NORMAL' | 'EMERGENCY'; settings: SiteSettings }) {
-  const inside = urgency === 'EMERGENCY' ? settings.emergencyFeeInside : settings.inspectionFeeInside;
-  const outside = urgency === 'EMERGENCY' ? settings.emergencyFeeOutside : settings.inspectionFeeOutside;
+function FeeBox({ fee, label, note, pending }: { fee: number | null; label: string; note: string; pending?: string }) {
   return (
     <div className={cx('rounded-xl border px-4 py-3.5', fee != null ? 'border-brand-300 bg-brand-50 dark:border-brand-600 dark:bg-brand-900/30' : 'border-line bg-subtle')} aria-live="polite">
       {fee != null ? (
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="font-semibold">رسوم الكشف {urgency === 'EMERGENCY' ? 'الطارئ' : ''}</p>
-            <p className="text-sm text-muted">تُدفع عند الزيارة، وتشمل تشخيص العطل وتقدير سعر الإصلاح.</p>
+            <p className="font-semibold">{label}</p>
+            <p className="text-sm text-muted">{note}</p>
           </div>
           <p className="shrink-0 text-2xl font-bold text-brand-800 dark:text-brand-100">{formatJOD(fee)}</p>
         </div>
       ) : (
-        <p className="text-sm text-muted">
-          رسوم الكشف {urgency === 'EMERGENCY' ? 'الطارئ' : ''}: {formatJOD(inside)} داخل عمّان، {formatJOD(outside)} خارجها. حدد مكان الموقع لرؤية المبلغ.
-        </p>
+        <p className="text-sm text-muted">{pending}</p>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 /** أنواع بيانات لوحة التحكم — مطابقة لاستجابات /api/v1/admin */
 import type { AdminSettings, BookingType, CorporateType, MediaKind, RequestStatus } from '../../lib/types';
 
-export type Urgency = 'NORMAL' | 'EMERGENCY';
+export type Urgency = 'NORMAL' | 'URGENT' | 'EMERGENCY';
 export type AreaZone = 'INSIDE_AMMAN' | 'OUTSIDE_AMMAN';
 export type ContractStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 export type FileKind = 'EVALUATION' | 'QUOTE' | 'CONTRACT' | 'INVOICE' | 'OTHER';

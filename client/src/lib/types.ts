@@ -10,10 +10,11 @@ export type SiteSettings = {
   phone: string;
   email: string;
   address: string;
-  inspectionFeeInside: number;
-  inspectionFeeOutside: number;
-  emergencyFeeInside: number;
-  emergencyFeeOutside: number;
+  inspectionFeeNormal: number;
+  inspectionFeeUrgent: number;
+  inspectionFeeEmergency: number;
+  paintingFeeInside: number;
+  paintingFeeOutside: number;
   emergencyNote: string;
   workingDays: number[];
   workStart: string;

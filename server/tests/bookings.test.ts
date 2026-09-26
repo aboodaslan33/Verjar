@@ -62,11 +62,11 @@ describe('POST /api/v1/bookings', () => {
     const d = res.body.data;
     expect(d.number).toBeGreaterThanOrEqual(1000);
     expect(d.ref).toMatch(/^B-[A-Z0-9]{6}$/);
-    expect(d.inspectionFee).toBe(15);
+    expect(d.inspectionFee).toBe(25);
     expect(d.whatsapp.link).toMatch(/^https:\/\/wa\.me\/962780192930\?text=/);
     expect(d.whatsapp.sent).toBe(false);
     expect(d.message).toContain('كشف أعطال بناء');
-    expect(d.message).toContain('رسوم الكشف: 15 د.أ');
+    expect(d.message).toContain('رسوم الكشف: 25 د.أ');
 
     const customer = await prisma.customer.findUnique({ where: { phone: '962791234567' } });
     expect(customer?.name).toBe('أحمد السعدي');
@@ -74,19 +74,35 @@ describe('POST /api/v1/bookings', () => {
     expect(log?.channel).toBe('LINK');
   });
 
-  it('يحسب 25 دينار خارج عمّان ورسوم الطارئ من الإعدادات', async () => {
+  it('الكشف الفني ثابت لكل المحافظات: عادي 25، عاجل 50، طارئ 70 (المنطقة لا تؤثر)', async () => {
     const date = nextWorkingDate();
-    const outside = await user
-      .post('/api/v1/bookings')
-      .send(inspection(date, '08:00', { zone: 'OUTSIDE_AMMAN' }));
-    expect(outside.status).toBe(201);
-    expect(outside.body.data.inspectionFee).toBe(25);
+    const urgent = await user.post('/api/v1/bookings').send(inspection(date, '08:00', { urgency: 'URGENT', zone: 'OUTSIDE_AMMAN' }));
+    expect(urgent.status).toBe(201);
+    expect(urgent.body.data.inspectionFee).toBe(50);
+    expect(urgent.body.data.message).toContain('عاجل');
 
-    const emergency = await user
-      .post('/api/v1/bookings')
-      .send(inspection(date, '12:00', { zone: 'INSIDE_AMMAN', urgency: 'EMERGENCY' }));
+    const emergency = await user.post('/api/v1/bookings').send(inspection(date, '12:00', { urgency: 'EMERGENCY' }));
     expect(emergency.status).toBe(201);
-    expect(emergency.body.data.inspectionFee).toBe(30);
+    expect(emergency.body.data.inspectionFee).toBe(70);
+  });
+
+  it('الكشف على الدهان: 15 داخل عمّان و25 خارجها، والمنطقة مطلوبة', async () => {
+    const date = nextWorkingDate();
+    const painting = (time: string, zone?: string) => ({
+      type: 'PAINTING',
+      ...base,
+      date,
+      time,
+      ...(zone ? { zone } : {}),
+      details: { paintType: 'بلاستيك', jobKind: 'NEW', rooms: 2, area: 80, decorations: false },
+    });
+    const missing = await user.post('/api/v1/bookings').send(painting('08:00'));
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.fields.zone).toBeDefined();
+    const inside = await user.post('/api/v1/bookings').send(painting('08:00', 'INSIDE_AMMAN'));
+    expect(inside.body.data.inspectionFee).toBe(15);
+    const outside = await user.post('/api/v1/bookings').send(painting('12:00', 'OUTSIDE_AMMAN'));
+    expect(outside.body.data.inspectionFee).toBe(25);
   });
 
   it('يمنع حجزين بفارق أقل من 3 ساعات ويعطّل الأوقات في جدول المواعيد', async () => {
@@ -157,6 +173,7 @@ describe('POST /api/v1/bookings', () => {
       ...base,
       date,
       time: '09:00',
+      zone: 'INSIDE_AMMAN',
       details: { paintType: 'بلاستيك', jobKind: 'RENEW', rooms: 3, area: 120, colors: 'أبيض', decorations: false },
     });
     const okRes = await user
@@ -242,7 +259,7 @@ describe('إدارة الحجوزات', () => {
     const overview = await user.get('/api/v1/account/overview');
     expect(overview.status).toBe(200);
     expect(overview.body.data.bookings).toHaveLength(1);
-    expect(overview.body.data.finance.billed).toBe(15);
+    expect(overview.body.data.finance.billed).toBe(25);
   });
 
   it('لا حجز بدون تسجيل دخول، ولا حجز بحساب أدمن', async () => {

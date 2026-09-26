@@ -46,7 +46,7 @@ type OBooking = {
   status: RequestStatus;
   scheduledAt: string;
   locationText: string;
-  urgency: 'NORMAL' | 'EMERGENCY';
+  urgency: 'NORMAL' | 'URGENT' | 'EMERGENCY';
   inspectionFee: Num | null;
   quotedAmount: Num | null;
   createdAt: string;
@@ -354,6 +354,7 @@ function BookingsTab({ items }: { items: OBooking[] }) {
             status={
               <div className="flex items-center gap-1.5">
                 {b.urgency === 'EMERGENCY' && <Tag tone="danger">طارئ</Tag>}
+                {b.urgency === 'URGENT' && <Tag tone="brand">عاجل</Tag>}
                 <StatusBadge status={b.status} />
               </div>
             }

@@ -29,8 +29,8 @@ const common = {
 export const inspectionSchema = z.object({
   type: z.literal('INSPECTION'),
   ...common,
-  zone: z.enum(['INSIDE_AMMAN', 'OUTSIDE_AMMAN'], { required_error: 'حدد إن كان الموقع داخل عمّان أو خارجها' }),
-  urgency: z.enum(['NORMAL', 'EMERGENCY']).default('NORMAL'),
+  /** رسوم الكشف الفني ثابتة لكل المحافظات — تختلف حسب الأولوية فقط */
+  urgency: z.enum(['NORMAL', 'URGENT', 'EMERGENCY']).default('NORMAL'),
   details: z.object({
     faultType: requiredText('نوع العطل', 100),
     description: requiredText('وصف العطل', 2000),
@@ -40,6 +40,8 @@ export const inspectionSchema = z.object({
 export const paintingSchema = z.object({
   type: z.literal('PAINTING'),
   ...common,
+  /** رسوم الكشف على الدهان: داخل عمّان / خارجها */
+  zone: z.enum(['INSIDE_AMMAN', 'OUTSIDE_AMMAN'], { required_error: 'حدد إن كان الموقع داخل عمّان أو خارجها' }),
   details: z.object({
     paintType: requiredText('نوعية الدهان', 100),
     jobKind: z.enum(['NEW', 'RENEW'], { required_error: 'اختر دهان جديد أم تجديد' }),

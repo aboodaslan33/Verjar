@@ -30,7 +30,7 @@ bookingsAdminRouter.get(
         from: optionalDate,
         to: optionalDate,
         technicianId: z.string().optional(),
-        urgency: z.enum(['NORMAL', 'EMERGENCY']).optional(),
+        urgency: z.enum(['NORMAL', 'URGENT', 'EMERGENCY']).optional(),
       })
       .parse(req.query);
     const phone = q.q ? normalizePhone(q.q) : null;
@@ -147,7 +147,7 @@ bookingsAdminRouter.patch(
         overrideHours: z.boolean().default(false),
         quotedAmount: moneyInput.nullable().optional(),
         adminNotes: z.string().max(3000).nullable().optional(),
-        urgency: z.enum(['NORMAL', 'EMERGENCY']).optional(),
+        urgency: z.enum(['NORMAL', 'URGENT', 'EMERGENCY']).optional(),
         notify: z.boolean().default(true),
       })
       .parse(req.body);

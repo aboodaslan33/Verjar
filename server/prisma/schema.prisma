@@ -38,8 +38,9 @@ enum BookingType {
 }
 
 enum Urgency {
-  NORMAL
-  EMERGENCY
+  NORMAL // عادي
+  URGENT // عاجل
+  EMERGENCY // طارئ
 }
 
 enum AreaZone {

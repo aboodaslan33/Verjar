@@ -115,8 +115,24 @@ export async function assertSlotAvailable(
   return scheduledAt;
 }
 
-/** رسوم الكشف حسب المنطقة ونوع الطلب */
-export function inspectionFee(s: Settings, zone: 'INSIDE_AMMAN' | 'OUTSIDE_AMMAN', urgency: 'NORMAL' | 'EMERGENCY') {
-  if (urgency === 'EMERGENCY') return zone === 'INSIDE_AMMAN' ? s.emergencyFeeInside : s.emergencyFeeOutside;
-  return zone === 'INSIDE_AMMAN' ? s.inspectionFeeInside : s.inspectionFeeOutside;
+export type UrgencyValue = 'NORMAL' | 'URGENT' | 'EMERGENCY';
+export type ZoneValue = 'INSIDE_AMMAN' | 'OUTSIDE_AMMAN';
+
+/**
+ * رسوم الكشف وقت الحجز:
+ * - الكشف الفني (أعطال البناء): ثابتة لكل المحافظات حسب الأولوية (عادي / عاجل / طارئ)
+ * - أعمال الدهان: حسب المنطقة (داخل / خارج عمّان)
+ * - باقي الأنواع: بدون رسوم كشف (السعر بعد الزيارة)
+ */
+export function bookingFee(
+  s: Settings,
+  b: { type: string; urgency?: UrgencyValue; zone?: ZoneValue | null },
+): number | null {
+  if (b.type === 'INSPECTION') {
+    if (b.urgency === 'EMERGENCY') return s.inspectionFeeEmergency;
+    if (b.urgency === 'URGENT') return s.inspectionFeeUrgent;
+    return s.inspectionFeeNormal;
+  }
+  if (b.type === 'PAINTING' && b.zone) return b.zone === 'INSIDE_AMMAN' ? s.paintingFeeInside : s.paintingFeeOutside;
+  return null;
 }

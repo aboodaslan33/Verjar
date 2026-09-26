@@ -118,6 +118,7 @@ function BookingsTable() {
         <span className="flex flex-wrap items-center gap-1">
           <StatusBadge status={b.status} />
           {b.urgency === 'EMERGENCY' && <Tag tone="danger">{URGENCY_LABEL.EMERGENCY}</Tag>}
+          {b.urgency === 'URGENT' && <Tag tone="brand">{URGENCY_LABEL.URGENT}</Tag>}
         </span>
       ),
     },
@@ -141,6 +142,7 @@ function BookingsTable() {
         <FilterSelect label="الأولوية" value={v.urgency} onChange={(e) => f.set({ urgency: e.target.value })}>
           <option value="">الكل</option>
           <option value="NORMAL">عادي</option>
+          <option value="URGENT">عاجل</option>
           <option value="EMERGENCY">طارئ</option>
         </FilterSelect>
         <FilterSelect label="الفني" value={v.technicianId} onChange={(e) => f.set({ technicianId: e.target.value })}>

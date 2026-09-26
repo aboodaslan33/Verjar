@@ -17,6 +17,7 @@ import { ApiError, api, toFormData } from '../../lib/api';
 import { CORPORATE_TYPE_LABEL, isValidPhone } from '../../lib/format';
 import type { CorporateCreated, CorporateService, CorporateType } from '../../lib/types';
 import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
+import { prepareWhatsAppWindow } from '../../lib/whatsapp';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
 const SLUG_TYPE: Record<string, CorporateType> = { annual: 'ANNUAL', urgent: 'URGENT' };
@@ -209,6 +210,7 @@ function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) 
           }
         : {}),
     };
+    const wa = prepareWhatsAppWindow();
     try {
       const res = await api.post<CorporateCreated>(
         '/corporate/requests',
@@ -216,7 +218,9 @@ function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) 
       );
       clearDraft(draftKey);
       setDone(res);
+      wa.open(res.whatsapp.link);
     } catch (e) {
+      wa.cancel();
       if (!(e instanceof ApiError)) {
         setSubmitError('حدث خطأ غير متوقع، حاول مرة أخرى.');
       } else {

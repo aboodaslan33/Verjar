@@ -12,6 +12,8 @@ const schema = z.object({
   /** عدد البروكسيات أمام السيرفر (لمعرفة IP العميل الحقيقي في حدود المحاولات) */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
   ADMIN_WHATSAPP: z.string().default('962780192930'),
+  /** link (افتراضي): الموقع يفتح واتساب برسالة جاهزة. cloud: إرسال تلقائي عبر Cloud API (يتطلب WA_TOKEN و WA_PHONE_ID صالحين) */
+  WA_MODE: z.enum(['link', 'cloud']).default('link'),
   WA_TOKEN: z.string().optional().default(''),
   WA_PHONE_ID: z.string().optional().default(''),
   WA_API_VERSION: z.string().default('v21.0'),
@@ -31,6 +33,6 @@ export const env = {
   isProd: parsed.data.NODE_ENV === 'production',
   isTest: parsed.data.NODE_ENV === 'test',
   clientOrigins: parsed.data.CLIENT_URL.split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean),
-  waCloudEnabled: Boolean(parsed.data.WA_TOKEN && parsed.data.WA_PHONE_ID),
+  waCloudEnabled: parsed.data.WA_MODE === 'cloud' && Boolean(parsed.data.WA_TOKEN && parsed.data.WA_PHONE_ID),
   cloudinaryEnabled: Boolean(parsed.data.CLOUDINARY_URL),
 };

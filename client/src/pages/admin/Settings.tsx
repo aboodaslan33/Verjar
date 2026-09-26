@@ -11,10 +11,11 @@ import { useDocumentTitle } from '../../lib/useAsync';
 type Key = keyof AdminSettings;
 /** حدود الحقول الرقمية (نفس قيود الخادم) لعرض رسائل عربية قبل الإرسال */
 const RANGES: Partial<Record<Key, [number, number, boolean?]>> = {
-  inspectionFeeInside: [0, 1_000_000],
-  inspectionFeeOutside: [0, 1_000_000],
-  emergencyFeeInside: [0, 1_000_000],
-  emergencyFeeOutside: [0, 1_000_000],
+  inspectionFeeNormal: [0, 1_000_000],
+  inspectionFeeUrgent: [0, 1_000_000],
+  inspectionFeeEmergency: [0, 1_000_000],
+  paintingFeeInside: [0, 1_000_000],
+  paintingFeeOutside: [0, 1_000_000],
   slotMinutes: [15, 240, true],
   bookingGapHours: [0, 24],
   maxDaysAhead: [1, 365, true],
@@ -22,10 +23,11 @@ const RANGES: Partial<Record<Key, [number, number, boolean?]>> = {
 };
 
 const NUMERIC: Key[] = [
-  'inspectionFeeInside',
-  'inspectionFeeOutside',
-  'emergencyFeeInside',
-  'emergencyFeeOutside',
+  'inspectionFeeNormal',
+  'inspectionFeeUrgent',
+  'inspectionFeeEmergency',
+  'paintingFeeInside',
+  'paintingFeeOutside',
   'slotMinutes',
   'bookingGapHours',
   'maxDaysAhead',
@@ -190,12 +192,17 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
         </div>
       </Section>
 
-      <Section title="الرسوم" description="رسوم الكشف بالدينار الأردني حسب المنطقة">
+      <Section title="الرسوم" description="رسوم الكشف بالدينار الأردني">
+        <p className="mb-2 text-sm font-semibold">الكشف الفني (ثابت لكل المحافظات)</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {num('inspectionFeeNormal', 'عادي', { min: 0 })}
+          {num('inspectionFeeUrgent', 'عاجل', { min: 0 })}
+          {num('inspectionFeeEmergency', 'طارئ', { min: 0 })}
+        </div>
+        <p className="mb-2 mt-5 text-sm font-semibold">الكشف على أعمال الدهان</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          {num('inspectionFeeInside', 'رسوم الكشف داخل عمّان', { min: 0 })}
-          {num('inspectionFeeOutside', 'رسوم الكشف خارج عمّان', { min: 0 })}
-          {num('emergencyFeeInside', 'رسوم الطارئ داخل عمّان', { min: 0 })}
-          {num('emergencyFeeOutside', 'رسوم الطارئ خارج عمّان', { min: 0 })}
+          {num('paintingFeeInside', 'داخل عمّان', { min: 0 })}
+          {num('paintingFeeOutside', 'خارج عمّان', { min: 0 })}
         </div>
         <Textarea label="ملاحظة الطلب الطارئ" rows={2} wrapperClassName="mt-4" value={str('emergencyNote')} onChange={set('emergencyNote')} error={fe.emergencyNote} />
       </Section>

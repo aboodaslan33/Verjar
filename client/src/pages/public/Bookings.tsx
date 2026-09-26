@@ -66,9 +66,9 @@ export default function Bookings() {
                       </span>
                       <h2 className="mt-1 text-xl">{BOOKING_TYPE_LABEL[type]}</h2>
                     </div>
-                    {type === 'INSPECTION' && (
+                    {(type === 'INSPECTION' || type === 'PAINTING') && (
                       <span className="shrink-0 rounded-lg border border-line bg-subtle px-2.5 py-1 text-sm font-semibold text-ink">
-                        من {formatJOD(settings.inspectionFeeInside)}
+                        كشف من {formatJOD(type === 'INSPECTION' ? settings.inspectionFeeNormal : settings.paintingFeeInside)}
                       </span>
                     )}
                   </div>
@@ -88,15 +88,20 @@ export default function Bookings() {
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <section className="card p-5">
               <h2 className="text-lg">رسوم الكشف</h2>
-              <p className="mt-1 text-sm text-muted">تُدفع عند الزيارة، وتخص حجز كشف الأعطال فقط.</p>
-              <dl className="mt-4 divide-y divide-line text-[15px]">
-                <FeeRow label="داخل عمّان" value={settings.inspectionFeeInside} />
-                <FeeRow label="خارج عمّان" value={settings.inspectionFeeOutside} />
-                <FeeRow label="طارئ داخل عمّان" value={settings.emergencyFeeInside} />
-                <FeeRow label="طارئ خارج عمّان" value={settings.emergencyFeeOutside} />
+              <p className="mt-1 text-sm text-muted">تُدفع عند الزيارة.</p>
+              <h3 className="mt-4 text-sm font-semibold">الكشف الفني — ثابت لكل المحافظات</h3>
+              <dl className="mt-1 divide-y divide-line text-[15px]">
+                <FeeRow label="عادي" value={settings.inspectionFeeNormal} />
+                <FeeRow label="عاجل" value={settings.inspectionFeeUrgent} />
+                <FeeRow label="طارئ" value={settings.inspectionFeeEmergency} />
               </dl>
-              {settings.emergencyNote && <p className="mt-3 text-sm text-muted">{settings.emergencyNote}</p>}
-              <p className="mt-3 text-sm text-muted">الدهان والبناء والأعمال المعدنية: نزورك ونعطيك عرض سعر مكتوب.</p>
+              {settings.emergencyNote && <p className="mt-2 text-sm text-muted">{settings.emergencyNote}</p>}
+              <h3 className="mt-4 text-sm font-semibold">الكشف على أعمال الدهان</h3>
+              <dl className="mt-1 divide-y divide-line text-[15px]">
+                <FeeRow label="داخل عمّان" value={settings.paintingFeeInside} />
+                <FeeRow label="خارج عمّان" value={settings.paintingFeeOutside} />
+              </dl>
+              <p className="mt-3 text-sm text-muted">البناء والأعمال المعدنية: نزورك ونعطيك عرض سعر مكتوب.</p>
             </section>
 
             <section className="card p-5">

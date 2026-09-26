@@ -1,6 +1,6 @@
 import type { ContractStatus, FileKind, PaymentMethod, ProductionImpact, UrgencyLevel } from './types';
 
-export const URGENCY_LABEL = { NORMAL: 'عادي', EMERGENCY: 'طارئ' } as const;
+export const URGENCY_LABEL = { NORMAL: 'عادي', URGENT: 'عاجل', EMERGENCY: 'طارئ' } as const;
 export const ZONE_LABEL = { INSIDE_AMMAN: 'داخل عمّان', OUTSIDE_AMMAN: 'خارج عمّان' } as const;
 
 export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
