@@ -10,7 +10,8 @@ import { normalizePhone } from '../../lib/phone';
 import { prisma } from '../../lib/prisma';
 import { ammanParts, ammanToUtc } from '../../lib/time';
 import { statusMessage } from '../../services/messages';
-import { assertSlotAvailable, getDaySlots } from '../../services/schedule.service';
+import { assertSlotAvailable, bookingFee, getDaySlots } from '../../services/schedule.service';
+import { getSettings } from '../../services/settings.service';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
 import { dateField, timeField } from '../../validators/common';
 import { moneyInput, optionalDate, statusEnum } from './shared';
@@ -179,6 +180,10 @@ bookingsAdminRouter.patch(
             : {}),
           ...(input.adminNotes !== undefined ? { adminNotes: input.adminNotes } : {}),
           ...(input.urgency ? { urgency: input.urgency } : {}),
+          // تغيير أولوية الكشف الفني يعيد حساب رسومه (تدخل في المالية وصفحة العميل)
+          ...(input.urgency && input.urgency !== current.urgency && current.type === 'INSPECTION'
+            ? { inspectionFee: new Prisma.Decimal(bookingFee(await getSettings(), { type: 'INSPECTION', urgency: input.urgency }) ?? 0) }
+            : {}),
         },
         include: { technician: true },
       });

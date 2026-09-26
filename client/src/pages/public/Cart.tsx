@@ -48,7 +48,7 @@ export default function Cart() {
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex items-start justify-between gap-2">
                       <h2 className="text-[15px] font-semibold leading-snug sm:text-base">
-                        <Link to={`/store/${i.slug}`} className="hover:text-brand-600 dark:hover:text-brand-200">
+                        <Link to={`/store/${i.slug}`} className="hover:text-brand-700 dark:hover:text-brand-200">
                           {i.name}
                         </Link>
                       </h2>
@@ -87,7 +87,7 @@ export default function Cart() {
               );
             })}
           </ul>
-          <Link to="/store" className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-200">
+          <Link to="/store" className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
             <Icon name="chevronRight" className="h-4 w-4" /> متابعة التسوق
           </Link>
         </section>

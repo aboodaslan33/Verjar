@@ -1,3 +1,10 @@
 User-agent: *
 Disallow: /admin
 Disallow: /account
+Disallow: /login
+Disallow: /register
+Disallow: /cart
+Disallow: /checkout
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /unsubscribe

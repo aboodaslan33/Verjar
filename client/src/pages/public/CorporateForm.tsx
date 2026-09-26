@@ -235,7 +235,7 @@ function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) 
           goTo(first);
           window.setTimeout(() => focusFirstError(formRef.current, STEP_KEYS[first], mapped), 50);
         } else {
-          setSubmitError(e.status === 429 ? 'أرسلتم طلبات كثيرة خلال وقت قصير. انتظروا قليلًا ثم حاولوا مجددًا.' : e.message);
+          setSubmitError(e.message);
         }
       }
     } finally {
@@ -320,7 +320,7 @@ function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) 
                 </div>
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div data-field="managerPhone">
-                    <Input label="هاتف المدير" type="tel" inputMode="tel" dir="ltr" className="text-end" autoComplete="tel" placeholder="07XXXXXXXX" value={v.managerPhone} onChange={(e) => set('managerPhone', e.target.value)} onBlur={() => touch('managerPhone')} error={err('managerPhone')} hint="يُستخدم للدخول إلى صفحة الشركة" />
+                    <Input label="هاتف المدير" type="tel" inputMode="tel" dir="ltr" className="text-end" autoComplete="tel" placeholder="07XXXXXXXX" value={v.managerPhone} onChange={(e) => set('managerPhone', e.target.value)} onBlur={() => touch('managerPhone')} error={err('managerPhone')} hint="نتواصل معه لتأكيد الطلب وترتيب الزيارة" />
                   </div>
                   <div data-field="maintenancePhone">
                     <Input label="هاتف مسؤول الصيانة" type="tel" inputMode="tel" dir="ltr" className="text-end" placeholder="07XXXXXXXX" value={v.maintenancePhone} onChange={(e) => set('maintenancePhone', e.target.value)} onBlur={() => touch('maintenancePhone')} error={err('maintenancePhone')} />

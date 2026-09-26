@@ -33,7 +33,7 @@ export function ProductImage({
           height={600}
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
         />
       ) : (
         <div className="absolute inset-0 grid place-items-center text-muted" role="img" aria-label={`${alt} — لا توجد صورة`}>
@@ -55,7 +55,7 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
   const H = headingLevel === 2 ? 'h2' : 'h3';
 
   return (
-    <article className="card group flex flex-col overflow-hidden">
+    <article className="card lift group flex flex-col overflow-hidden">
       <Link to={`/store/${product.slug}`} className="relative block" tabIndex={-1} aria-hidden>
         <ProductImage
           src={productImage(product)}
@@ -76,7 +76,7 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
       <div className="flex flex-1 flex-col p-3 sm:p-4">
         <p className="text-xs text-muted">{product.category.name}</p>
         <H className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug sm:text-base">
-          <Link to={`/store/${product.slug}`} className="hover:text-brand-600 dark:hover:text-brand-200">
+          <Link to={`/store/${product.slug}`} className="hover:text-brand-700 dark:hover:text-brand-200">
             {product.name}
           </Link>
         </H>

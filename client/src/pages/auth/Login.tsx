@@ -105,6 +105,11 @@ export default function Login() {
           }}
           error={fields.password}
         />
+        <div className="-mt-1 text-end">
+          <Link to="/forgot-password" className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline">
+            نسيت كلمة المرور؟
+          </Link>
+        </div>
         <Button type="submit" size="lg" block loading={busy}>
           دخول
         </Button>

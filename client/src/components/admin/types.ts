@@ -322,7 +322,7 @@ export type DashboardStats = {
 
 export type SettingsResponse = {
   settings: AdminSettings;
-  system: { whatsappMode: 'LINK' | 'CLOUD_API'; cloudinary: boolean };
+  system: { whatsappMode: 'LINK' | 'CLOUD_API'; cloudinary: boolean; email: boolean };
 };
 
 export type AdminEvent = {

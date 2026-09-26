@@ -58,6 +58,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
       if (!alive) return;
       markSeen();
       root.classList.remove('splash-active');
+      window.dispatchEvent(new Event('vj:splash-done'));
       onDone();
     };
 

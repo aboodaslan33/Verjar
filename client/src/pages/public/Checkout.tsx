@@ -171,7 +171,7 @@ export default function Checkout() {
               onChange={set('phone')}
               onBlur={blur('phone')}
               error={errors.phone}
-              hint="نتواصل معك على هذا الرقم، وتستخدمه للدخول إلى حسابك."
+              hint="نتواصل معك على هذا الرقم لتأكيد الطلب وموعد التوصيل."
               required
             />
             <Textarea
@@ -214,7 +214,7 @@ export default function Checkout() {
           <div className="card p-5 lg:sticky lg:top-24">
             <div className="flex items-center justify-between">
               <h2 className="text-lg">ملخص الطلب</h2>
-              <Link to="/cart" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-600 hover:underline dark:text-brand-200">
+              <Link to="/cart" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
                 تعديل السلة
               </Link>
             </div>
@@ -280,11 +280,11 @@ function Confirmation({ order }: { order: OrderCreated }) {
         <p className="text-sm text-muted">الرمز المرجعي</p>
         <p className="ltr mt-1 select-all text-2xl font-bold tracking-wider">{order.ref}</p>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          احتفظ بهذا الرمز. تدخل به مع رقم هاتفك إلى{' '}
-          <Link to="/account" className="font-semibold text-brand-600 underline dark:text-brand-200">
-            صفحة حسابك
-          </Link>{' '}
-          لمتابعة حالة الطلب.
+          تجد الطلب وحالته في{' '}
+          <Link to="/account" className="font-semibold text-brand-700 underline dark:text-brand-200">
+            حسابك
+          </Link>
+          .
         </p>
       </div>
 
@@ -295,7 +295,7 @@ function Confirmation({ order }: { order: OrderCreated }) {
         <p className="mt-2 text-center text-sm text-muted">
           {order.whatsapp.sent
             ? 'أُرسلت تفاصيل الطلب إلينا تلقائيًا أيضًا. يمكنك إرسالها من واتساب لتبدأ المحادثة معنا مباشرة.'
-            : 'اضغط الزر لإرسال تفاصيل الطلب إلينا على واتساب، وسنرد عليك لتأكيد الطلب وموعد التوصيل.'}
+            : 'فتحنا لك واتساب برسالة الطلب جاهزة — اضغط إرسال هناك. إن لم يُفتح، اضغط الزر أعلاه.'}
         </p>
       </div>
 

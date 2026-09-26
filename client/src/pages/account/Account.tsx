@@ -272,12 +272,12 @@ function FinanceTile({ label, value, highlight }: { label: string; value: number
   return (
     <div
       className={cx(
-        'rounded-2xl border p-3 sm:p-5',
-        highlight ? 'border-sand-400 bg-sand-50 dark:border-sand-600 dark:bg-sand-700/15' : 'border-line bg-surface',
+        'min-w-0 rounded-2xl border p-3 sm:p-5',
+        highlight ? 'border-brand-300 bg-brand-50 dark:border-brand-600 dark:bg-brand-500/10' : 'border-line bg-surface',
       )}
     >
       <p className="text-xs text-muted sm:text-sm">{label}</p>
-      <p className="mt-1 text-lg font-bold sm:text-2xl">{formatJOD(value)}</p>
+      <p className="mt-1 break-words text-base font-bold leading-snug sm:text-2xl">{formatJOD(value)}</p>
     </div>
   );
 }

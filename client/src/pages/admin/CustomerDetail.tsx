@@ -249,6 +249,7 @@ function EditPanel({ customer: c, onSaved }: { customer: Customer; onSaved: () =
   const [company, setCompany] = useState(c.companyName ?? '');
   const [notes, setNotes] = useState(c.notes ?? '');
   const [confirmReset, setConfirmReset] = useState(false);
+  const [tempPassword, setTempPassword] = useState('');
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -267,9 +268,12 @@ function EditPanel({ customer: c, onSaved }: { customer: Customer; onSaved: () =
   };
 
   const reset = async () => {
-    const r = await m.run('reset', () => api.patch(`/admin/customers/${c.id}`, { resetPassword: true }), 'تم حذف كلمة المرور — يدخل العميل برمز التحقق');
+    const r = await m.run('reset', () => api.patch(`/admin/customers/${c.id}`, { tempPassword }), 'تم تعيين كلمة المرور المؤقتة');
     setConfirmReset(false);
-    if (r) onSaved();
+    if (r) {
+      setTempPassword('');
+      onSaved();
+    }
   };
 
   return (
@@ -287,13 +291,23 @@ function EditPanel({ customer: c, onSaved }: { customer: Customer; onSaved: () =
       </Panel>
       <Panel title="كلمة المرور">
         <p className="mb-3 text-sm text-muted">
-          {c.hasPassword ? 'لدى العميل كلمة مرور. يمكنك حذفها ليدخل برمز التحقق ويعيّن كلمة جديدة.' : 'لا توجد كلمة مرور — يدخل العميل برمز التحقق.'}
+          إذا نسي العميل كلمة المرور ولا يملك بريدًا في حسابه، عيّن له كلمة مرور مؤقتة وأرسلها له، ثم يغيّرها من حسابه.
         </p>
-        {c.hasPassword && (
-          <Button size="sm" variant="outline" onClick={() => setConfirmReset(true)}>
-            إعادة تعيين كلمة المرور
+        <div className="flex flex-wrap items-end gap-2">
+          <Input
+            label="كلمة مرور مؤقتة"
+            dir="ltr"
+            className="text-start"
+            wrapperClassName="min-w-0 flex-1"
+            value={tempPassword}
+            onChange={(e) => setTempPassword(e.target.value)}
+            error={m.fieldErrors.tempPassword}
+            hint="8 أحرف على الأقل"
+          />
+          <Button size="sm" variant="outline" className="mb-7 h-[50px]" disabled={tempPassword.length < 8} onClick={() => setConfirmReset(true)}>
+            تعيين
           </Button>
-        )}
+        </div>
       </Panel>
       <ConfirmDialog
         open={confirmReset}
@@ -304,7 +318,7 @@ function EditPanel({ customer: c, onSaved }: { customer: Customer; onSaved: () =
         onClose={() => setConfirmReset(false)}
         onConfirm={reset}
       >
-        ستُحذف كلمة مرور {c.name}، وسيدخل برمز تحقق يصله على هاتفه.
+        ستُستبدل كلمة مرور {c.name} بالكلمة المؤقتة، وتنتهي جلساته الحالية. أرسلها له بطريقة آمنة (اتصال أو واتساب).
       </ConfirmDialog>
     </>
   );

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
@@ -89,16 +90,22 @@ customersRouter.patch(
         companyName: z.string().trim().max(150).nullable().optional(),
         notes: z.string().max(3000).nullable().optional(),
         resetPassword: z.boolean().optional(),
+        /** كلمة مرور مؤقتة يبلّغها الأدمن للعميل (تُنهي جلساته الحالية) */
+        tempPassword: z.string().min(8, 'كلمة المرور المؤقتة 8 أحرف على الأقل').max(100).optional(),
       })
       .parse(req.body);
-    const { resetPassword, ...data } = input;
+    const { resetPassword, tempPassword, ...data } = input;
     if (data.email) {
       const other = await prisma.customer.findUnique({ where: { email: data.email }, select: { id: true } });
       if (other && other.id !== req.params.id) throw conflict('هذا البريد مستخدم لعميل آخر', { field: 'email' });
     }
     const c = await prisma.customer.update({
       where: { id: req.params.id },
-      data: { ...data, ...(resetPassword ? { passwordHash: null } : {}) },
+      data: {
+        ...data,
+        ...(resetPassword ? { passwordHash: null } : {}),
+        ...(tempPassword ? { passwordHash: await bcrypt.hash(tempPassword, 11) } : {}),
+      },
       select: { id: true, name: true, phone: true, email: true, companyName: true, notes: true },
     });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'update', entity: 'customer', entityId: c.id });

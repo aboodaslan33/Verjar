@@ -141,7 +141,7 @@ export default function Register() {
           value={v.phone}
           onChange={set('phone')}
           error={errors.phone}
-          hint="رقم جوال أردني، يُستخدم للدخول وللتواصل معك."
+          hint="رقم جوال أردني، تدخل به إلى حسابك ونتواصل معك عليه."
         />
         <Input
           name="email"

@@ -16,9 +16,9 @@ export default function LeafletMap({ lat, lng, label }: { lat: number; lng: numb
     // دائرة بدل أيقونة الدبوس الافتراضية (تتجنب مشاكل مسارات الصور مع Vite)
     const marker = L.circleMarker([lat, lng], {
       radius: 9,
-      color: '#ffffff',
+      color: '#1F2937',
       weight: 3,
-      fillColor: '#1f3a2e',
+      fillColor: '#E8B40B',
       fillOpacity: 1,
     }).addTo(map);
     if (label) marker.bindTooltip(label);

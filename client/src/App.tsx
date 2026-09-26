@@ -21,6 +21,8 @@ const NotFound = lazy(() => import('./pages/public/NotFound'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const Unsubscribe = lazy(() => import('./pages/public/Unsubscribe'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const Account = lazy(() => import('./pages/account/Account'));
 
 // لوحة الأدمن — حزمة منفصلة لا تُحمّل للزوار
@@ -54,6 +56,8 @@ export default function App() {
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           <Route path="unsubscribe" element={<Unsubscribe />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="reset-password" element={<ResetPassword />} />
           <Route path="account/login" element={<Navigate to="/login" replace />} />
           {/* الحجز والطلب والحساب للعملاء المسجّلين فقط */}
           <Route element={<RequireCustomer />}>

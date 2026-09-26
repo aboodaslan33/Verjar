@@ -58,7 +58,7 @@ export default function Settings() {
 
 function SystemStatus({ system }: { system: SettingsResponse['system'] }) {
   return (
-    <div className="mb-6 grid gap-3 sm:grid-cols-2">
+    <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div className="card p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="font-semibold">رسائل واتساب</p>
@@ -69,7 +69,7 @@ function SystemStatus({ system }: { system: SettingsResponse['system'] }) {
         <p className="mt-1 text-sm text-muted">
           {system.whatsappMode === 'CLOUD_API'
             ? 'تُرسل الرسائل تلقائيًا عبر WhatsApp Cloud API.'
-            : 'تُجهّز الرسائل كروابط wa.me، ويفتحها الموظف لإرسالها يدويًا. لتفعيل الإرسال التلقائي أضف مفاتيح Cloud API في إعدادات الخادم.'}
+            : 'بعد كل حجز أو طلب يفتح الموقع واتساب عند العميل برسالة جاهزة لرقمكم. للإرسال التلقائي اضبط WA_MODE=cloud مع مفاتيح Cloud API صالحة.'}
         </p>
       </div>
       <div className={cx('card p-4', !system.cloudinary && 'border-warn/50')}>
@@ -81,6 +81,17 @@ function SystemStatus({ system }: { system: SettingsResponse['system'] }) {
           {system.cloudinary
             ? 'الصور والملفات تُحفظ على Cloudinary.'
             : 'تنبيه: الملفات تُحفظ على خادم التطبيق وقد تُفقد عند إعادة النشر. اضبط CLOUDINARY_URL في بيئة الإنتاج.'}
+        </p>
+      </div>
+      <div className="card p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-semibold">البريد الإلكتروني</p>
+          <Tag tone={system.email ? 'brand' : 'sand'}>{system.email ? 'مفعّل' : 'غير مفعّل'}</Tag>
+        </div>
+        <p className="mt-1 text-sm text-muted">
+          {system.email
+            ? 'النشرة البريدية ورسائل استعادة كلمة المرور تعمل.'
+            : 'لتفعيل النشرة البريدية واستعادة كلمة المرور اضبط SMTP_USER و SMTP_PASS (Gmail App Password) على الخادم.'}
         </p>
       </div>
     </div>

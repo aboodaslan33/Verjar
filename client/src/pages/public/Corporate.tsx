@@ -50,7 +50,7 @@ export default function Corporate() {
       />
 
       <div className="container py-10 md:py-14">
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-2" data-reveal-group>
           {OPTIONS.map((o) => {
             const services = data?.filter((s) => s.kind === o.type) ?? [];
             return (
@@ -62,7 +62,7 @@ export default function Corporate() {
                 <ul className="mt-5 space-y-2 text-[15px]">
                   {o.points.map((p) => (
                     <li key={p} className="flex gap-2.5">
-                      <Icon name="check" className="mt-1 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" />
+                      <Icon name="check" className="mt-1 h-4 w-4 shrink-0 text-brand-700 dark:text-brand-300" />
                       <span>{p}</span>
                     </li>
                   ))}
@@ -104,7 +104,7 @@ export default function Corporate() {
           </div>
         )}
 
-        <section className="mt-10 grid gap-6 rounded-2xl border border-line bg-subtle p-6 md:grid-cols-3 md:p-8">
+        <section className="mt-10 grid gap-6 rounded-2xl border border-line bg-subtle p-6 md:grid-cols-3 md:p-8" data-reveal-group>
           <div>
             <h2 className="text-lg">ما الذي نحتاجه منكم</h2>
             <p className="mt-1 text-sm text-muted">لطلب العقد السنوي نطلب نسخة من السجل التجاري ورخصة المنشأة (صورة أو PDF).</p>

@@ -11,7 +11,7 @@ import { memoryUpload, uploadGuard } from '../../middleware/upload';
 import { accountCustomer } from '../../services/customer.service';
 import { corporateMessage, customerConfirmationMessage } from '../../services/messages';
 import { POLICIES, storeFile, validateFile } from '../../services/upload.service';
-import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
+import { confirmCustomer, notifyAdmin } from '../../services/whatsapp.service';
 import { corporateSchema } from '../../validators/corporate';
 
 export const corporateRouter = Router();
@@ -120,7 +120,7 @@ corporateRouter.post(
     });
 
     const wa = await notifyAdmin(request.whatsappText, { entityType: 'corporate', entityId: request.id });
-    await notifyCustomer(
+    await confirmCustomer(
       request.managerPhone,
       customerConfirmationMessage('طلب شركتكم', request.number, request.ref, request.contactName),
       { entityType: 'corporate', entityId: request.id },

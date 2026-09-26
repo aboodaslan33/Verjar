@@ -52,12 +52,12 @@ export default function Bookings() {
 
       <div className="container py-10 md:py-14">
         <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid gap-3 sm:grid-cols-2" data-reveal-group>
             {TYPES.map(({ type, text, needs }, i) => (
               <li key={type} className={i === 0 ? 'sm:col-span-2' : undefined}>
                 <Link
                   to={`/bookings/${BOOKING_TYPE_SLUG[type]}`}
-                  className="group flex h-full flex-col rounded-2xl border border-line bg-surface p-5 shadow-card transition-colors hover:border-brand-400 md:p-6"
+                  className="lift group flex h-full flex-col rounded-2xl border border-line bg-surface p-5 shadow-card hover:border-brand-400 md:p-6"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -85,7 +85,7 @@ export default function Bookings() {
             ))}
           </ul>
 
-          <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start" data-reveal>
             <section className="card p-5">
               <h2 className="text-lg">رسوم الكشف</h2>
               <p className="mt-1 text-sm text-muted">تُدفع عند الزيارة.</p>

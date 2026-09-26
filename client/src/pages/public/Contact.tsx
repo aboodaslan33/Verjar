@@ -44,7 +44,7 @@ export default function Contact() {
       />
 
       <div className="container grid gap-8 py-10 md:py-14 lg:grid-cols-12">
-        <section className="space-y-4 lg:col-span-5" aria-label="طرق التواصل">
+        <section className="space-y-4 lg:col-span-5" aria-label="طرق التواصل" data-reveal>
           <ButtonA
             href={waLink(settings.whatsappNumber)}
             target="_blank"
@@ -58,12 +58,12 @@ export default function Contact() {
 
           <ul className="card divide-y divide-line">
             <Method icon="phone" label="اتصال هاتفي">
-              <a href={`tel:${settings.phone}`} className="ltr inline-block min-h-[44px] py-2 hover:text-brand-600 dark:hover:text-brand-200">
+              <a href={`tel:${settings.phone}`} className="ltr inline-block min-h-[44px] py-2 hover:text-brand-700 dark:hover:text-brand-200">
                 {settings.phone}
               </a>
             </Method>
             <Method icon="mail" label="البريد الإلكتروني">
-              <a href={`mailto:${settings.email}`} className="ltr inline-block min-h-[44px] break-all py-2 hover:text-brand-600 dark:hover:text-brand-200">
+              <a href={`mailto:${settings.email}`} className="ltr inline-block min-h-[44px] break-all py-2 hover:text-brand-700 dark:hover:text-brand-200">
                 {settings.email}
               </a>
             </Method>
@@ -93,7 +93,7 @@ export default function Contact() {
           </div>
         </section>
 
-        <section className="space-y-6 lg:col-span-7" aria-labelledby="quick-msg">
+        <section className="space-y-6 lg:col-span-7" aria-labelledby="quick-msg" data-reveal>
           <form onSubmit={send} noValidate className="card space-y-5 p-5 sm:p-6">
             <div>
               <h2 id="quick-msg" className="text-xl">

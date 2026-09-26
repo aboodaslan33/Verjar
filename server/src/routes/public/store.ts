@@ -12,7 +12,7 @@ import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
 import { accountCustomer } from '../../services/customer.service';
 import { customerConfirmationMessage, orderMessage } from '../../services/messages';
-import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
+import { confirmCustomer, notifyAdmin } from '../../services/whatsapp.service';
 import { orderSchema } from '../../validators/order';
 
 export const storeRouter = Router();
@@ -182,7 +182,7 @@ storeRouter.post(
     });
 
     const wa = await notifyAdmin(order.whatsappText, { entityType: 'order', entityId: order.id });
-    await notifyCustomer(order.phone, customerConfirmationMessage('طلبك', order.number, order.ref, order.customerName), {
+    await confirmCustomer(order.phone, customerConfirmationMessage('طلبك', order.number, order.ref, order.customerName), {
       entityType: 'order',
       entityId: order.id,
     });

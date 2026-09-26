@@ -14,7 +14,7 @@ settingsRouter.get(
   asyncHandler(async (_req, res) => {
     ok(res, {
       settings: await getSettings(),
-      system: { whatsappMode: whatsappMode(), cloudinary: env.cloudinaryEnabled },
+      system: { whatsappMode: whatsappMode(), cloudinary: env.cloudinaryEnabled, email: env.emailEnabled },
     });
   }),
 );

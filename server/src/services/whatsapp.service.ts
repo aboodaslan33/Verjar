@@ -103,6 +103,15 @@ export async function notifyCustomer(phone: string, text: string, opts: SendOpti
   return sendWhatsApp(phone, text, opts);
 }
 
+/**
+ * تأكيد تلقائي للعميل بعد الحجز/الطلب — يُرسل فقط مع Cloud API.
+ * في وضع الروابط لا أحد يفتح الرابط، فلا داعي لتسجيله (العميل يرسل طلبه بنفسه عبر واتساب).
+ */
+export async function confirmCustomer(phone: string, text: string, opts: SendOptions = {}): Promise<void> {
+  if (!env.waCloudEnabled) return;
+  await sendWhatsApp(phone, text, opts);
+}
+
 export function whatsappMode() {
   return env.waCloudEnabled ? 'CLOUD_API' : 'LINK';
 }

@@ -15,7 +15,7 @@ import { bookingMessage, customerConfirmationMessage } from '../../services/mess
 import { assertSlotAvailable, bookingFee, getDaySlots } from '../../services/schedule.service';
 import { getSettings } from '../../services/settings.service';
 import { POLICIES, validateFile, validateAndStore } from '../../services/upload.service';
-import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
+import { confirmCustomer, notifyAdmin } from '../../services/whatsapp.service';
 import { MAX_DESIGN_FILES, MAX_PHOTOS, bookingSchema } from '../../validators/booking';
 import { dateField } from '../../validators/common';
 
@@ -157,7 +157,7 @@ bookingsRouter.post(
 
     const wa = await notifyAdmin(booking.whatsappText, { entityType: 'booking', entityId: booking.id });
     // تأكيد للعميل (يُرسل تلقائيًا فقط عند تفعيل Cloud API)
-    await notifyCustomer(
+    await confirmCustomer(
       booking.phone,
       customerConfirmationMessage('حجزك', booking.number, booking.ref, booking.name),
       { entityType: 'booking', entityId: booking.id },

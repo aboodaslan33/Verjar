@@ -1,6 +1,7 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useSite } from '../../context/SiteContext';
+import { useReveal } from '../../lib/useReveal';
 import { Icon, PageLoader } from '../ui';
 import { SiteFooter } from './SiteFooter';
 import { SiteHeader } from './SiteHeader';
@@ -8,6 +9,8 @@ import { SiteHeader } from './SiteHeader';
 export function PublicLayout() {
   const { pathname } = useLocation();
   const { settings } = useSite();
+  const [main, setMain] = useState<HTMLElement | null>(null);
+  useReveal(main, pathname);
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [pathname]);
@@ -18,10 +21,12 @@ export function PublicLayout() {
         تخطَّ إلى المحتوى
       </a>
       <SiteHeader />
-      <main id="main" className="flex-1">
-        <Suspense fallback={<PageLoader />}>
-          <Outlet />
-        </Suspense>
+      <main id="main" ref={setMain} className="flex-1">
+        <div key={pathname} className="page-enter">
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
+        </div>
       </main>
       <SiteFooter />
       {/* زر واتساب ثابت للجوال */}

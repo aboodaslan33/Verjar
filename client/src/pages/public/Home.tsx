@@ -49,7 +49,7 @@ export default function Home() {
       {/* ——— الواجهة ——— */}
       <section className="border-b border-line bg-surface">
         <div className="container grid gap-10 py-14 md:py-20 lg:grid-cols-12 lg:items-center">
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7" data-reveal-group>
             <p className="eyebrow">فرجار قروب — مقاولات وصيانة</p>
             <h1 className="mt-3 text-3xl leading-tight sm:text-4xl md:text-5xl md:leading-tight">
               {settings.heroTitle}
@@ -65,18 +65,18 @@ export default function Home() {
             </div>
             <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-muted">
               <a href={`tel:${settings.phone}`} className="inline-flex min-h-[44px] items-center gap-2 hover:text-ink">
-                <Icon name="phone" className="h-4 w-4 text-brand-600" />
+                <Icon name="phone" className="h-4 w-4 text-brand-700" />
                 <span className="ltr">{settings.phone}</span>
               </a>
               <span className="h-4 w-px bg-line" aria-hidden />
               <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-2 hover:text-ink">
-                <Icon name="whatsapp" className="h-4 w-4 text-brand-600" />
+                <Icon name="whatsapp" className="h-4 w-4 text-brand-700" />
                 واتساب <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
               </a>
             </p>
           </div>
 
-          <aside className="lg:col-span-5" aria-label="رسوم الكشف">
+          <aside className="lg:col-span-5" aria-label="رسوم الكشف" data-reveal>
             <div className="card p-6">
               <h2 className="text-base font-semibold">رسوم الكشف الفني</h2>
               <p className="mt-1 text-sm text-muted">ثابتة لكل المحافظات</p>
@@ -106,7 +106,7 @@ export default function Home() {
       <section className="border-b border-line bg-surface">
         <div className="container py-12 md:py-14">
           <h2 className="sr-only">نبذة سريعة: كيف نعمل</h2>
-          <ol className="grid gap-8 md:grid-cols-3 md:gap-10">
+          <ol className="grid gap-8 md:grid-cols-3 md:gap-10" data-reveal-group>
             {[
               {
                 t: 'كشف على الموقع',
@@ -137,23 +137,23 @@ export default function Home() {
               <p className="eyebrow">الخدمات</p>
               <h2 className="mt-1 text-2xl md:text-3xl">اختر نوع العمل واحجز موعدك</h2>
             </div>
-            <Link to="/bookings" className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-200">
+            <Link to="/bookings" className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
               كل أنواع الحجز <Icon name="chevronLeft" className="h-4 w-4" />
             </Link>
           </div>
 
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-reveal-group>
             {SERVICES.map((s, i) => (
               <li key={s.slug}>
                 <Link
                   to={`/bookings/${s.slug}`}
-                  className="card group flex h-full flex-col p-6 transition-colors hover:border-brand-300 dark:hover:border-brand-500"
+                  className="card lift group flex h-full flex-col p-6 hover:border-brand-300 dark:hover:border-brand-500"
                 >
                   <span className="ltr text-sm font-bold text-brand-700 dark:text-brand-300">{String(i + 1).padStart(2, '0')}</span>
                   <span className="mt-3 block h-px w-10 bg-brand-400 transition-all group-hover:w-16" aria-hidden />
                   <h3 className="mt-4 text-xl">{s.title}</h3>
                   <p className="mt-2 flex-1 text-muted">{s.text}</p>
-                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 dark:text-brand-200">
+                  <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 dark:text-brand-200">
                     احجز {s.title} <Icon name="chevronLeft" className="h-4 w-4" />
                   </span>
                 </Link>
@@ -165,7 +165,7 @@ export default function Home() {
 
       {/* ——— الشركات ——— */}
       <section className="border-y border-line bg-subtle">
-        <div className="container grid gap-8 py-12 md:grid-cols-12 md:items-center md:py-16">
+        <div className="container grid gap-8 py-12 md:grid-cols-12 md:items-center md:py-16" data-reveal-group>
           <div className="md:col-span-7">
             <p className="eyebrow">للمصانع والشركات</p>
             <h2 className="mt-1 text-2xl md:text-3xl">عقود صيانة سنوية للمصانع والمنشآت</h2>
@@ -201,7 +201,7 @@ export default function Home() {
                 <p className="eyebrow">المتجر</p>
                 <h2 className="mt-1 text-2xl md:text-3xl">منتجات من ورشتنا</h2>
               </div>
-              <Link to="/store" className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-200">
+              <Link to="/store" className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
                 كل المنتجات <Icon name="chevronLeft" className="h-4 w-4" />
               </Link>
             </div>
@@ -209,7 +209,7 @@ export default function Home() {
               {featured.loading ? (
                 <ProductGridSkeleton count={4} className={PRODUCT_GRID} />
               ) : (
-                <div className={PRODUCT_GRID}>
+                <div className={PRODUCT_GRID} data-reveal-group>
                   {featuredItems.map((p) => (
                     <ProductCard key={p.id} product={p} />
                   ))}
@@ -222,7 +222,7 @@ export default function Home() {
 
       {/* ——— التواصل ——— */}
       <section className="border-t border-line bg-surface">
-        <div className="container grid gap-10 py-12 md:grid-cols-12 md:py-16">
+        <div className="container grid gap-10 py-12 md:grid-cols-12 md:py-16" data-reveal-group>
           <div className="md:col-span-5">
             <p className="eyebrow">تواصل</p>
             <h2 className="mt-1 text-2xl md:text-3xl">عندك سؤال قبل الحجز؟</h2>
@@ -233,12 +233,12 @@ export default function Home() {
           </div>
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 md:col-span-7">
             <ContactItem icon="phone" label="الهاتف">
-              <a href={`tel:${settings.phone}`} className="ltr hover:text-brand-600 dark:hover:text-brand-200">
+              <a href={`tel:${settings.phone}`} className="ltr hover:text-brand-700 dark:hover:text-brand-200">
                 {settings.phone}
               </a>
             </ContactItem>
             <ContactItem icon="mail" label="البريد الإلكتروني">
-              <a href={`mailto:${settings.email}`} className="ltr break-all hover:text-brand-600 dark:hover:text-brand-200">
+              <a href={`mailto:${settings.email}`} className="ltr break-all hover:text-brand-700 dark:hover:text-brand-200">
                 {settings.email}
               </a>
             </ContactItem>

@@ -16,7 +16,7 @@ function limiter(windowMs: number, limit: number, message: string) {
 /** نماذج الحجز والطلب: 20 طلبًا كل 15 دقيقة لكل IP */
 export const formLimiter = limiter(15 * 60_000, 20, 'طلبات كثيرة خلال وقت قصير، حاول بعد قليل');
 
-/** تسجيل الدخول و OTP: 10 محاولات كل 15 دقيقة */
+/** تسجيل الدخول والتسجيل واستعادة كلمة المرور: 10 محاولات كل 15 دقيقة لكل IP */
 export const authLimiter = limiter(15 * 60_000, 10, 'محاولات كثيرة، حاول بعد 15 دقيقة');
 
 /** حد عام للـ API */

@@ -6,7 +6,7 @@ type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'whats
 type Size = 'sm' | 'md' | 'lg';
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 select-none';
+  'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98] motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100 select-none';
 
 const variants: Record<Variant, string> = {
   primary: 'bg-primary text-primary-fg hover:bg-primary-hover active:bg-primary-hover',

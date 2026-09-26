@@ -1,4 +1,6 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
+import * as email from '../src/services/email.service';
 import { unsubscribeToken } from '../src/services/email.service';
 import { app, createAdmin, createCustomer, createProduct, prisma, resetDb } from './helpers';
 
@@ -71,5 +73,43 @@ describe('النشرة البريدية', () => {
     const okRes = await request(app).post(`/api/email/unsubscribe?c=${id}&t=${unsubscribeToken(id)}`).type('form').send('List-Unsubscribe=One-Click');
     expect(okRes.status).toBe(200);
     expect((await prisma.customer.findUniqueOrThrow({ where: { id } })).emailOptIn).toBe(false);
+  });
+});
+
+describe('نسيت كلمة المرور', () => {
+  it('يرسل رابطًا صالحًا لمرة واحدة ويُنهي الجلسات القديمة', async () => {
+    const spy = jest.spyOn(email, 'sendPasswordReset').mockResolvedValue(undefined);
+    const old = await createCustomer({ phone: '0791000009', email: 'r@example.com', password: 'OldPass@123' });
+    const unknown = await request(app).post('/api/auth/password/forgot').send({ email: 'nobody@example.com' });
+    const known = await request(app).post('/api/auth/password/forgot').send({ email: 'R@example.com' });
+    expect(unknown.status).toBe(200);
+    expect(known.body.data.message).toBe(unknown.body.data.message);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const url = spy.mock.calls[0][2];
+    const token = decodeURIComponent(url.split('token=')[1]);
+
+    const agent = request.agent(app);
+    const r = await agent.post('/api/auth/password/reset').send({ token, password: 'NewPass@123' });
+    expect(r.status).toBe(200);
+    expect((await agent.get('/api/auth/me')).status).toBe(200);
+    expect((await old.get('/api/auth/me')).status).toBe(401);
+    const again = await request(app).post('/api/auth/password/reset').send({ token, password: 'Other@1234' });
+    expect(again.status).toBe(400);
+
+    // رابط بغرض آخر أو توكن جلسة لا يصلح
+    const fake = jwt.sign({ sub: r.body.data.id, purpose: 'other' }, process.env.JWT_SECRET!);
+    expect((await request(app).post('/api/auth/password/reset').send({ token: fake, password: 'X@12345678' })).status).toBe(400);
+    spy.mockRestore();
+  });
+
+  it('الأدمن يعيّن كلمة مرور مؤقتة', async () => {
+    const c = await createCustomer({ phone: '0791000010' });
+    const me = await c.get('/api/auth/me');
+    const admin = await createAdmin();
+    const r = await admin.patch(`/api/admin/customers/${me.body.data.id}`).send({ tempPassword: 'Temp@2026x' });
+    expect(r.status).toBe(200);
+    expect((await c.get('/api/auth/me')).status).toBe(401);
+    const login = await request(app).post('/api/auth/login').send({ identifier: '0791000010', password: 'Temp@2026x' });
+    expect(login.status).toBe(200);
   });
 });

@@ -157,7 +157,7 @@ function ProductView({ product, related }: ProductResponse) {
         <section className="border-t border-line bg-surface">
           <div className="container py-10 md:py-14">
             <h2 className="text-xl md:text-2xl">منتجات من نفس التصنيف</h2>
-            <div className={cx(PRODUCT_GRID, 'mt-6')}>
+            <div className={cx(PRODUCT_GRID, 'mt-6')} data-reveal-group>
               {related.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

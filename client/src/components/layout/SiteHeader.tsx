@@ -28,13 +28,22 @@ export function SiteHeader() {
 
   useEffect(() => setOpen(false), [location.pathname]);
 
+  // ظل خفيف للهيدر بعد بدء التمرير
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   async function onLogout() {
     await logout();
     if (location.pathname.startsWith('/account')) navigate('/', { replace: true });
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
+    <header className={cx('sticky top-0 z-40 border-b border-line bg-bg transition-shadow duration-300', scrolled && 'shadow-[0_6px_20px_-14px_rgb(17_24_39/0.35)]')}>
       {/* شريط التواصل العلوي */}
       <div className="hidden border-b border-line bg-subtle text-muted md:block">
         <div className="container flex h-9 items-center justify-between text-[13px]">
@@ -133,7 +142,7 @@ export function SiteHeader() {
       </div>
 
       {open && (
-        <nav id="mobile-nav" className="border-t border-line bg-bg lg:hidden" aria-label="القائمة">
+        <nav id="mobile-nav" className="animate-fade-up border-t border-line bg-bg lg:hidden" aria-label="القائمة">
           <ul className="container space-y-1 py-3">
             {NAV.map((n) => (
               <li key={n.to}>

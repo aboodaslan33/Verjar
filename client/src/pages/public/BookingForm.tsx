@@ -392,7 +392,7 @@ function BookingWizard({ type }: { type: BookingType }) {
         return;
       }
     }
-    setSubmitError(e.status === 429 ? 'أرسلت طلبات كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مجددًا.' : e.message);
+    setSubmitError(e.message);
   }
 
   if (done) {

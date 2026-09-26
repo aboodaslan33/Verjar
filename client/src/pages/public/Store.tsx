@@ -150,7 +150,7 @@ export default function Store() {
             <ProductGridSkeleton count={8} className={PRODUCT_GRID} />
           ) : products.data && products.data.items.length > 0 ? (
             <>
-              <div className={PRODUCT_GRID}>
+              <div className={PRODUCT_GRID} data-reveal-group>
                 {products.data.items.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}

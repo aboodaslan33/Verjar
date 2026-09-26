@@ -17,10 +17,11 @@
 2. [متغيرات البيئة](#متغيرات-البيئة)
 3. [النشر على Render خطوة بخطوة](#النشر-على-render-خطوة-بخطوة)
 4. [واتساب](#واتساب)
-5. [قواعد العمل](#قواعد-العمل)
-6. [توثيق الـ API](#توثيق-الـ-api)
-7. [الاختبارات](#الاختبارات)
-8. [هيكل المشروع](#هيكل-المشروع)
+5. [النشرة البريدية](#النشرة-البريدية)
+6. [قواعد العمل](#قواعد-العمل)
+7. [توثيق الـ API](#توثيق-الـ-api)
+8. [الاختبارات](#الاختبارات)
+9. [هيكل المشروع](#هيكل-المشروع)
 
 ---
 
@@ -92,6 +93,7 @@ npm run dev
 | `CLOUDINARY_FOLDER` | | المجلد في Cloudinary (افتراضي `verjar`) |
 | `WA_MODE` | | `link` (افتراضي): بعد إرسال الحجز أو الطلب يفتح الموقع واتساب برسالة جاهزة لرقم الإدارة. `cloud`: إرسال تلقائي عبر Cloud API |
 | `WA_TOKEN` / `WA_PHONE_ID` | اختياري | مفاتيح WhatsApp Cloud API — تُستخدم فقط مع `WA_MODE=cloud` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM_NAME` | للبريد | النشرة البريدية واستعادة كلمة المرور (راجع قسم النشرة البريدية) |
 | `WA_API_VERSION` | | إصدار Graph API (افتراضي `v21.0`) |
 | `TEST_DATABASE_URL` | اختبارات | قاعدة بيانات الاختبار، ويجب أن يحتوي اسمها على `test` |
 
@@ -182,8 +184,8 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 الخدمة `server/src/services/whatsapp.service.ts` لها واجهة واحدة (`sendWhatsApp` / `notifyAdmin` / `notifyCustomer`) تعمل بحالتين:
 
-1. **الافتراضي، بدون API:** بعد كل حجز أو طلب أو طلب شركة يولّد السيرفر رسالة مرتبة ويعيد رابط `https://wa.me/<رقم الإدارة>?text=<الرسالة>`، فتعرض الواجهة زر **"إرسال عبر واتساب"**. في لوحة التحكم، عند تغيير الحالة أو رفع عرض سعر، يظهر للأدمن زر يفتح واتساب برسالة جاهزة للعميل.
-2. **WhatsApp Cloud API (اختياري):** عند ضبط `WA_MODE=cloud` مع `WA_TOKEN` و `WA_PHONE_ID` صالحين يرسل السيرفر الرسالة تلقائيًا للإدارة وللعميل، ويبقى رابط wa.me كنسخة احتياطية. رموز الدخول (OTP) تُرسل بهذه الطريقة.
+1. **الافتراضي (`WA_MODE=link`):** بعد كل حجز أو طلب أو طلب شركة يولّد السيرفر رسالة مرتبة ويعيد رابط `https://wa.me/<رقم الإدارة>?text=<الرسالة>`، وتفتح الواجهة واتساب تلقائيًا عند العميل برسالة جاهزة (مع زر "إرسال عبر واتساب" احتياطًا). في لوحة التحكم، عند تغيير الحالة أو رفع عرض سعر، يظهر للأدمن زر يفتح واتساب برسالة جاهزة للعميل.
+2. **WhatsApp Cloud API (اختياري):** عند ضبط `WA_MODE=cloud` مع `WA_TOKEN` و `WA_PHONE_ID` صالحين يرسل السيرفر الرسالة تلقائيًا للإدارة وللعميل، ويبقى رابط wa.me كنسخة احتياطية.
 
 كل رسالة تُسجّل في جدول `WhatsAppLog` وتظهر في **لوحة التحكم ← السجلات**.
 
@@ -204,6 +206,15 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 ```
 
 ---
+
+## النشرة البريدية
+
+من **لوحة التحكم ← النشرة البريدية** يكتب الأدمن رسالة موحّدة (منتج جديد، خدمة جديدة، إعلان) مع زر اختياري (منتج، الحجوزات، الشركات، المتجر)، ويعاينها ويرسل نسخة تجريبية لبريده، ثم يرسلها لكل العملاء المسجّلين الذين لديهم بريد ووافقوا على الاستلام. الإرسال في الخلفية مع عدادات حيّة وسجل للحملات. من صفحة أي منتج يوجد زر **"أعلن عنه بالبريد"**.
+
+- الإعداد: `SMTP_USER` (مثل farjarweb@gmail.com) و `SMTP_PASS` = **App Password** من حساب Google (يتطلب تفعيل التحقق بخطوتين: myaccount.google.com/apppasswords). `SMTP_HOST=smtp.gmail.com` و `SMTP_PORT=465` افتراضيًا.
+- حد Gmail تقريبًا 500 رسالة يوميًا؛ للأعداد الأكبر استخدم مزود SMTP مخصص (Brevo، Mailgun، SES) بنفس المتغيرات.
+- كل رسالة فيها رابط إلغاء اشتراك موقّع، وزر إلغاء الاشتراك في Gmail (One-Click). العميل يتحكم بالاشتراك من صفحة حسابه أيضًا.
+- نفس الإعداد يفعّل **"نسيت كلمة المرور"**: رابط بالبريد صالح لساعة ولمرة واحدة. العميل بدون بريد يعيّن له الأدمن كلمة مرور مؤقتة من صفحة العميل.
 
 ## قواعد العمل
 
@@ -247,8 +258,8 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 | type | حقول إضافية |
 |---|---|
-| `INSPECTION` | `zone: INSIDE_AMMAN\|OUTSIDE_AMMAN`, `urgency: NORMAL\|EMERGENCY`, `details: { faultType, description }` |
-| `PAINTING` | `details: { paintType, jobKind: NEW\|RENEW, rooms, area, colors?, decorations }` |
+| `INSPECTION` | `urgency: NORMAL\|URGENT\|EMERGENCY` (رسوم ثابتة لكل المحافظات)، `details: { faultType, description }` |
+| `PAINTING` | `zone: INSIDE_AMMAN\|OUTSIDE_AMMAN` (رسوم الكشف)، `details: { paintType, jobKind: NEW\|RENEW, rooms, area, colors?, decorations }` |
 | `CONSTRUCTION` | `lat, lng` مطلوبة، `details: { tiles, buildingType: HOUSE\|APARTMENT\|VILLA\|COMMERCIAL, landArea, buildArea, floors, hasDesign }` + `designFiles` عند `hasDesign` |
 | `METALWORK` | `details: { workType, hasDesign, dimensions, quantity }` + `designFiles` عند `hasDesign` |
 | `GENERAL` | `details: { description }` |
@@ -270,7 +281,9 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 | POST | `/auth/logout` | يمسح الجلسة |
 | POST | `/auth/register` | تسجيل عميل `{ name, phone (07XXXXXXXX), email?, password (8+), ref? }`. إن كان للرقم حجوزات سابقة من قبل التسجيل (بيانات قديمة) يُعاد `409 CLAIM_REQUIRED` ويُطلب `ref` (رقم مرجع أحدها) لإثبات ملكية الرقم |
 | POST | `/auth/login` | دخول العميل `{ identifier, password }` حيث `identifier` رقم الهاتف أو البريد |
-| PATCH | `/auth/profile` | تعديل `{ name?, email? }` للعميل |
+| PATCH | `/auth/profile` | تعديل `{ name?, email?, emailOptIn? }` للعميل |
+| POST | `/auth/password/forgot` | `{ email }` يرسل رابط تعيين كلمة مرور جديدة (صالح لساعة) |
+| POST | `/auth/password/reset` | `{ token, password }` |
 | POST | `/auth/admin/login` | `{ email, password }` — حسابات الأدمن تُنشأ من الـ seed فقط |
 | POST | `/auth/admin/logout` | |
 | GET | `/auth/admin/me` | |
@@ -401,8 +414,8 @@ verjar/
 │   │   │   └── useAsync.ts
 │   │   ├── pages/
 │   │   │   ├── account/
-│   │   │   │   ├── Account.tsx
-│   │   │   │   └── Login.tsx
+│   │   │   │   └── Account.tsx
+│   │   │   ├── auth/            # Login, Register, ForgotPassword, ResetPassword
 │   │   │   ├── admin/
 │   │   │   │   ├── AdminApp.tsx
 │   │   │   │   ├── BookingDetail.tsx

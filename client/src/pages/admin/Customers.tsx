@@ -35,7 +35,7 @@ export default function Customers() {
   ];
 
   return (
-    <AdminPage title="العملاء" description="يُنشأ العميل تلقائيًا عند أول حجز أو طلب برقم هاتفه">
+    <AdminPage title="العملاء" description="العملاء المسجّلون عبر صفحة إنشاء حساب">
       <FilterBar onClear={f.clear} active={f.active}>
         <SearchInput value={v.q} onChange={(q) => f.set({ q })} placeholder="اسم، شركة، رقم هاتف…" />
       </FilterBar>

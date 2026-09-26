@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { env } from '../config/env';
 import { audit } from '../lib/audit';
 import { HttpError, asyncHandler, badRequest, conflict, ok, unauthorized } from '../lib/http';
 import { normalizePhone } from '../lib/phone';
 import { prisma } from '../lib/prisma';
-import { clearAuthCookie, isAdminRole, principalOf, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
+import { clearAuthCookie, isAdminRole, passwordFingerprint, principalOf, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
 import { accountLimiter, authLimiter } from '../middleware/rateLimit';
+import { emailReady, sendPasswordReset } from '../services/email.service';
 import { nameField } from '../validators/common';
 
 export const authRouter = Router();
@@ -228,6 +231,64 @@ authRouter.post(
     const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
     setAuthCookie(res, principalOf(updated));
     return ok(res, customerPublic(updated));
+  }),
+);
+
+// ───────────── نسيت كلمة المرور ─────────────
+
+const RESET_TTL_S = 60 * 60;
+
+/** طلب رابط إعادة التعيين بالبريد — الرد نفسه دائمًا حتى لا يكشف وجود الحساب */
+authRouter.post(
+  '/password/forgot',
+  authLimiter,
+  accountLimiter('email'),
+  asyncHandler(async (req, res) => {
+    const { email } = z.object({ email: emailField }).parse(req.body);
+    if (!emailReady()) {
+      throw new HttpError(503, 'استعادة كلمة المرور بالبريد غير متاحة حاليًا. تواصل معنا على واتساب لتعيين كلمة مرور مؤقتة.', 'EMAIL_DISABLED');
+    }
+    const c = await prisma.customer.findUnique({ where: { email } });
+    if (c && !c.deletedAt) {
+      const token = jwt.sign({ sub: c.id, purpose: 'reset', pv: passwordFingerprint(c.passwordHash) }, env.JWT_SECRET, {
+        algorithm: 'HS256',
+        expiresIn: RESET_TTL_S,
+      });
+      const url = `${env.siteUrl}/reset-password?token=${encodeURIComponent(token)}`;
+      try {
+        await sendPasswordReset(email, c.name, url);
+      } catch (e) {
+        console.error('password reset email failed', e);
+      }
+    }
+    ok(res, { message: 'إذا كان البريد مسجّلًا لدينا ستصلك رسالة فيها رابط لتعيين كلمة مرور جديدة خلال دقائق.' });
+  }),
+);
+
+/** تعيين كلمة مرور جديدة من رابط البريد (صالح لساعة ولمرة واحدة) */
+authRouter.post(
+  '/password/reset',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { token, password } = z.object({ token: z.string().min(10).max(2000), password: passwordField }).parse(req.body);
+    const invalid = () => badRequest('الرابط غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.', { field: 'token' });
+    let p: { sub?: string; purpose?: string; pv?: string };
+    try {
+      p = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as typeof p;
+    } catch {
+      throw invalid();
+    }
+    if (p.purpose !== 'reset' || !p.sub) throw invalid();
+    const c = await prisma.customer.findUnique({ where: { id: p.sub } });
+    // بصمة كلمة المرور تجعل الرابط صالحًا لمرة واحدة: بعد التغيير لا يعود يطابق
+    if (!c || c.deletedAt || p.pv !== passwordFingerprint(c.passwordHash)) throw invalid();
+    const updated = await prisma.customer.update({
+      where: { id: c.id },
+      data: { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS), lastLoginAt: new Date() },
+    });
+    setAuthCookie(res, principalOf(updated));
+    await audit({ actorType: 'customer', action: 'password_reset', entity: 'customer', entityId: c.id });
+    ok(res, customerPublic(updated));
   }),
 );
 

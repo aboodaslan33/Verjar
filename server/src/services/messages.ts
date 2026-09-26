@@ -8,6 +8,7 @@ import {
   URGENCY_LEVEL_AR,
   formatDetailValue,
 } from '../lib/labels';
+import { env } from '../config/env';
 import { formatJOD, toNum } from '../lib/money';
 import { displayPhone } from '../lib/phone';
 import { formatAmman } from '../lib/time';
@@ -84,7 +85,7 @@ export function corporateMessage(r: CorporateRequest & { services: CorporateServ
 }
 
 export function statusMessage(kind: string, number: number, status: keyof typeof STATUS_AR, name: string): string {
-  return `مرحبًا ${name}،\nتم تحديث حالة ${kind} رقم #${number} لدى ${BRAND} إلى: ${STATUS_AR[status]}.\nتقدر تتابع التفاصيل من صفحتك على موقعنا.`;
+  return `مرحبًا ${name}،\nتم تحديث حالة ${kind} رقم #${number} لدى ${BRAND} إلى: ${STATUS_AR[status]}.\nتقدر تتابع التفاصيل من حسابك: ${env.siteUrl}/account`;
 }
 
 export function quoteFileMessage(name: string, title: string, url: string, amount?: number | null): string {

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { ContractForm } from '../../components/admin/ContractForm';
 import { DataTable, type Column } from '../../components/admin/DataTable';
 import { FileUploadForm } from '../../components/admin/FileUploadForm';
-import { useAdminQuery, useFilters } from '../../components/admin/hooks';
+import { useAdminQuery, useFilters, useMutation } from '../../components/admin/hooks';
 import { CONTRACT_STATUS_LABEL, daysUntil } from '../../components/admin/labels';
 import type { Contract } from '../../components/admin/types';
 import { AdminPage, FilterBar, FilterSelect } from '../../components/admin/ui';
@@ -26,6 +27,15 @@ export default function Contracts() {
   );
   const [edit, setEdit] = useState<Contract | null>(null);
   const [upload, setUpload] = useState<Contract | null>(null);
+  const [remove, setRemove] = useState<Contract | null>(null);
+  const m = useMutation();
+
+  async function doRemove() {
+    if (!remove) return;
+    const r = await m.run('del', () => api.del(`/admin/corporate/contracts/${remove.id}`), 'تم حذف العقد');
+    setRemove(null);
+    if (r) list.reload();
+  }
 
   const columns: Column<Contract>[] = [
     {
@@ -94,6 +104,9 @@ export default function Contracts() {
               الطلب
             </Link>
           )}
+          <Button size="sm" variant="ghost" className="text-danger" onClick={() => setRemove(c)} aria-label={`حذف العقد #${c.number}`}>
+            حذف
+          </Button>
         </span>
       ),
     },
@@ -171,6 +184,16 @@ export default function Contracts() {
           </>
         )}
       </Modal>
+      <ConfirmDialog
+        open={Boolean(remove)}
+        title="حذف العقد؟"
+        confirmLabel="حذف"
+        loading={m.pending === 'del'}
+        onConfirm={doRemove}
+        onClose={() => setRemove(null)}
+      >
+        سيُحذف العقد #{remove?.number} من القوائم وحسابات العميل المالية. يبقى محفوظًا في السجلات.
+      </ConfirmDialog>
     </AdminPage>
   );
 }

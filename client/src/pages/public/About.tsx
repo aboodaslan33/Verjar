@@ -14,7 +14,7 @@ export default function About() {
   const steps = [
     {
       t: 'تحجز موعدًا',
-      d: 'تختار نوع العمل والموعد المناسب من الموقع، وترفق صورًا للمشكلة إن وجدت. يصلك تأكيد على واتساب.',
+      d: 'تختار نوع العمل والموعد المناسب من الموقع، وترفق صورًا للمشكلة إن وجدت، ثم ترسل الطلب لنا على واتساب برسالة جاهزة.',
     },
     {
       t: 'نكشف على الموقع',
@@ -34,7 +34,7 @@ export default function About() {
     <>
       <PageHeader eyebrow="من نحن" title={settings.aboutTitle} />
 
-      <section className="container py-10 md:py-14">
+      <section className="container py-10 md:py-14" data-reveal>
         <div className="max-w-prose space-y-5 text-lg leading-loose">
           {paragraphs.length > 0 ? (
             paragraphs.map((p, i) => (
@@ -50,7 +50,7 @@ export default function About() {
         </div>
       </section>
 
-      <section className="border-y border-line bg-surface">
+      <section className="border-y border-line bg-surface" data-reveal>
         <div className="container py-12 md:py-16">
           <p className="eyebrow">كيف نعمل</p>
           <h2 className="mt-1 text-2xl md:text-3xl">من الحجز حتى التسليم</h2>
@@ -66,7 +66,7 @@ export default function About() {
         </div>
       </section>
 
-      <section className="container py-12 md:py-16">
+      <section className="container py-12 md:py-16" data-reveal>
         <div className="grid gap-8 md:grid-cols-12 md:items-center">
           <div className="md:col-span-8">
             <h2 className="text-2xl">أين نعمل</h2>
