@@ -9,7 +9,7 @@ import { round3, toNum } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
 import { formLimiter } from '../../middleware/rateLimit';
-import { upsertCustomer } from '../../services/customer.service';
+import { resolveCustomer } from '../../services/customer.service';
 import { customerConfirmationMessage, orderMessage } from '../../services/messages';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
 import { orderSchema } from '../../validators/order';
@@ -148,7 +148,7 @@ storeRouter.post(
         if (updated.count === 0) throw badRequest(`الكمية المطلوبة من "${it.name}" لم تعد متوفرة`);
       }
 
-      const customer = await upsertCustomer(tx, { phone: input.phone, name: input.name });
+      const customer = await resolveCustomer(tx, req.auth, { phone: input.phone, name: input.name });
       subtotal = round3(subtotal);
       total = round3(total);
       const created = await tx.order.create({

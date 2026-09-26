@@ -152,6 +152,15 @@ export function waLink(number: string, text?: string) {
 }
 
 /** تحقق فوري من رقم الهاتف الأردني (نفس منطق السيرفر) */
+/** رقم جوال أردني فقط (07XXXXXXXX) — للتسجيل */
+export function isJordanMobile(raw: string): boolean {
+  let s = raw.replace(/[\s\-()]/g, '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+  if (s.startsWith('+')) s = s.slice(1);
+  else if (s.startsWith('00')) s = s.slice(2);
+  if (s.startsWith('07')) s = '962' + s.slice(1);
+  return /^9627[789]\d{7}$/.test(s);
+}
+
 export function isValidPhone(raw: string): boolean {
   let s = raw.replace(/[\s\-()]/g, '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
   if (s.startsWith('+')) s = s.slice(1);

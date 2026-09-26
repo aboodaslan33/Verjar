@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
 import { Alert, Button, ButtonA, ButtonLink, EmptyState, Icon, Input, PageHeader, Textarea } from '../../components/ui';
+import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useCart } from '../../context/CartContext';
 import { ApiError, api } from '../../lib/api';
 import { formatJOD, isValidPhone } from '../../lib/format';
@@ -40,6 +41,7 @@ export default function Checkout() {
   useDocumentTitle('إتمام الطلب');
   const cart = useCart();
   const [form, setForm] = useState<Form>({ name: '', phone: '', address: '', notes: '' });
+  useAccountPrefill((c) => setForm((f) => ({ ...f, name: f.name || c.name, phone: f.phone || c.localPhone })));
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -138,6 +140,7 @@ export default function Checkout() {
             </Alert>
           )}
           <div className="card space-y-5 p-5 sm:p-6">
+            <AccountNote what="الطلب" />
             <Input
               ref={(el) => (refs.current.name = el)}
               label="الاسم"

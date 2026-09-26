@@ -17,6 +17,7 @@ import {
   useDraftSaver,
 } from '../../components/forms/formUtils';
 import { Alert, ButtonLink, ChoiceGroup, Input, Stepper, Textarea } from '../../components/ui';
+import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useSite } from '../../context/SiteContext';
 import { ApiError, api, toFormData } from '../../lib/api';
 import {
@@ -246,6 +247,7 @@ function BookingWizard({ type }: { type: BookingType }) {
   const [showRestored, setShowRestored] = useState(restored);
 
   const [v, setV] = useState<Vals>(initial);
+  useAccountPrefill((c) => setV((s) => ({ ...s, name: s.name || c.name, phone: s.phone || c.localPhone })));
   const [photos, setPhotos] = useState<File[]>([]);
   const [designFiles, setDesignFiles] = useState<File[]>([]);
   const [step, setStep] = useState(0);
@@ -693,6 +695,7 @@ function BookingWizard({ type }: { type: BookingType }) {
             {step === 1 && (
               <div className="space-y-5">
                 <StepHeading stepKey={step} title="بياناتك وموقع العمل" description="نستخدم الرقم للتواصل وتأكيد الموعد فقط." />
+                <AccountNote />
                 <Field field="name">
                   <Input label="الاسم" autoComplete="name" value={v.name} maxLength={100} onChange={(e) => set('name', e.target.value)} onBlur={() => touch('name')} error={err('name')} />
                 </Field>

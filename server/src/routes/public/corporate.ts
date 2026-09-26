@@ -7,7 +7,7 @@ import { CORPORATE_TYPE_AR } from '../../lib/labels';
 import { prisma } from '../../lib/prisma';
 import { formLimiter } from '../../middleware/rateLimit';
 import { memoryUpload } from '../../middleware/upload';
-import { upsertCustomer } from '../../services/customer.service';
+import { resolveCustomer } from '../../services/customer.service';
 import { corporateMessage, customerConfirmationMessage } from '../../services/messages';
 import { POLICIES, storeFile, validateFile } from '../../services/upload.service';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
@@ -71,7 +71,7 @@ corporateRouter.post(
     ]);
 
     const request = await prisma.$transaction(async (tx) => {
-      const customer = await upsertCustomer(tx, {
+      const customer = await resolveCustomer(tx, req.auth, {
         phone: input.managerPhone,
         name: input.contactName,
         companyName: input.companyName,

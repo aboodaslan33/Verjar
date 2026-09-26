@@ -15,6 +15,7 @@ import {
   StatusBadge,
   Tag,
 } from '../../components/ui';
+import { isAdminUser, useAuth } from '../../context/Auth';
 import { useCustomer } from '../../context/CustomerAuth';
 import { useToast } from '../../context/ToastContext';
 import { ApiError, api } from '../../lib/api';
@@ -140,9 +141,11 @@ function linkedLabel(x: { booking?: Linked; order?: Linked; corporateRequest?: L
 
 export default function Account() {
   useDocumentTitle('صفحتي');
+  const { user } = useAuth();
   const { customer, loading } = useCustomer();
   if (loading) return <PageLoader />;
-  if (!customer) return <Navigate to="/account/login?next=/account" replace />;
+  if (isAdminUser(user)) return <Navigate to="/admin" replace />;
+  if (!customer) return <Navigate to="/login?next=/account" replace />;
   return <AccountView customer={customer} />;
 }
 
@@ -163,7 +166,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
 
   async function onLogout() {
     await logout();
-    navigate('/account/login', { replace: true });
+    navigate('/login', { replace: true });
   }
 
   return (
@@ -246,11 +249,17 @@ function AccountView({ customer }: { customer: CustomerMe }) {
           ) : null}
         </div>
 
-        {customer.hasPassword && (
-          <div className="mt-12 border-t border-line pt-8">
-            <PasswordCard customer={customer} />
-          </div>
-        )}
+        <section aria-labelledby="profile-title" className="mt-12 border-t border-line pt-8">
+          <h2 id="profile-title" className="text-lg">
+            بياناتي
+          </h2>
+          <ProfileCard customer={customer} />
+          {customer.hasPassword && (
+            <div className="mt-4">
+              <PasswordCard customer={customer} />
+            </div>
+          )}
+        </section>
       </div>
     </>
   );
@@ -546,6 +555,60 @@ function PaymentsTab({ items }: { items: OPayment[] }) {
   );
 }
 
+function ProfileCard({ customer }: { customer: CustomerMe }) {
+  const { setCustomer } = useCustomer();
+  const { toast } = useToast();
+  const [name, setName] = useState(customer.name);
+  const [email, setEmail] = useState(customer.email ?? '');
+  const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
+  const [busy, setBusy] = useState(false);
+  const dirty = name.trim() !== customer.name || email.trim().toLowerCase() !== (customer.email ?? '');
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const errs: typeof errors = {};
+    if (name.trim().length < 2) errs.name = 'الاسم قصير جدًا';
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = 'البريد الإلكتروني غير صالح';
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    setBusy(true);
+    try {
+      setCustomer(await api.patch<CustomerMe>('/auth/profile', { name: name.trim(), email: email.trim() || null }));
+      toast('تم حفظ بياناتك');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const field = (err.field ?? Object.keys(err.fields)[0]) as 'name' | 'email' | undefined;
+        setErrors(field ? { [field]: err.fields[field] ?? err.message } : { name: err.message });
+      } else setErrors({ name: 'تعذر الحفظ' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form noValidate onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-3 sm:items-start">
+      <Input label="الاسم" autoComplete="name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} error={errors.name} />
+      <Input label="رقم الهاتف" value={displayPhone(customer.phone)} dir="ltr" className="text-end" disabled hint="للتعديل تواصل معنا." />
+      <Input
+        label="البريد الإلكتروني"
+        optional
+        type="email"
+        dir="ltr"
+        className="text-end"
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        error={errors.email}
+      />
+      <div className="sm:col-span-3">
+        <Button type="submit" variant="outline" loading={busy} disabled={!dirty}>
+          حفظ البيانات
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent?: boolean }) {
   const { refresh } = useCustomer();
   const { toast } = useToast();
@@ -556,7 +619,7 @@ function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent
   const [busy, setBusy] = useState(false);
   const [serverErr, setServerErr] = useState<string | null>(null);
 
-  const e1 = pw.length < 6 ? 'كلمة المرور 6 أحرف على الأقل' : pw.length > 100 ? 'كلمة المرور طويلة جدًا' : undefined;
+  const e1 = pw.length < 8 ? 'كلمة المرور 8 أحرف على الأقل' : pw.length > 100 ? 'كلمة المرور طويلة جدًا' : undefined;
   const e2 = pw2 !== pw ? 'كلمتا المرور غير متطابقتين' : undefined;
 
   async function submit(e: FormEvent) {

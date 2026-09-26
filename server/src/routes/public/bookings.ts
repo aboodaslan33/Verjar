@@ -9,7 +9,7 @@ import { BOOKING_TYPE_AR } from '../../lib/labels';
 import { prisma } from '../../lib/prisma';
 import { formLimiter } from '../../middleware/rateLimit';
 import { memoryUpload } from '../../middleware/upload';
-import { upsertCustomer } from '../../services/customer.service';
+import { resolveCustomer } from '../../services/customer.service';
 import { bookingMessage, customerConfirmationMessage } from '../../services/messages';
 import { assertSlotAvailable, getDaySlots, inspectionFee } from '../../services/schedule.service';
 import { getSettings } from '../../services/settings.service';
@@ -100,7 +100,7 @@ bookingsRouter.post(
     const booking = await prisma.$transaction(
       async (tx) => {
         const scheduledAt = await assertSlotAvailable(tx, input.date, input.time);
-        const customer = await upsertCustomer(tx, { phone: input.phone, name: input.name });
+        const customer = await resolveCustomer(tx, req.auth, { phone: input.phone, name: input.name });
         const created = await tx.booking.create({
           data: {
             ref: makeRef('B'),

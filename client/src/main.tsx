@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { CartProvider } from './context/CartContext';
-import { CustomerAuthProvider } from './context/CustomerAuth';
+import { AuthProvider } from './context/Auth';
 import { SiteProvider } from './context/SiteContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -15,11 +15,11 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <ToastProvider>
           <SiteProvider>
-            <CustomerAuthProvider>
+            <AuthProvider>
               <CartProvider>
                 <App />
               </CartProvider>
-            </CustomerAuthProvider>
+            </AuthProvider>
           </SiteProvider>
         </ToastProvider>
       </ThemeProvider>

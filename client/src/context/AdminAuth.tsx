@@ -1,38 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api } from '../lib/api';
+import type { ReactNode } from 'react';
 import type { AdminMe } from '../lib/types';
+import { isAdminUser, useAuth } from './Auth';
 
-type Ctx = {
-  admin: AdminMe | null;
-  loading: boolean;
-  setAdmin: (a: AdminMe | null) => void;
-  logout: () => Promise<void>;
-};
-
-const AdminAuthContext = createContext<Ctx | null>(null);
-
+/** متوافق مع الإصدار السابق — الجلسة الفعلية في AuthProvider */
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
-  const [admin, setAdmin] = useState<AdminMe | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api
-      .get<AdminMe>('/auth/admin/me')
-      .then(setAdmin)
-      .catch(() => setAdmin(null))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const logout = useCallback(async () => {
-    await api.post('/auth/admin/logout').catch(() => undefined);
-    setAdmin(null);
-  }, []);
-
-  return <AdminAuthContext.Provider value={{ admin, loading, setAdmin, logout }}>{children}</AdminAuthContext.Provider>;
+  return <>{children}</>;
 }
 
+/** واجهة الأدمن فوق الجلسة الموحّدة: admin = null إن لم يكن المستخدم أدمن */
 export function useAdmin() {
-  const ctx = useContext(AdminAuthContext);
-  if (!ctx) throw new Error('useAdmin outside provider');
-  return ctx;
+  const { user, loading, setUser, logout } = useAuth();
+  const admin = isAdminUser(user) ? user : null;
+  return { admin, loading, setAdmin: (a: AdminMe | null) => setUser(a), logout };
 }

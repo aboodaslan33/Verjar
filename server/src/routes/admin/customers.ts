@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
-import { asyncHandler, notFound, ok } from '../../lib/http';
+import { asyncHandler, conflict, notFound, ok } from '../../lib/http';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { normalizePhone } from '../../lib/phone';
 import { prisma } from '../../lib/prisma';
@@ -81,13 +81,21 @@ customersRouter.patch(
     const input = z
       .object({
         name: z.string().trim().min(2).max(100).optional(),
-        email: z.string().trim().email('بريد غير صالح').nullable().optional(),
+        email: z
+          .union([z.string().trim().toLowerCase().email('بريد غير صالح'), z.literal('')])
+          .nullable()
+          .optional()
+          .transform((v) => (v === undefined ? undefined : v || null)),
         companyName: z.string().trim().max(150).nullable().optional(),
         notes: z.string().max(3000).nullable().optional(),
         resetPassword: z.boolean().optional(),
       })
       .parse(req.body);
     const { resetPassword, ...data } = input;
+    if (data.email) {
+      const other = await prisma.customer.findUnique({ where: { email: data.email }, select: { id: true } });
+      if (other && other.id !== req.params.id) throw conflict('هذا البريد مستخدم لعميل آخر', { field: 'email' });
+    }
     const c = await prisma.customer.update({
       where: { id: req.params.id },
       data: { ...data, ...(resetPassword ? { passwordHash: null } : {}) },

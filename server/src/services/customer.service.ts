@@ -21,6 +21,28 @@ export async function upsertCustomer(
   return tx.customer.create({ data: { phone: data.phone, name: data.name, companyName: data.companyName ?? null } });
 }
 
+/**
+ * العميل الذي يُربط به حجز/طلب جديد:
+ * - إن كان العميل مسجّل الدخول يُربط بحسابه مباشرة (حتى لو أدخل رقمًا آخر للتواصل)
+ * - وإلا (ضيف) يُبحث عنه برقم الهاتف أو يُنشأ
+ */
+export async function resolveCustomer(
+  tx: Tx,
+  auth: { sub: string; role: string } | undefined,
+  data: { phone: string; name: string; companyName?: string | null },
+) {
+  if (auth?.role === 'CUSTOMER') {
+    const own = await tx.customer.findUnique({ where: { id: auth.sub } });
+    if (own && !own.deletedAt) {
+      if (data.companyName && !own.companyName) {
+        return tx.customer.update({ where: { id: own.id }, data: { companyName: data.companyName } });
+      }
+      return own;
+    }
+  }
+  return upsertCustomer(tx, data);
+}
+
 /** ملخص مالي لعميل: إجمالي المطلوب، المدفوع، المتبقي */
 export async function customerFinance(customerId: string) {
   const [orders, bookings, contracts, corporates, payments] = await Promise.all([

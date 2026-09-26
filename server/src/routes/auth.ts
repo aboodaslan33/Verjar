@@ -4,15 +4,238 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { env } from '../config/env';
 import { audit } from '../lib/audit';
-import { HttpError, asyncHandler, badRequest, ok, unauthorized } from '../lib/http';
+import { HttpError, asyncHandler, badRequest, conflict, ok, unauthorized } from '../lib/http';
+import { normalizePhone } from '../lib/phone';
 import { prisma } from '../lib/prisma';
-import { clearAuthCookie, requireAdmin, requireCustomer, setAuthCookie } from '../middleware/auth';
+import { clearAuthCookie, isAdminRole, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
 import { authLimiter } from '../middleware/rateLimit';
 import { otpMessage } from '../services/messages';
 import { sendWhatsApp, whatsappMode } from '../services/whatsapp.service';
-import { phoneField } from '../validators/common';
+import { nameField, phoneField } from '../validators/common';
 
 export const authRouter = Router();
+
+type CustomerRow = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  companyName: string | null;
+  passwordHash: string | null;
+};
+
+function customerPublic(c: CustomerRow) {
+  return {
+    role: 'CUSTOMER' as const,
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    email: c.email,
+    companyName: c.companyName,
+    hasPassword: Boolean(c.passwordHash),
+  };
+}
+
+function adminPublic(u: { id: string; name: string; email: string; role: 'ADMIN' | 'STAFF' }) {
+  return { role: u.role, id: u.id, name: u.name, email: u.email };
+}
+
+/** هاش ثابت للمقارنة عند عدم وجود الحساب (زمن استجابة متقارب) */
+const DUMMY_HASH = bcrypt.hashSync('verjar-dummy-password', 10);
+const BCRYPT_ROUNDS = 11;
+
+/** رقم هاتف أردني فقط: 07XXXXXXXX (يقبل الأرقام العربية و +962) */
+const jordanPhoneField = z
+  .string({ required_error: 'رقم الهاتف مطلوب' })
+  .trim()
+  .min(1, 'رقم الهاتف مطلوب')
+  .transform((v, ctx) => {
+    const n = normalizePhone(v);
+    if (!n || !/^9627[789]\d{7}$/.test(n)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'أدخل رقم هاتف أردني صحيح بالصيغة 07XXXXXXXX' });
+      return z.NEVER;
+    }
+    return n;
+  });
+
+const emailField = z.string().trim().toLowerCase().email('البريد الإلكتروني غير صالح').max(150, 'البريد الإلكتروني طويل جدًا');
+
+const passwordField = z
+  .string({ required_error: 'كلمة المرور مطلوبة' })
+  .min(8, 'كلمة المرور 8 أحرف على الأقل')
+  .max(100, 'كلمة المرور طويلة جدًا');
+
+// ───────────── الجلسة الموحّدة ─────────────
+
+/** بيانات المستخدم الحالي (عميل أو أدمن) — تُستدعى عند إقلاع الواجهة */
+authRouter.get(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const a = req.auth!;
+    if (isAdminRole(a.role)) {
+      const u = await prisma.user.findUnique({ where: { id: a.sub } });
+      if (!u || !u.active) {
+        clearAuthCookie(res);
+        throw unauthorized('انتهت الجلسة، سجّل الدخول مجددًا');
+      }
+      return ok(res, adminPublic(u));
+    }
+    const c = await prisma.customer.findUnique({ where: { id: a.sub } });
+    if (!c || c.deletedAt) {
+      clearAuthCookie(res);
+      throw unauthorized('انتهت الجلسة، سجّل الدخول مجددًا');
+    }
+    return ok(res, customerPublic(c));
+  }),
+);
+
+authRouter.post('/logout', (_req, res) => {
+  clearAuthCookie(res);
+  ok(res, { loggedOut: true });
+});
+
+/** تسجيل حساب عميل جديد */
+authRouter.post(
+  '/register',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const input = z
+      .object({
+        name: nameField,
+        phone: jordanPhoneField,
+        email: z
+          .union([emailField, z.literal('')])
+          .optional()
+          .nullable()
+          .transform((v) => v || null),
+        password: passwordField,
+        /** رقم مرجع حجز/طلب سابق — مطلوب فقط إذا كان للرقم حجوزات سابقة كضيف */
+        ref: z.string().trim().max(30).optional(),
+      })
+      .parse(req.body);
+
+    const existing = await prisma.customer.findUnique({ where: { phone: input.phone } });
+    if (existing && existing.passwordHash && !existing.deletedAt) {
+      throw conflict('هذا الرقم مسجّل مسبقًا. سجّل الدخول بدلًا من ذلك.', { field: 'phone', code: 'PHONE_TAKEN' });
+    }
+
+    if (input.email) {
+      const byEmail = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
+      if (byEmail && byEmail.id !== existing?.id) {
+        throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email', code: 'EMAIL_TAKEN' });
+      }
+    }
+
+    // رقم استُخدم سابقًا في حجز كضيف: نطلب رقم مرجع لإثبات ملكية الرقم قبل ربط الحجوزات بالحساب
+    if (existing) {
+      const where = { customerId: existing.id, deletedAt: null };
+      const [b, o, r] = await Promise.all([
+        prisma.booking.count({ where }),
+        prisma.order.count({ where }),
+        prisma.corporateRequest.count({ where }),
+      ]);
+      if (b + o + r > 0) {
+        if (!input.ref) {
+          throw new HttpError(
+            409,
+            'لهذا الرقم حجوزات أو طلبات سابقة. أدخل رقم المرجع لأحدها (مثل B-7K2M9Q) لتأكيد أن الرقم لك.',
+            'CLAIM_REQUIRED',
+            { field: 'ref' },
+          );
+        }
+        const ref = input.ref.toUpperCase().replace(/\s/g, '');
+        const refWhere = { ref, customerId: existing.id };
+        const [rb, ro, rr] = await Promise.all([
+          prisma.booking.findFirst({ where: refWhere, select: { id: true } }),
+          prisma.order.findFirst({ where: refWhere, select: { id: true } }),
+          prisma.corporateRequest.findFirst({ where: refWhere, select: { id: true } }),
+        ]);
+        if (!rb && !ro && !rr) throw badRequest('رقم المرجع غير صحيح لهذا الرقم', { field: 'ref' });
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
+    const now = new Date();
+    const data = { name: input.name, email: input.email, passwordHash, registeredAt: now, lastLoginAt: now };
+    const customer = existing
+      ? await prisma.customer.update({
+          where: { id: existing.id },
+          data: { ...data, email: input.email ?? existing.email, deletedAt: null, otpHash: null, otpExpiresAt: null },
+        })
+      : await prisma.customer.create({ data: { ...data, phone: input.phone } });
+
+    setAuthCookie(res, { sub: customer.id, role: 'CUSTOMER', name: customer.name });
+    await audit({ actorType: 'customer', action: existing ? 'register_claim' : 'register', entity: 'customer', entityId: customer.id });
+    ok(res, customerPublic(customer), 201);
+  }),
+);
+
+/** دخول العميل برقم الهاتف أو البريد + كلمة المرور */
+authRouter.post(
+  '/login',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { identifier, password } = z
+      .object({
+        identifier: z.string({ required_error: 'أدخل رقم الهاتف أو البريد الإلكتروني' }).trim().min(1, 'أدخل رقم الهاتف أو البريد الإلكتروني').max(150),
+        password: z.string({ required_error: 'أدخل كلمة المرور' }).min(1, 'أدخل كلمة المرور').max(100),
+      })
+      .parse(req.body);
+
+    let customer = null;
+    if (identifier.includes('@')) {
+      customer = await prisma.customer.findUnique({ where: { email: identifier.toLowerCase() } });
+    } else {
+      const phone = normalizePhone(identifier);
+      if (!phone) throw badRequest('رقم الهاتف غير صحيح (مثال: 0791234567)', { field: 'identifier' });
+      customer = await prisma.customer.findUnique({ where: { phone } });
+    }
+
+    const invalid = () => unauthorized('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة');
+    if (!customer || customer.deletedAt) {
+      await bcrypt.compare(password, DUMMY_HASH);
+      throw invalid();
+    }
+    if (!customer.passwordHash) {
+      throw new HttpError(
+        401,
+        'هذا الرقم غير مرتبط بكلمة مرور بعد. أنشئ حسابًا بنفس الرقم، أو ادخل برقم المرجع من صفحة المتابعة.',
+        'NO_PASSWORD',
+      );
+    }
+    if (!(await bcrypt.compare(password, customer.passwordHash))) throw invalid();
+
+    const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
+    setAuthCookie(res, { sub: updated.id, role: 'CUSTOMER', name: updated.name });
+    ok(res, customerPublic(updated));
+  }),
+);
+
+/** تعديل بيانات العميل (الاسم والبريد) */
+authRouter.patch(
+  '/profile',
+  requireCustomer,
+  asyncHandler(async (req, res) => {
+    const input = z
+      .object({
+        name: nameField.optional(),
+        email: z
+          .union([emailField, z.literal('')])
+          .optional()
+          .nullable()
+          .transform((v) => (v === undefined ? undefined : v || null)),
+      })
+      .parse(req.body);
+    if (input.email) {
+      const other = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
+      if (other && other.id !== req.auth!.sub) throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email' });
+    }
+    const c = await prisma.customer.update({ where: { id: req.auth!.sub }, data: input });
+    if (input.name) setAuthCookie(res, { sub: c.id, role: 'CUSTOMER', name: c.name });
+    ok(res, customerPublic(c));
+  }),
+);
 
 // ───────────── الأدمن ─────────────
 
@@ -30,12 +253,12 @@ authRouter.post(
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     setAuthCookie(res, { sub: user.id, role: user.role, name: user.name });
     await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });
-    ok(res, { id: user.id, name: user.name, email: user.email, role: user.role });
+    ok(res, adminPublic(user));
   }),
 );
 
 authRouter.post('/admin/logout', (_req, res) => {
-  clearAuthCookie(res, 'admin');
+  clearAuthCookie(res);
   ok(res, { loggedOut: true });
 });
 
@@ -43,12 +266,9 @@ authRouter.get(
   '/admin/me',
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const user = await prisma.user.findUnique({
-      where: { id: req.auth!.sub },
-      select: { id: true, name: true, email: true, role: true, active: true },
-    });
+    const user = await prisma.user.findUnique({ where: { id: req.auth!.sub } });
     if (!user || !user.active) throw unauthorized();
-    ok(res, user);
+    ok(res, adminPublic(user));
   }),
 );
 
@@ -87,10 +307,6 @@ async function findCustomer(phone: string) {
     throw new HttpError(404, 'لا يوجد حساب بهذا الرقم. يُنشأ حسابك تلقائيًا عند أول حجز أو طلب.', 'NO_ACCOUNT');
   }
   return c;
-}
-
-function customerPublic(c: { id: string; name: string; phone: string; companyName: string | null; passwordHash: string | null }) {
-  return { id: c.id, name: c.name, phone: c.phone, companyName: c.companyName, hasPassword: Boolean(c.passwordHash) };
 }
 
 /** طرق الدخول المتاحة للعميل */
@@ -181,7 +397,7 @@ authRouter.post(
 );
 
 authRouter.post('/customer/logout', (_req, res) => {
-  clearAuthCookie(res, 'customer');
+  clearAuthCookie(res);
   ok(res, { loggedOut: true });
 });
 
@@ -199,8 +415,8 @@ authRouter.post(
   '/customer/password',
   requireCustomer,
   asyncHandler(async (req, res) => {
-    const { password } = z.object({ password: z.string().min(6, 'كلمة المرور 6 أحرف على الأقل').max(100) }).parse(req.body);
-    await prisma.customer.update({ where: { id: req.auth!.sub }, data: { passwordHash: await bcrypt.hash(password, 11) } });
+    const { password } = z.object({ password: passwordField }).parse(req.body);
+    await prisma.customer.update({ where: { id: req.auth!.sub }, data: { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) } });
     ok(res, { updated: true });
   }),
 );

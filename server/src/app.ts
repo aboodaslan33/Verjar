@@ -7,6 +7,8 @@ import helmet from 'helmet';
 import { env } from './config/env';
 import { ok } from './lib/http';
 import { prisma } from './lib/prisma';
+import { attachSession } from './middleware/auth';
+import { originGuard } from './middleware/csrf';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { apiLimiter } from './middleware/rateLimit';
 import { adminRouter } from './routes/admin';
@@ -55,6 +57,8 @@ export function createApp() {
 
   const api = express.Router();
   api.use(apiLimiter);
+  api.use(originGuard);
+  api.use(attachSession);
   api.use('/site', siteRouter);
   api.use('/bookings', bookingsRouter);
   api.use('/store', storeRouter);
@@ -63,6 +67,8 @@ export function createApp() {
   api.use('/account', accountRouter);
   api.use('/admin', adminRouter);
   app.use('/api/v1', api);
+  // نفس المسارات بدون رقم الإصدار: /api/auth/me و /api/admin/...
+  app.use('/api', api);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

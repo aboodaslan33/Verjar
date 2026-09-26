@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, Button, ButtonLink, Input, PageLoader, Skeleton } from '../../components/ui';
+import { isAdminUser, useAuth } from '../../context/Auth';
 import { useCustomer } from '../../context/CustomerAuth';
 import { ApiError, api } from '../../lib/api';
 import { cx, isValidPhone } from '../../lib/format';
@@ -18,6 +19,7 @@ function safeNext(next: string | null) {
 export default function Login() {
   useDocumentTitle('الدخول إلى صفحتي');
   const { customer, loading, setCustomer } = useCustomer();
+  const { user } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const next = safeNext(params.get('next'));
@@ -49,6 +51,7 @@ export default function Login() {
 
   if (loading) return <PageLoader />;
   if (customer) return <Navigate to={next} replace />;
+  if (isAdminUser(user)) return <Navigate to="/admin" replace />;
 
   const phoneError = !phone.trim() ? 'أدخل رقم الهاتف' : isValidPhone(phone) ? undefined : 'رقم الهاتف غير صحيح (مثال: 0791234567)';
   const shownPhoneErr = fieldErr.phone ?? (phoneTouched ? phoneError : undefined);
@@ -315,6 +318,11 @@ export default function Login() {
       </div>
 
       <p className="mt-6 text-center text-sm text-muted">
+        لديك حساب بكلمة مرور؟{' '}
+        <Link to="/login" className="font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-brand-200">
+          تسجيل الدخول
+        </Link>
+        {' · '}
         ليس لديك حجز بعد؟{' '}
         <Link to="/bookings" className="font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-brand-200">
           احجز أول موعد

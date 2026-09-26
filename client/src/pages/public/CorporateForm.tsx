@@ -16,6 +16,7 @@ import { Alert, ButtonLink, Checkbox, ChoiceGroup, ErrorState, Input, Skeleton, 
 import { ApiError, api, toFormData } from '../../lib/api';
 import { CORPORATE_TYPE_LABEL, isValidPhone } from '../../lib/format';
 import type { CorporateCreated, CorporateService, CorporateType } from '../../lib/types';
+import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
 const SLUG_TYPE: Record<string, CorporateType> = { annual: 'ANNUAL', urgent: 'URGENT' };
@@ -117,6 +118,14 @@ export default function CorporateForm() {
 function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) {
   const draftKey = `vj-corporate-draft-${slug}`;
   const [v, setV] = useState<Vals>(() => loadDraft<Vals>(draftKey, EMPTY));
+  useAccountPrefill((c) =>
+    setV((s) => ({
+      ...s,
+      contactName: s.contactName || c.name,
+      managerPhone: s.managerPhone || c.localPhone,
+      companyName: s.companyName || c.companyName || '',
+    })),
+  );
   const [cr, setCr] = useState<File[]>([]);
   const [lic, setLic] = useState<File[]>([]);
   const [step, setStep] = useState(0);
@@ -298,6 +307,7 @@ function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) 
             {step === 0 && (
               <div className="space-y-5">
                 <StepHeading stepKey={step} title="بيانات الشركة" />
+                <AccountNote what="الطلب" />
                 <div data-field="companyName">
                   <Input label="اسم الشركة / المنشأة" autoComplete="organization" value={v.companyName} maxLength={150} onChange={(e) => set('companyName', e.target.value)} onBlur={() => touch('companyName')} error={err('companyName')} />
                 </div>

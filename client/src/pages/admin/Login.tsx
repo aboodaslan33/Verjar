@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from '../../components/layout/Logo';
 import { Alert, Button, Icon, Input } from '../../components/ui';
 import { useAdmin } from '../../context/AdminAuth';
+import { useAuth } from '../../context/Auth';
 import { useTheme } from '../../context/ThemeContext';
 import { api, ApiError } from '../../lib/api';
 import type { AdminMe } from '../../lib/types';
@@ -11,6 +12,7 @@ import { useDocumentTitle } from '../../lib/useAsync';
 export default function Login() {
   useDocumentTitle('دخول لوحة التحكم');
   const { admin, setAdmin } = useAdmin();
+  const { user } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,6 +70,9 @@ export default function Login() {
             <h1 className="text-xl">دخول لوحة التحكم</h1>
             <p className="mt-1 text-sm text-muted">للإدارة والموظفين فقط.</p>
             <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+              {user?.role === 'CUSTOMER' && !error && (
+                <Alert tone="info">أنت مسجّل الدخول كعميل ({user.name}). الدخول هنا سينهي جلسة العميل.</Alert>
+              )}
               {error && <Alert tone="error">{error}</Alert>}
               <Input
                 label="البريد الإلكتروني"

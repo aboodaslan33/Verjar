@@ -123,12 +123,13 @@ model User {
   quotes    QuoteFile[] @relation("QuoteUploadedBy")
 }
 
-/// العملاء — يتم إنشاؤهم تلقائيًا عند أول حجز أو طلب برقم الهاتف
+/// العملاء — يتم إنشاؤهم تلقائيًا عند أول حجز أو طلب برقم الهاتف، أو بالتسجيل من صفحة /register
 model Customer {
   id           String    @id @default(cuid())
   phone        String    @unique
   name         String
-  email        String?
+  /// يُخزن بأحرف صغيرة — يُستخدم للدخول مع كلمة المرور
+  email        String?   @unique
   companyName  String?
   passwordHash String?
   otpHash      String?
@@ -136,6 +137,8 @@ model Customer {
   otpAttempts  Int       @default(0)
   notes        String?
   lastLoginAt  DateTime?
+  /// وقت إنشاء الحساب بالتسجيل الذاتي (فارغ للعملاء المنشئين تلقائيًا من الحجز)
+  registeredAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?

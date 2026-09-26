@@ -115,7 +115,17 @@ export type CorporateCreated = {
   whatsapp: WhatsAppResult;
 };
 
-export type CustomerMe = { id: string; name: string; phone: string; companyName: string | null; hasPassword: boolean };
+export type CustomerMe = {
+  role: 'CUSTOMER';
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  companyName: string | null;
+  hasPassword: boolean;
+};
 export type AdminMe = { id: string; name: string; email: string; role: 'ADMIN' | 'STAFF' };
+/** المستخدم الحالي كما يعيده GET /auth/me */
+export type SessionUser = CustomerMe | AdminMe;
 
 export type Finance = { billed: number; paid: number; remaining: number };

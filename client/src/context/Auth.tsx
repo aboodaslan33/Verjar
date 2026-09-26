@@ -1,0 +1,57 @@
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { api } from '../lib/api';
+import type { SessionUser } from '../lib/types';
+
+type Ctx = {
+  /** المستخدم الحالي (عميل أو أدمن) أو null للزائر */
+  user: SessionUser | null;
+  /** true حتى ينتهي أول نداء لـ /auth/me */
+  loading: boolean;
+  setUser: (u: SessionUser | null) => void;
+  refresh: () => Promise<void>;
+  logout: () => Promise<void>;
+};
+
+const AuthContext = createContext<Ctx | null>(null);
+
+/**
+ * الجلسة الموحّدة: التوكن في كوكي httpOnly فقط (لا شيء في localStorage).
+ * عند الإقلاع يُستدعى /auth/me لاستعادة الجلسة بعد إعادة التحميل.
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      setUser(await api.get<SessionUser>('/auth/me'));
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const logout = useCallback(async () => {
+    await api.post('/auth/logout').catch(() => undefined);
+    setUser(null);
+  }, []);
+
+  return <AuthContext.Provider value={{ user, loading, setUser, refresh, logout }}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth outside provider');
+  return ctx;
+}
+
+export const isAdminUser = (u: SessionUser | null): u is Extract<SessionUser, { role: 'ADMIN' | 'STAFF' }> =>
+  u?.role === 'ADMIN' || u?.role === 'STAFF';
+
+/** الصفحة الرئيسية لكل نوع مستخدم بعد الدخول */
+export const homeFor = (u: SessionUser) => (isAdminUser(u) ? '/admin' : '/account');

@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { lazy, Suspense, useCallback, useState } from 'react';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { PublicLayout } from './components/layout/PublicLayout';
+import { Splash, shouldShowSplash } from './components/layout/Splash';
 import { PageLoader } from './components/ui';
 import Home from './pages/public/Home';
 
@@ -17,38 +18,48 @@ const About = lazy(() => import('./pages/public/About'));
 const Contact = lazy(() => import('./pages/public/Contact'));
 const NotFound = lazy(() => import('./pages/public/NotFound'));
 const AccountLogin = lazy(() => import('./pages/account/Login'));
+const Login = lazy(() => import('./pages/auth/Login'));
+const Register = lazy(() => import('./pages/auth/Register'));
 const Account = lazy(() => import('./pages/account/Account'));
 
 // لوحة الأدمن — حزمة منفصلة لا تُحمّل للزوار
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
 
 export default function App() {
+  const { pathname } = useLocation();
+  const [splash, setSplash] = useState(() => shouldShowSplash(pathname));
+  const endSplash = useCallback(() => setSplash(false), []);
   return (
-    <Routes>
-      <Route
-        path="/admin/*"
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <AdminApp />
-          </Suspense>
-        }
-      />
-      <Route element={<PublicLayout />}>
-        <Route index element={<Home />} />
-        <Route path="bookings" element={<Bookings />} />
-        <Route path="bookings/:type" element={<BookingForm />} />
-        <Route path="corporate" element={<Corporate />} />
-        <Route path="corporate/:type" element={<CorporateForm />} />
-        <Route path="store" element={<Store />} />
-        <Route path="store/:slug" element={<ProductPage />} />
-        <Route path="cart" element={<Cart />} />
-        <Route path="checkout" element={<Checkout />} />
-        <Route path="about" element={<About />} />
-        <Route path="contact" element={<Contact />} />
-        <Route path="account/login" element={<AccountLogin />} />
-        <Route path="account" element={<Account />} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
+    <>
+      {splash && <Splash onDone={endSplash} />}
+      <Routes>
+        <Route
+          path="/admin/*"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <AdminApp />
+            </Suspense>
+          }
+        />
+        <Route element={<PublicLayout />}>
+          <Route index element={<Home />} />
+          <Route path="bookings" element={<Bookings />} />
+          <Route path="bookings/:type" element={<BookingForm />} />
+          <Route path="corporate" element={<Corporate />} />
+          <Route path="corporate/:type" element={<CorporateForm />} />
+          <Route path="store" element={<Store />} />
+          <Route path="store/:slug" element={<ProductPage />} />
+          <Route path="cart" element={<Cart />} />
+          <Route path="checkout" element={<Checkout />} />
+          <Route path="about" element={<About />} />
+          <Route path="contact" element={<Contact />} />
+          <Route path="login" element={<Login />} />
+          <Route path="register" element={<Register />} />
+          <Route path="account/login" element={<AccountLogin />} />
+          <Route path="account" element={<Account />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </>
   );
 }

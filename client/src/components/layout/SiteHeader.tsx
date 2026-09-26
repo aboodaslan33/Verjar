@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { homeFor, useAuth } from '../../context/Auth';
 import { useCart } from '../../context/CartContext';
 import { useSite } from '../../context/SiteContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -20,10 +21,17 @@ export function SiteHeader() {
   const { settings } = useSite();
   const { count } = useCart();
   const { theme, toggle } = useTheme();
+  const { user, loading: authLoading, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => setOpen(false), [location.pathname]);
+
+  async function onLogout() {
+    await logout();
+    if (location.pathname.startsWith('/account')) navigate('/', { replace: true });
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
@@ -45,7 +53,7 @@ export function SiteHeader() {
       </div>
 
       <div className="container flex h-16 items-center justify-between gap-4">
-        <Logo />
+        <Logo splashAnchor />
 
         <nav className="hidden lg:block" aria-label="القائمة الرئيسية">
           <ul className="flex items-center gap-1">
@@ -77,9 +85,26 @@ export function SiteHeader() {
           >
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
-          <Link to="/account" className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink" aria-label="حسابي">
-            <Icon name="user" />
-          </Link>
+          {authLoading ? (
+            <span className="hidden w-16 sm:block" aria-hidden />
+          ) : user ? (
+            <div className="hidden items-center sm:flex">
+              <Link
+                to={homeFor(user)}
+                className="flex h-10 max-w-[10rem] items-center rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-subtle"
+                title={user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}
+              >
+                <span className="truncate">{user.name}</span>
+              </Link>
+              <button type="button" onClick={onLogout} className="flex h-10 items-center rounded-lg px-2.5 text-sm text-muted hover:bg-subtle hover:text-ink">
+                خروج
+              </button>
+            </div>
+          ) : (
+            <Link to="/login" className="hidden h-10 items-center rounded-lg px-3 text-sm font-medium text-ink hover:bg-subtle sm:flex">
+              دخول
+            </Link>
+          )}
           <Link to="/cart" className="relative grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink" aria-label={`السلة (${count})`}>
             <Icon name="cart" />
             {count > 0 && (
@@ -123,6 +148,28 @@ export function SiteHeader() {
                 </NavLink>
               </li>
             ))}
+            <li className="mt-2 border-t border-line pt-3">
+              {user ? (
+                <div className="flex items-center justify-between gap-3 px-4">
+                  <Link to={homeFor(user)} className="min-w-0 py-2 font-medium">
+                    <span className="block truncate">{user.name}</span>
+                    <span className="block text-sm text-muted">{user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}</span>
+                  </Link>
+                  <button type="button" onClick={onLogout} className="h-11 shrink-0 rounded-xl border border-line px-4 text-sm font-medium">
+                    تسجيل الخروج
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Link to="/login" className="flex h-12 items-center justify-center rounded-xl border border-line font-medium">
+                    تسجيل الدخول
+                  </Link>
+                  <Link to="/register" className="flex h-12 items-center justify-center rounded-xl border border-line font-medium">
+                    إنشاء حساب
+                  </Link>
+                </div>
+              )}
+            </li>
             <li className="grid grid-cols-2 gap-2 pt-2">
               <a href={`tel:${settings.phone}`} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-line font-medium">
                 <Icon name="phone" className="h-4 w-4" /> <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
