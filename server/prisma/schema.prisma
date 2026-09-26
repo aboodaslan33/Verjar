@@ -539,3 +539,15 @@ model EmailCampaign {
 
   @@index([createdAt])
 }
+
+/// قفل تسجيل الدخول بعد محاولات خاطئة متكررة (لكل هاتف/بريد، حتى لو لم يكن الحساب موجودًا)
+model LoginLock {
+  /// المعرّف الموحّد: بريد بأحرف صغيرة أو رقم هاتف بالصيغة الدولية
+  key         String    @id
+  /// المحاولات الخاطئة منذ آخر قفل/نجاح
+  failures    Int       @default(0)
+  /// عدد مرات القفل المتتالية (كل مرة تتضاعف المدة)
+  level       Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}

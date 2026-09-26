@@ -10,6 +10,7 @@ import { prisma } from '../lib/prisma';
 import { clearAuthCookie, isAdminRole, passwordFingerprint, principalOf, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
 import { accountLimiter, authLimiter } from '../middleware/rateLimit';
 import { emailReady, sendPasswordReset } from '../services/email.service';
+import { beginLoginAttempt, invalidCredentials, lockKey, loginFailed, loginSucceeded } from '../services/loginLock.service';
 import { nameField } from '../validators/common';
 
 export const authRouter = Router();
@@ -186,7 +187,6 @@ authRouter.post(
 authRouter.post(
   '/login',
   authLimiter,
-  accountLimiter('identifier'),
   asyncHandler(async (req, res) => {
     const { identifier, password } = z
       .object({
@@ -195,20 +195,25 @@ authRouter.post(
       })
       .parse(req.body);
 
-    let customer = null;
-    if (identifier.includes('@')) {
-      customer = await prisma.customer.findUnique({ where: { email: identifier.toLowerCase() } });
-    } else {
-      const phone = normalizePhone(identifier);
-      if (!phone) throw badRequest('رقم الهاتف غير صحيح (مثال: 0791234567)', { field: 'identifier' });
-      customer = await prisma.customer.findUnique({ where: { phone } });
-    }
+    const phone = identifier.includes('@') ? null : normalizePhone(identifier);
+    if (!identifier.includes('@') && !phone) throw badRequest('رقم الهاتف غير صحيح (مثال: 0791234567)', { field: 'identifier' });
 
-    const invalid = () => unauthorized('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة');
+    // قفل بعد 5 محاولات خاطئة (تُحسب المحاولة قبل فحص كلمة المرور)
+    const key = lockKey(identifier);
+    const attempt = await beginLoginAttempt(key);
+    const invalid = async (): Promise<never> => {
+      throw invalidCredentials('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة', await loginFailed(key, attempt));
+    };
+
+    const customer = phone
+      ? await prisma.customer.findUnique({ where: { phone } })
+      : await prisma.customer.findUnique({ where: { email: identifier.toLowerCase() } });
+
     if ((!customer || customer.deletedAt) && identifier.includes('@')) {
       const user = await prisma.user.findUnique({ where: { email: identifier.toLowerCase() } });
       if (user) {
-        if (!user.active || !(await bcrypt.compare(password, user.passwordHash))) throw invalid();
+        if (!user.active || !(await bcrypt.compare(password, user.passwordHash))) return invalid();
+        await loginSucceeded(key);
         const updatedUser = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
         setAuthCookie(res, principalOf(updatedUser));
         await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });
@@ -217,7 +222,7 @@ authRouter.post(
     }
     if (!customer || customer.deletedAt) {
       await bcrypt.compare(password, DUMMY_HASH);
-      throw invalid();
+      return invalid();
     }
     if (!customer.passwordHash) {
       throw new HttpError(
@@ -226,8 +231,9 @@ authRouter.post(
         'NO_PASSWORD',
       );
     }
-    if (!(await bcrypt.compare(password, customer.passwordHash))) throw invalid();
+    if (!(await bcrypt.compare(password, customer.passwordHash))) return invalid();
 
+    await loginSucceeded(key);
     const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
     setAuthCookie(res, principalOf(updated));
     return ok(res, customerPublic(updated));
@@ -323,15 +329,18 @@ authRouter.patch(
 authRouter.post(
   '/admin/login',
   authLimiter,
-  accountLimiter('email'),
   asyncHandler(async (req, res) => {
     const { email, password } = z
       .object({ email: z.string().trim().toLowerCase().email('بريد غير صالح'), password: z.string().min(1, 'كلمة المرور مطلوبة').max(100) })
       .parse(req.body);
+    const key = lockKey(email);
+    const attempt = await beginLoginAttempt(key);
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.active || !(await bcrypt.compare(password, user.passwordHash))) {
-      throw unauthorized('البريد أو كلمة المرور غير صحيحة');
+    const valid = user ? await bcrypt.compare(password, user.passwordHash) : (await bcrypt.compare(password, DUMMY_HASH), false);
+    if (!user || !user.active || !valid) {
+      throw invalidCredentials('البريد أو كلمة المرور غير صحيحة', await loginFailed(key, attempt));
     }
+    await loginSucceeded(key);
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     setAuthCookie(res, principalOf(user));
     await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });

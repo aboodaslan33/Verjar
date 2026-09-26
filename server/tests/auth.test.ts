@@ -104,7 +104,7 @@ describe('POST /api/auth/login', () => {
   it('رسالة موحّدة عند الخطأ', async () => {
     const wrong = await request(app).post('/api/auth/login').send({ identifier: '0791112233', password: 'nope-nope' });
     expect(wrong.status).toBe(401);
-    expect(wrong.body.error.message).toBe('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة');
+    expect(wrong.body.error.message).toBe('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة.');
     const missing = await request(app).post('/api/auth/login').send({ identifier: 'x@y.jo', password: 'nope-nope' });
     expect(missing.status).toBe(401);
     expect(missing.body.error.message).toBe(wrong.body.error.message);

@@ -27,7 +27,7 @@ export function nextWorkingDate(minDaysAhead = 2, offset = 0): string {
 
 export async function resetDb() {
   const tables = [
-    'EmailCampaign', 'Payment', 'QuoteFile', 'Contract', 'BookingMedia', 'Booking', 'OrderItem', 'Order', 'ProductMedia', 'Product',
+    'LoginLock', 'EmailCampaign', 'Payment', 'QuoteFile', 'Contract', 'BookingMedia', 'Booking', 'OrderItem', 'Order', 'ProductMedia', 'Product',
     'Category', '_CorporateRequestToCorporateService', 'CorporateRequest', 'CorporateService', 'Customer', 'Technician',
     'WhatsAppLog', 'AuditLog', 'Setting', 'User',
   ];
