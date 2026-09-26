@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Button,
+  Checkbox,
   ButtonA,
   ButtonLink,
   EmptyState,
@@ -561,9 +562,11 @@ function ProfileCard({ customer }: { customer: CustomerMe }) {
   const { toast } = useToast();
   const [name, setName] = useState(customer.name);
   const [email, setEmail] = useState(customer.email ?? '');
+  const [optIn, setOptIn] = useState(customer.emailOptIn);
   const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
   const [busy, setBusy] = useState(false);
-  const dirty = name.trim() !== customer.name || email.trim().toLowerCase() !== (customer.email ?? '');
+  const dirty =
+    name.trim() !== customer.name || email.trim().toLowerCase() !== (customer.email ?? '') || optIn !== customer.emailOptIn;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -574,7 +577,7 @@ function ProfileCard({ customer }: { customer: CustomerMe }) {
     if (Object.keys(errs).length) return;
     setBusy(true);
     try {
-      setCustomer(await api.patch<CustomerMe>('/auth/profile', { name: name.trim(), email: email.trim() || null }));
+      setCustomer(await api.patch<CustomerMe>('/auth/profile', { name: name.trim(), email: email.trim() || null, emailOptIn: optIn }));
       toast('تم حفظ بياناتك');
     } catch (err) {
       if (err instanceof ApiError) {
@@ -601,6 +604,14 @@ function ProfileCard({ customer }: { customer: CustomerMe }) {
         onChange={(e) => setEmail(e.target.value)}
         error={errors.email}
       />
+      <div className="sm:col-span-3">
+        <Checkbox
+          label="استلام أخبار المنتجات والخدمات الجديدة بالبريد"
+          description={email.trim() ? undefined : 'أضف بريدك الإلكتروني حتى تصلك الرسائل.'}
+          checked={optIn}
+          onChange={setOptIn}
+        />
+      </div>
       <div className="sm:col-span-3">
         <Button type="submit" variant="outline" loading={busy} disabled={!dirty}>
           حفظ البيانات

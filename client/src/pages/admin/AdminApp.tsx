@@ -23,6 +23,7 @@ const CustomerDetail = lazy(() => import('./CustomerDetail'));
 const Technicians = lazy(() => import('./Technicians'));
 const Settings = lazy(() => import('./Settings'));
 const Logs = lazy(() => import('./Logs'));
+const Newsletter = lazy(() => import('./Newsletter'));
 
 /** هيكل تحميل بشكل لوحة التحكم (أثناء التحقق من الجلسة) */
 function ShellSkeleton() {
@@ -108,6 +109,7 @@ export default function AdminApp() {
           <Route path="technicians" element={s(<Technicians />)} />
           <Route path="settings" element={s(<Settings />)} />
           <Route path="logs" element={s(<Logs />)} />
+          <Route path="newsletter" element={s(<Newsletter />)} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

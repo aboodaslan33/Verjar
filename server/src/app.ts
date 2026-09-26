@@ -16,6 +16,7 @@ import { authRouter } from './routes/auth';
 import { accountRouter } from './routes/customer/account';
 import { bookingsRouter } from './routes/public/bookings';
 import { corporateRouter } from './routes/public/corporate';
+import { emailRouter } from './routes/public/email';
 import { siteRouter } from './routes/public/site';
 import { storeRouter } from './routes/public/store';
 import { LOCAL_UPLOAD_DIR } from './services/upload.service';
@@ -63,6 +64,7 @@ export function createApp() {
   api.use('/bookings', bookingsRouter);
   api.use('/store', storeRouter);
   api.use('/corporate', corporateRouter);
+  api.use('/email', emailRouter);
   api.use('/auth', authRouter);
   api.use('/account', accountRouter);
   api.use('/admin', adminRouter);

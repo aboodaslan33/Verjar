@@ -120,6 +120,7 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   auditLogs AuditLog[]
+  campaigns EmailCampaign[]
   payments  Payment[]   @relation("PaymentRecordedBy")
   quotes    QuoteFile[] @relation("QuoteUploadedBy")
 }
@@ -140,6 +141,8 @@ model Customer {
   lastLoginAt  DateTime?
   /// وقت إنشاء الحساب بالتسجيل الذاتي (فارغ للعملاء المنشئين تلقائيًا من الحجز)
   registeredAt DateTime?
+  /// موافقة على استلام النشرة البريدية (منتجات وخدمات جديدة) — يمكن إلغاؤها من الحساب أو رابط البريد
+  emailOptIn   Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -511,5 +514,28 @@ model AuditLog {
   actor User? @relation(fields: [actorId], references: [id])
 
   @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+/// نشرة بريدية موحّدة لكل العملاء المسجّلين (منتج جديد، خدمة جديدة، إعلان)
+model EmailCampaign {
+  id          String    @id @default(cuid())
+  subject     String
+  body        String
+  /// زر في الرسالة: none | product | bookings | corporate | store
+  ctaKind     String    @default("none")
+  productId   String?
+  /// SENDING | DONE | FAILED
+  status      String    @default("SENDING")
+  recipients  Int       @default(0)
+  sent        Int       @default(0)
+  failed      Int       @default(0)
+  lastError   String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  createdBy User? @relation(fields: [createdById], references: [id])
+
   @@index([createdAt])
 }

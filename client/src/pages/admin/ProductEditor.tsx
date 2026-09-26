@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
 import type { AdminCategory, AdminProduct, ProductMedia } from '../../components/admin/types';
 import { AdminPage, DetailSkeleton, FieldError, Panel } from '../../components/admin/ui';
-import { Alert, Button, Checkbox, ErrorState, Icon, Input, Select, Textarea } from '../../components/ui';
+import { Alert, Button, ButtonLink, Checkbox, ErrorState, Icon, Input, Select, Textarea } from '../../components/ui';
 import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
@@ -84,9 +84,16 @@ function Editor({ product, categories, onReload }: { product: AdminProduct | nul
       title={product ? product.name : 'منتج جديد'}
       actions={
         product && (
-          <a href={`/store/${product.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-            <Icon name="external" className="h-4 w-4" /> عرض في المتجر
-          </a>
+          <>
+            <a href={`/store/${product.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
+              <Icon name="external" className="h-4 w-4" /> عرض في المتجر
+            </a>
+            {product.visible && (
+              <ButtonLink to={`/admin/newsletter?product=${product.id}`} variant="outline" size="sm">
+                أعلن عنه بالبريد
+              </ButtonLink>
+            )}
+          </>
         )
       }
     >

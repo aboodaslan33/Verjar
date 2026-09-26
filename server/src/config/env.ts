@@ -18,6 +18,12 @@ const schema = z.object({
   WA_PHONE_ID: z.string().optional().default(''),
   WA_API_VERSION: z.string().default('v21.0'),
   CLOUDINARY_URL: z.string().optional().default(''),
+  // البريد (SMTP) للنشرة البريدية — مثال Gmail: smtp.gmail.com / 465 / البريد / App Password
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().int().default(465),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  MAIL_FROM_NAME: z.string().default('فرجار قروب'),
   CLOUDINARY_FOLDER: z.string().default('verjar'),
 });
 
@@ -35,4 +41,7 @@ export const env = {
   clientOrigins: parsed.data.CLIENT_URL.split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean),
   waCloudEnabled: parsed.data.WA_MODE === 'cloud' && Boolean(parsed.data.WA_TOKEN && parsed.data.WA_PHONE_ID),
   cloudinaryEnabled: Boolean(parsed.data.CLOUDINARY_URL),
+  emailEnabled: Boolean(parsed.data.SMTP_HOST && parsed.data.SMTP_USER && parsed.data.SMTP_PASS),
+  /** رابط الواجهة العام (أول قيمة في CLIENT_URL) — لروابط البريد */
+  siteUrl: parsed.data.CLIENT_URL.split(',')[0].trim().replace(/\/$/, ''),
 };

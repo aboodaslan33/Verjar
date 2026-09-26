@@ -35,6 +35,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin/finance', label: 'المالية' },
       { to: '/admin/customers', label: 'العملاء' },
+      { to: '/admin/newsletter', label: 'النشرة البريدية' },
       { to: '/admin/technicians', label: 'الفنيون' },
     ],
   },

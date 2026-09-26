@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { Alert, Button, Input, PageLoader } from '../../components/ui';
+import { Alert, Button, Checkbox, Input, PageLoader } from '../../components/ui';
 import { homeFor, useAuth } from '../../context/Auth';
 import { ApiError, api } from '../../lib/api';
 import { isJordanMobile } from '../../lib/format';
@@ -39,6 +39,7 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [claim, setClaim] = useState<string | null>(null);
   const [phoneTaken, setPhoneTaken] = useState(false);
+  const [optIn, setOptIn] = useState(true);
   const [busy, setBusy] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -72,6 +73,7 @@ export default function Register() {
         phone: v.phone.trim(),
         email: v.email.trim() || null,
         password: v.password,
+        emailOptIn: optIn,
         ...(claim ? { ref: v.ref.trim() } : {}),
       });
       setUser(me);
@@ -155,6 +157,14 @@ export default function Register() {
           error={errors.email}
           hint="يمكنك الدخول به بدل رقم الهاتف."
         />
+        {v.email.trim() && (
+          <Checkbox
+            label="أرسلوا لي أخبار المنتجات والخدمات الجديدة"
+            description="رسائل قليلة بالبريد، ويمكنك إلغاؤها في أي وقت."
+            checked={optIn}
+            onChange={setOptIn}
+          />
+        )}
         <PasswordInput name="password" label="كلمة المرور" autoComplete="new-password" value={v.password} onChange={set('password')} error={errors.password} hint="8 أحرف على الأقل." />
         <PasswordInput name="confirm" label="تأكيد كلمة المرور" autoComplete="new-password" value={v.confirm} onChange={set('confirm')} error={errors.confirm} />
 

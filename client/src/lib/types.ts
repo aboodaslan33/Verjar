@@ -124,6 +124,7 @@ export type CustomerMe = {
   email: string | null;
   companyName: string | null;
   hasPassword: boolean;
+  emailOptIn: boolean;
 };
 export type AdminMe = { id: string; name: string; email: string; role: 'ADMIN' | 'STAFF' };
 /** المستخدم الحالي كما يعيده GET /auth/me */

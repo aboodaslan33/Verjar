@@ -18,6 +18,7 @@ type CustomerRow = {
   email: string | null;
   companyName: string | null;
   passwordHash: string | null;
+  emailOptIn: boolean;
 };
 
 function customerPublic(c: CustomerRow) {
@@ -29,6 +30,7 @@ function customerPublic(c: CustomerRow) {
     email: c.email,
     companyName: c.companyName,
     hasPassword: Boolean(c.passwordHash),
+    emailOptIn: c.emailOptIn,
   };
 }
 
@@ -107,6 +109,8 @@ authRouter.post(
           .nullable()
           .transform((v) => v || null),
         password: passwordField,
+        /** موافقة على استلام أخبار المنتجات والخدمات الجديدة بالبريد */
+        emailOptIn: z.boolean().default(true),
         /** رقم مرجع حجز/طلب سابق — مطلوب فقط إذا كان للرقم حجوزات سابقة كضيف */
         ref: z.string().trim().max(30).optional(),
       })
@@ -158,7 +162,7 @@ authRouter.post(
 
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
     const now = new Date();
-    const data = { name: input.name, email: input.email, passwordHash, registeredAt: now, lastLoginAt: now };
+    const data = { name: input.name, email: input.email, passwordHash, registeredAt: now, lastLoginAt: now, emailOptIn: input.emailOptIn };
     const customer = existing
       ? await prisma.customer.update({
           where: { id: existing.id },
@@ -240,6 +244,7 @@ authRouter.patch(
           .optional()
           .nullable()
           .transform((v) => (v === undefined ? undefined : v || null)),
+        emailOptIn: z.boolean().optional(),
       })
       .parse(req.body);
     if (input.email) {
