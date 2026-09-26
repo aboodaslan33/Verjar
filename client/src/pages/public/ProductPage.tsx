@@ -116,7 +116,7 @@ function ProductView({ product, related }: ProductResponse) {
                 <span id="qty-label" className="label">
                   الكمية
                 </span>
-                <QtyStepper value={qty} max={product.stock} onChange={setQty} labelledBy="qty-label" />
+                <QtyStepper value={qty} max={Math.min(product.stock, 20)} onChange={setQty} labelledBy="qty-label" />
               </div>
             )}
 

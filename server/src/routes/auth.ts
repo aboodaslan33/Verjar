@@ -127,12 +127,16 @@ authRouter.post(
     // رقم استُخدم سابقًا في حجز كضيف: نطلب رقم مرجع لإثبات ملكية الرقم قبل ربط الحجوزات بالحساب
     if (existing) {
       const where = { customerId: existing.id, deletedAt: null };
-      const [b, o, r] = await Promise.all([
+      // أي سجل مرتبط بالرقم (حتى العقود والملفات والدفعات) يتطلب إثبات الملكية
+      const counts = await Promise.all([
         prisma.booking.count({ where }),
         prisma.order.count({ where }),
         prisma.corporateRequest.count({ where }),
+        prisma.contract.count({ where }),
+        prisma.quoteFile.count({ where }),
+        prisma.payment.count({ where }),
       ]);
-      if (b + o + r > 0) {
+      if (counts.some((n) => n > 0)) {
         if (!input.ref) {
           throw new HttpError(
             409,

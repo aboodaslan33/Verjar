@@ -73,7 +73,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const add = useCallback((p: Product, qty = 1) => {
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === p.id);
-      const cap = Math.max(p.stock, 0);
+      // الحد الأقصى 20 قطعة من المنتج في الطلب الواحد (مطابق للسيرفر)
+      const cap = Math.min(Math.max(p.stock, 0), 20);
       if (existing) {
         return prev.map((i) =>
           i.productId === p.id ? { ...i, stock: cap, quantity: Math.min(i.quantity + qty, cap || 1) } : i,

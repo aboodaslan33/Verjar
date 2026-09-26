@@ -6,7 +6,7 @@ import { asyncHandler, badRequest, notFound, ok } from '../../lib/http';
 import { prisma } from '../../lib/prisma';
 import { memoryUpload } from '../../middleware/upload';
 import { quoteFileMessage } from '../../services/messages';
-import { POLICIES, storeFile, validateFile } from '../../services/upload.service';
+import { POLICIES, deleteStored, storeFile, validateFile } from '../../services/upload.service';
 import { notifyCustomer } from '../../services/whatsapp.service';
 
 export const filesRouter = Router();
@@ -122,7 +122,9 @@ filesRouter.post(
 filesRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
-    await prisma.quoteFile.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
+    const file = await prisma.quoteFile.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
+    // روابط Cloudinary عامة: الملف المحذوف يُزال فعليًا حتى لا يبقى متاحًا لمن يملك الرابط
+    await deleteStored(file.publicId, 'DOCUMENT');
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'delete', entity: 'quoteFile', entityId: req.params.id });
     ok(res, { deleted: true });
   }),

@@ -51,7 +51,7 @@ npm run dev
 ```
 
 - الموقع: http://localhost:5173
-- لوحة التحكم: http://localhost:5173/admin/login — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا في التطوير `farjarweb@gmail.com` / `FarjarGroup@2026`)
+- لوحة التحكم: http://localhost:5173/admin/login (أو من `/login` بنفس البريد) — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` من `server/.env`
 - حساب عميل: أنشئه من http://localhost:5173/register ثم ادخل من http://localhost:5173/login (بالهاتف أو البريد + كلمة المرور)
 - عميل تجريبي (من `npm run seed`): الهاتف `0791234567` وكلمة المرور `Demo@12345`
 
@@ -128,7 +128,7 @@ git push origin main
 2. اربط المستودع. سيقرأ Render ملف `render.yaml` ويعرض الخدمات الثلاث.
 3. سيطلب قيم المتغيرات المعلّمة `sync: false`:
    - `ADMIN_EMAIL`: `farjarweb@gmail.com`
-   - `ADMIN_PASSWORD`: كلمة مرور قوية لحساب الأدمن (8 أحرف على الأقل). لتغييرها لاحقًا عدّلها هنا وأعد النشر
+   - `ADMIN_PASSWORD`: كلمة مرور قوية خاصة بك (8 أحرف على الأقل، ولا تستخدم أي مثال منشور في هذا المستودع — يرفضها السيرفر في الإنتاج). لتغييرها لاحقًا عدّلها هنا وأعد النشر؛ تغييرها من لوحة التحكم يُستبدل بهذه القيمة عند إعادة التشغيل
    - `CLOUDINARY_URL`: القيمة من الخطوة 1
    - `WA_TOKEN` و `WA_PHONE_ID`: اتركهما فارغين إذا لم تفعّل Cloud API
 4. اضغط **Apply**. سيُنشئ Render قاعدة البيانات ويربط `DATABASE_URL` بالسيرفر تلقائيًا، ويولّد `JWT_SECRET`.

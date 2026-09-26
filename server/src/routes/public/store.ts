@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
 import { emitAdmin } from '../../lib/events';
-import { asyncHandler, badRequest, notFound, ok } from '../../lib/http';
+import { HttpError, asyncHandler, badRequest, notFound, ok } from '../../lib/http';
 import { makeRef } from '../../lib/ids';
 import { round3, toNum } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
@@ -107,6 +107,11 @@ storeRouter.post(
   formLimiter,
   asyncHandler(async (req, res) => {
     const input = orderSchema.parse(req.body);
+    // الطلب يحجز المخزون فورًا: حد للطلبات المفتوحة يمنع تفريغ المخزون بحساب واحد
+    const open = await prisma.order.count({ where: { customerId: req.auth!.sub, deletedAt: null, status: 'NEW' } });
+    if (open >= 3) {
+      throw new HttpError(429, 'لديك 3 طلبات بانتظار التأكيد. انتظر تأكيدها قبل طلب جديد، أو تواصل معنا.', 'TOO_MANY_OPEN');
+    }
 
     // دمج المنتجات المكررة
     const qty = new Map<string, number>();

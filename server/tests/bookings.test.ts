@@ -260,4 +260,23 @@ describe('إدارة الحجوزات', () => {
     const res = await request(app).post('/api/v1/auth/customer/login').send({ phone: '0791234567', secret: 'B-ABCDEF' });
     expect(res.status).toBe(404);
   });
+
+  it('حد 3 حجوزات مفتوحة لكل عميل (يمنع حجز كل المواعيد بحساب واحد)', async () => {
+    for (let i = 0; i < 3; i++) {
+      const r = await user.post('/api/v1/bookings').send(inspection(nextWorkingDate(2, i), '10:00'));
+      expect(r.status).toBe(201);
+    }
+    const fourth = await user.post('/api/v1/bookings').send(inspection(nextWorkingDate(2, 3), '10:00'));
+    expect(fourth.status).toBe(429);
+    expect(fourth.body.error.code).toBe('TOO_MANY_OPEN');
+  });
+
+  it('يرفض رفع ملفات أكبر من الحد الكلي قبل تحميلها', async () => {
+    const res = await user
+      .post('/api/v1/bookings')
+      .set('Content-Type', 'multipart/form-data; boundary=x')
+      .set('Content-Length', String(50 * 1024 * 1024))
+      .send('--x--');
+    expect(res.status).toBe(413);
+  });
 });

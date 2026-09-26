@@ -215,12 +215,12 @@ describe('الجلسة', () => {
     expect(renewed).toMatch(/Max-Age=2592000/);
   });
 
-  it('يقبل كوكي الإصدار السابق ويستبدله', async () => {
+  it('كوكي الإصدار الأول لم يعد مقبولًا ويُمسح', async () => {
     const reg = await request(app).post('/api/auth/register').send(account);
     const legacy = jwt.sign({ sub: reg.body.data.id, role: 'CUSTOMER', name: account.name }, process.env.JWT_SECRET!, { expiresIn: '30d' });
     const res = await request(app).get('/api/v1/auth/customer/me').set('Cookie', `vj_customer=${legacy}`);
-    expect(res.status).toBe(200);
-    expect(sessionCookie(res)).toBeDefined();
+    expect(res.status).toBe(401);
+    expect(String(res.headers['set-cookie'])).toContain('vj_customer=;');
   });
 
   it('توكن مزوّر لا يُقبل', async () => {

@@ -19,9 +19,8 @@ declare global {
 
 /** كوكي الجلسة الموحّدة (عميل أو أدمن) */
 export const SESSION_COOKIE = 'vj_session';
-/** كوكيز الإصدار السابق — تُقرأ مرة واحدة ثم تُستبدل بـ vj_session */
-export const ADMIN_COOKIE = 'vj_admin';
-export const CUSTOMER_COOKIE = 'vj_customer';
+/** كوكيز الإصدار الأول — لم تعد مقبولة، تُمسح فقط عند الخروج أو عند وجودها */
+const LEGACY_COOKIES = ['vj_admin', 'vj_customer'];
 
 export const SESSION_TTL_S = 60 * 60 * 24 * 30; // 30 يومًا
 /** تُجدَّد الجلسة تلقائيًا إذا مضى على إصدارها أكثر من يوم */
@@ -66,7 +65,7 @@ export function setAuthCookie(res: Response, p: Principal) {
 
 export function clearAuthCookie(res: Response) {
   const { maxAge: _m, ...opts } = cookieOptions(0);
-  for (const name of [SESSION_COOKIE, ADMIN_COOKIE, CUSTOMER_COOKIE]) res.clearCookie(name, opts);
+  for (const name of [SESSION_COOKIE, ...LEGACY_COOKIES]) res.clearCookie(name, opts);
 }
 
 type Decoded = AuthPayload & { pv?: string; iat: number; exp: number };
@@ -105,25 +104,18 @@ export async function loadPrincipal(p: Pick<AuthPayload, 'sub' | 'role'>): Promi
 export async function attachSession(req: Request, res: Response, next: NextFunction) {
   try {
     const cookies = req.cookies ?? {};
-    let p = verify(cookies[SESSION_COOKIE]);
-    let legacy = false;
+    const p = verify(cookies[SESSION_COOKIE]);
     if (!p) {
-      p = verify(cookies[ADMIN_COOKIE]) ?? verify(cookies[CUSTOMER_COOKIE]);
-      legacy = Boolean(p);
-    }
-    if (!p) {
-      if (cookies[SESSION_COOKIE] || cookies[ADMIN_COOKIE] || cookies[CUSTOMER_COOKIE]) clearAuthCookie(res);
+      if (cookies[SESSION_COOKIE] || LEGACY_COOKIES.some((c) => cookies[c])) clearAuthCookie(res);
       return next();
     }
     const fresh = await loadPrincipal(p);
-    // الكوكيز القديمة لا تحمل بصمة كلمة المرور — تُقبل مرة واحدة وتُستبدل
-    if (!fresh || fresh.role !== p.role || (!legacy && p.pv !== fresh.pv)) {
+    if (!fresh || fresh.role !== p.role || p.pv !== fresh.pv) {
       clearAuthCookie(res);
       return next();
     }
     const age = Math.floor(Date.now() / 1000) - p.iat;
-    if (legacy) clearAuthCookie(res);
-    if (legacy || age > REFRESH_AFTER_S || fresh.name !== p.name) setAuthCookie(res, fresh);
+    if (age > REFRESH_AFTER_S || fresh.name !== p.name) setAuthCookie(res, fresh);
     req.auth = { sub: fresh.sub, role: fresh.role, name: fresh.name };
     next();
   } catch (e) {

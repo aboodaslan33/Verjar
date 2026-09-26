@@ -64,6 +64,17 @@ describe('POST /api/v1/store/orders', () => {
     expect(res.body.error.fields.phone).toBeDefined();
   });
 
+  it('حد الكمية لكل منتج وحد الطلبات المفتوحة', async () => {
+    const p = await createProduct({ stock: 100 });
+    const big = await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 21 }] });
+    expect(big.status).toBe(400);
+    for (let i = 0; i < 3; i++) {
+      expect((await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 1 }] })).status).toBe(201);
+    }
+    const fourth = await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 1 }] });
+    expect(fourth.status).toBe(429);
+  });
+
   it('لا طلب بدون تسجيل دخول', async () => {
     const p = await createProduct();
     const res = await request(app).post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 1 }] });

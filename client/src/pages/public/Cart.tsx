@@ -71,7 +71,7 @@ export default function Cart() {
                       )}
                     </p>
                     <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
-                      <QtyStepper value={i.quantity} max={i.stock || 99} onChange={(v) => setQty(i.productId, v)} size="sm" />
+                      <QtyStepper value={i.quantity} max={Math.min(i.stock || 20, 20)} onChange={(v) => setQty(i.productId, v)} size="sm" />
                       <p className="text-end">
                         <span className="sr-only">المجموع: </span>
                         <span className="font-bold">{formatJOD(i.finalPrice * i.quantity)}</span>

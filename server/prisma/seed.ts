@@ -183,7 +183,8 @@ const DEV_ADMIN_PASSWORD = 'FarjarGroup@2026';
 /**
  * حساب الأدمن من متغيرات البيئة عند كل تشغيل:
  * - غير موجود ← يُنشأ
- * - موجود وكلمة المرور في البيئة مختلفة عن المحفوظة ← تُحدَّث (ويُعاد تفعيل الحساب)
+ * - موجود وكلمة المرور في البيئة مختلفة عن المحفوظة ← تُحدَّث
+ *   (ملاحظة: تغيير كلمة المرور من لوحة التحكم يُستبدل بقيمة ADMIN_PASSWORD عند إعادة التشغيل — غيّرها في Render)
  * في الإنتاج لا تُستخدم كلمة مرور افتراضية: بدون ADMIN_PASSWORD لا يُنشأ الحساب ولا يُعدَّل.
  */
 async function syncAdmin() {
@@ -198,6 +199,12 @@ async function syncAdmin() {
     console.warn('! ADMIN_PASSWORD أقصر من 8 أحرف — لم يُحدَّث حساب الأدمن.');
     return;
   }
+  // كلمات المرور المنشورة في ملفات المثال والتوثيق لا تُقبل في الإنتاج
+  const PUBLISHED = ['Verjar@2026', 'FarjaGroup@2026', 'FarjarGroup@2026', 'change-me', 'change-me-strong-password'];
+  if (isProd && PUBLISHED.some((p) => p.toLowerCase() === password.toLowerCase())) {
+    console.warn('! ADMIN_PASSWORD يطابق كلمة مرور منشورة في ملفات المثال — لم يُنشأ/يُحدَّث حساب الأدمن. اختر كلمة مرور خاصة.');
+    return;
+  }
   const name = process.env.ADMIN_NAME || 'إدارة فرجار قروب';
   const existing = await prisma.user.findUnique({ where: { email } });
   if (!existing) {
@@ -209,14 +216,11 @@ async function syncAdmin() {
     await prisma.user.update({ where: { id: existing.id }, data: { name } });
   }
   if (!(await bcrypt.compare(password, existing.passwordHash))) {
-    await prisma.user.update({
-      where: { id: existing.id },
-      data: { passwordHash: await bcrypt.hash(password, 11), active: true },
-    });
+    await prisma.user.update({ where: { id: existing.id }, data: { passwordHash: await bcrypt.hash(password, 11) } });
     console.log(`✓ حُدّثت كلمة مرور الأدمن من متغيرات البيئة: ${email}`);
   } else if (!existing.active) {
-    await prisma.user.update({ where: { id: existing.id }, data: { active: true } });
-    console.log(`✓ أُعيد تفعيل حساب الأدمن: ${email}`);
+    // لا يُعاد تفعيل حساب أوقفه أحد عمدًا
+    console.warn(`! حساب الأدمن ${email} موقوف — لم يُعَد تفعيله تلقائيًا`);
   } else {
     console.log(`• حساب الأدمن جاهز: ${email}`);
   }

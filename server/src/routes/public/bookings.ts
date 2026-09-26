@@ -3,13 +3,13 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
 import { emitAdmin } from '../../lib/events';
-import { asyncHandler, badRequest, ok } from '../../lib/http';
+import { HttpError, asyncHandler, badRequest, ok } from '../../lib/http';
 import { makeRef } from '../../lib/ids';
 import { BOOKING_TYPE_AR } from '../../lib/labels';
 import { prisma } from '../../lib/prisma';
 import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
-import { memoryUpload } from '../../middleware/upload';
+import { memoryUpload, uploadGuard } from '../../middleware/upload';
 import { accountCustomer } from '../../services/customer.service';
 import { bookingMessage, customerConfirmationMessage } from '../../services/messages';
 import { assertSlotAvailable, getDaySlots, inspectionFee } from '../../services/schedule.service';
@@ -49,10 +49,27 @@ function parseDataField(raw: unknown) {
  *  data: JSON للحقول | photos: حتى 5 صور (5MB) | designFiles: ملفات التصميم (صور أو PDF)
  * يقبل أيضًا application/json بدون ملفات.
  */
+/** حد الحجوزات المفتوحة لكل عميل — يمنع حجز كل المواعيد بحساب واحد */
+export const MAX_OPEN_BOOKINGS = 3;
+
 bookingsRouter.post(
   '/',
   requireCustomer,
   formLimiter,
+  asyncHandler(async (req, _res, next) => {
+    const open = await prisma.booking.count({
+      where: { customerId: req.auth!.sub, deletedAt: null, status: { in: ['NEW', 'UNDER_REVIEW'] } },
+    });
+    if (open >= MAX_OPEN_BOOKINGS) {
+      throw new HttpError(
+        429,
+        `لديك ${open} حجوزات قيد المراجعة. انتظر تأكيدها قبل إضافة حجز جديد، أو تواصل معنا.`,
+        'TOO_MANY_OPEN',
+      );
+    }
+    next();
+  }),
+  uploadGuard(40),
   upload,
   asyncHandler(async (req, res) => {
     const raw = req.is('multipart/form-data') ? parseDataField(req.body.data) : req.body;

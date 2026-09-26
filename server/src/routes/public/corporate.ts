@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { audit } from '../../lib/audit';
 import { emitAdmin } from '../../lib/events';
-import { asyncHandler, badRequest, ok } from '../../lib/http';
+import { HttpError, asyncHandler, badRequest, ok } from '../../lib/http';
 import { makeRef } from '../../lib/ids';
 import { CORPORATE_TYPE_AR } from '../../lib/labels';
 import { prisma } from '../../lib/prisma';
 import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
-import { memoryUpload } from '../../middleware/upload';
+import { memoryUpload, uploadGuard } from '../../middleware/upload';
 import { accountCustomer } from '../../services/customer.service';
 import { corporateMessage, customerConfirmationMessage } from '../../services/messages';
 import { POLICIES, storeFile, validateFile } from '../../services/upload.service';
@@ -41,6 +41,16 @@ corporateRouter.post(
   '/requests',
   requireCustomer,
   formLimiter,
+  asyncHandler(async (req, _res, next) => {
+    const open = await prisma.corporateRequest.count({
+      where: { customerId: req.auth!.sub, deletedAt: null, status: { in: ['NEW', 'UNDER_REVIEW'] } },
+    });
+    if (open >= 3) {
+      throw new HttpError(429, 'لديك 3 طلبات قيد المراجعة. انتظر ردنا قبل إرسال طلب جديد، أو تواصل معنا.', 'TOO_MANY_OPEN');
+    }
+    next();
+  }),
+  uploadGuard(22),
   upload,
   asyncHandler(async (req, res) => {
     let raw: unknown = req.body;
