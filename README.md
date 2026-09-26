@@ -322,5 +322,201 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/verjar_test npm 
 ## هيكل المشروع
 
 ```
-PROJECT_TREE
+verjar/
+├── client/
+│   ├── public/
+│   │   ├── seed/
+│   │   ├── _redirects
+│   │   ├── favicon.svg
+│   │   └── robots.txt
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── admin/
+│   │   │   │   ├── AdminLayout.tsx
+│   │   │   │   ├── AdminMap.tsx
+│   │   │   │   ├── ConfirmDialog.tsx
+│   │   │   │   ├── ContractForm.tsx
+│   │   │   │   ├── DataTable.tsx
+│   │   │   │   ├── FileUploadForm.tsx
+│   │   │   │   ├── LeafletMap.tsx
+│   │   │   │   ├── MediaGallery.tsx
+│   │   │   │   ├── PaymentForm.tsx
+│   │   │   │   ├── RecordLists.tsx
+│   │   │   │   ├── StatusSelect.tsx
+│   │   │   │   ├── WhatsAppFallback.tsx
+│   │   │   │   ├── hooks.ts
+│   │   │   │   ├── labels.ts
+│   │   │   │   ├── live.tsx
+│   │   │   │   ├── types.ts
+│   │   │   │   └── ui.tsx
+│   │   │   ├── forms/
+│   │   │   │   ├── FilePicker.tsx
+│   │   │   │   ├── FormBits.tsx
+│   │   │   │   ├── LocationPicker.tsx
+│   │   │   │   ├── MapView.tsx
+│   │   │   │   ├── SlotPicker.tsx
+│   │   │   │   └── formUtils.ts
+│   │   │   ├── layout/
+│   │   │   │   ├── Logo.tsx
+│   │   │   │   ├── PublicLayout.tsx
+│   │   │   │   ├── SiteFooter.tsx
+│   │   │   │   └── SiteHeader.tsx
+│   │   │   ├── store/
+│   │   │   │   ├── ProductCard.tsx
+│   │   │   │   └── QtyStepper.tsx
+│   │   │   └── ui/
+│   │   │       ├── Button.tsx
+│   │   │       ├── Feedback.tsx
+│   │   │       ├── Field.tsx
+│   │   │       ├── Icon.tsx
+│   │   │       ├── Modal.tsx
+│   │   │       ├── PageHeader.tsx
+│   │   │       ├── Pagination.tsx
+│   │   │       ├── Price.tsx
+│   │   │       ├── StatusBadge.tsx
+│   │   │       ├── Stepper.tsx
+│   │   │       └── index.ts
+│   │   ├── context/
+│   │   │   ├── AdminAuth.tsx
+│   │   │   ├── CartContext.tsx
+│   │   │   ├── CustomerAuth.tsx
+│   │   │   ├── SiteContext.tsx
+│   │   │   ├── ThemeContext.tsx
+│   │   │   └── ToastContext.tsx
+│   │   ├── lib/
+│   │   │   ├── api.ts
+│   │   │   ├── format.ts
+│   │   │   ├── types.ts
+│   │   │   └── useAsync.ts
+│   │   ├── pages/
+│   │   │   ├── account/
+│   │   │   │   ├── Account.tsx
+│   │   │   │   └── Login.tsx
+│   │   │   ├── admin/
+│   │   │   │   ├── AdminApp.tsx
+│   │   │   │   ├── BookingDetail.tsx
+│   │   │   │   ├── Bookings.tsx
+│   │   │   │   ├── Categories.tsx
+│   │   │   │   ├── Contracts.tsx
+│   │   │   │   ├── Corporate.tsx
+│   │   │   │   ├── CorporateDetail.tsx
+│   │   │   │   ├── CustomerDetail.tsx
+│   │   │   │   ├── Customers.tsx
+│   │   │   │   ├── Dashboard.tsx
+│   │   │   │   ├── Finance.tsx
+│   │   │   │   ├── Login.tsx
+│   │   │   │   ├── Logs.tsx
+│   │   │   │   ├── OrderDetail.tsx
+│   │   │   │   ├── Orders.tsx
+│   │   │   │   ├── ProductEditor.tsx
+│   │   │   │   ├── Products.tsx
+│   │   │   │   ├── Settings.tsx
+│   │   │   │   └── Technicians.tsx
+│   │   │   └── public/
+│   │   │       ├── About.tsx
+│   │   │       ├── BookingForm.tsx
+│   │   │       ├── Bookings.tsx
+│   │   │       ├── Cart.tsx
+│   │   │       ├── Checkout.tsx
+│   │   │       ├── Contact.tsx
+│   │   │       ├── Corporate.tsx
+│   │   │       ├── CorporateForm.tsx
+│   │   │       ├── Home.tsx
+│   │   │       ├── NotFound.tsx
+│   │   │       ├── ProductPage.tsx
+│   │   │       └── Store.tsx
+│   │   ├── styles/
+│   │   │   └── index.css
+│   │   ├── App.tsx
+│   │   ├── main.tsx
+│   │   └── vite-env.d.ts
+│   ├── .env.example
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── tsconfig.tsbuildinfo
+│   └── vite.config.ts
+├── server/
+│   ├── prisma/
+│   │   ├── migrations/
+│   │   ├── schema.prisma
+│   │   └── seed.ts
+│   ├── src/
+│   │   ├── config/
+│   │   │   └── env.ts
+│   │   ├── jobs/
+│   │   │   └── contractReminders.ts
+│   │   ├── lib/
+│   │   │   ├── audit.ts
+│   │   │   ├── events.ts
+│   │   │   ├── http.ts
+│   │   │   ├── ids.ts
+│   │   │   ├── labels.ts
+│   │   │   ├── money.ts
+│   │   │   ├── pagination.ts
+│   │   │   ├── phone.ts
+│   │   │   ├── prisma.ts
+│   │   │   ├── time.ts
+│   │   │   └── zodArabic.ts
+│   │   ├── middleware/
+│   │   │   ├── auth.ts
+│   │   │   ├── error.ts
+│   │   │   ├── rateLimit.ts
+│   │   │   └── upload.ts
+│   │   ├── routes/
+│   │   │   ├── admin/
+│   │   │   │   ├── bookings.ts
+│   │   │   │   ├── corporate.ts
+│   │   │   │   ├── customers.ts
+│   │   │   │   ├── dashboard.ts
+│   │   │   │   ├── files.ts
+│   │   │   │   ├── finance.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── orders.ts
+│   │   │   │   ├── products.ts
+│   │   │   │   ├── settings.ts
+│   │   │   │   └── shared.ts
+│   │   │   ├── customer/
+│   │   │   │   └── account.ts
+│   │   │   ├── public/
+│   │   │   │   ├── bookings.ts
+│   │   │   │   ├── corporate.ts
+│   │   │   │   ├── site.ts
+│   │   │   │   └── store.ts
+│   │   │   └── auth.ts
+│   │   ├── services/
+│   │   │   ├── customer.service.ts
+│   │   │   ├── messages.ts
+│   │   │   ├── schedule.service.ts
+│   │   │   ├── settings.service.ts
+│   │   │   ├── upload.service.ts
+│   │   │   └── whatsapp.service.ts
+│   │   ├── validators/
+│   │   │   ├── booking.ts
+│   │   │   ├── common.ts
+│   │   │   ├── corporate.ts
+│   │   │   └── order.ts
+│   │   ├── app.ts
+│   │   └── index.ts
+│   ├── tests/
+│   │   ├── bookings.test.ts
+│   │   ├── corporate.test.ts
+│   │   ├── env.ts
+│   │   ├── globalSetup.ts
+│   │   ├── helpers.ts
+│   │   └── orders.test.ts
+│   ├── .env.example
+│   ├── jest.config.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── tsconfig.build.json
+│   └── tsconfig.json
+├── .env.example
+├── .gitignore
+├── README.md
+├── package.json
+└── render.yaml
 ```

@@ -34,9 +34,19 @@ export function ContractForm({
   const [reminderDays, setReminderDays] = useState(contract ? String(contract.reminderDays) : '');
   const [status, setStatus] = useState<ContractStatus>(contract?.status ?? 'ACTIVE');
   const [notes, setNotes] = useState(contract?.notes ?? '');
+  const [local, setLocal] = useState<Record<string, string>>({});
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (title.trim().length < 2) errs.title = 'عنوان العقد مطلوب';
+    if (!startDate) errs.startDate = 'حدد تاريخ البداية';
+    if (!endDate) errs.endDate = 'حدد تاريخ النهاية';
+    else if (startDate && endDate <= startDate) errs.endDate = 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية';
+    if (value.trim() === '' || Number(value) < 0) errs.value = 'أدخل قيمة العقد';
+    if (reminderDays !== '' && (Number(reminderDays) < 1 || Number(reminderDays) > 180)) errs.reminderDays = 'بين 1 و 180 يوم';
+    setLocal(errs);
+    if (Object.keys(errs).length) return;
     const body: Record<string, unknown> = {
       title: title.trim(),
       startDate,
@@ -57,7 +67,7 @@ export function ContractForm({
     if (r) onSaved(r);
   };
 
-  const fe = m.fieldErrors;
+  const fe = { ...m.fieldErrors, ...local } as Record<string, string>;
   return (
     <form onSubmit={submit} className="space-y-3" noValidate>
       <Input label="عنوان العقد" value={title} onChange={(e) => setTitle(e.target.value)} error={fe.title} />
@@ -99,7 +109,7 @@ export function ContractForm({
         )}
       </div>
       <Textarea label="ملاحظات" optional rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} error={fe.notes} />
-      {m.error && !Object.keys(fe).length && <p className="text-sm text-danger">{m.error}</p>}
+      {m.error && !Object.keys(m.fieldErrors).length && <p className="text-sm text-danger">{m.error}</p>}
       <div className="flex gap-2">
         <Button type="submit" size="sm" loading={m.pending === 'save'}>
           {contract ? 'حفظ العقد' : 'إنشاء العقد'}

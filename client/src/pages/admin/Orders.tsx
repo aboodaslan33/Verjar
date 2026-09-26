@@ -18,7 +18,7 @@ export default function Orders() {
   const list = useAdminQuery(
     () => api.get<Paged<OrderRow>>('/admin/orders', { ...v, page, pageSize: 20 }),
     [JSON.stringify(v), page],
-    { live: true },
+    { live: true, keep: true },
   );
 
   const columns: Column<OrderRow>[] = [

@@ -1,3 +1,4 @@
+import './lib/zodArabic';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';

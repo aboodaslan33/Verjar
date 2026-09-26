@@ -104,7 +104,7 @@ function Shell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { data: stats } = useAdminQuery(() => api.get<DashboardStats>('/admin/dashboard/stats'), [location.pathname], { live: true });
+  const { data: stats } = useAdminQuery(() => api.get<DashboardStats>('/admin/dashboard/stats'), [location.pathname], { live: true, keep: true });
 
   useEffect(() => setOpen(false), [location.pathname]);
   useEffect(() => {

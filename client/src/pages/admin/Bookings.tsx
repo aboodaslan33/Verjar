@@ -83,7 +83,7 @@ function BookingsTable() {
   const list = useAdminQuery(
     () => api.get<Paged<BookingRow>>('/admin/bookings', { ...v, page, pageSize: 20 }),
     [JSON.stringify(v), page],
-    { live: true },
+    { live: true, keep: true },
   );
 
   const columns: Column<BookingRow>[] = [
@@ -208,7 +208,7 @@ function BookingsCalendar() {
       { replace: true },
     );
 
-  const q = useAdminQuery(() => api.get<CalendarItem[]>('/admin/bookings/calendar', { month }), [month], { live: true });
+  const q = useAdminQuery(() => api.get<CalendarItem[]>('/admin/bookings/calendar', { month }), [month], { live: true, keep: true });
 
   const { cells, byDate } = useMemo(() => {
     const [y, m] = month.split('-').map(Number);

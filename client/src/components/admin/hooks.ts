@@ -11,8 +11,9 @@ function toApiError(e: unknown) {
 /**
  * تحميل بيانات مع إبقاء البيانات السابقة أثناء إعادة التحميل (بدون وميض).
  * live: يعيد التحميل بصمت عند وصول أحداث SSE.
+ * keep: يُبقي البيانات السابقة (باهتة) عند تغيير الفلاتر بدل هيكل التحميل.
  */
-export function useAdminQuery<T>(fn: () => Promise<T>, deps: unknown[], opts: { live?: boolean } = {}) {
+export function useAdminQuery<T>(fn: () => Promise<T>, deps: unknown[], opts: { live?: boolean; keep?: boolean } = {}) {
   const { version } = useLive();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -22,10 +23,17 @@ export function useAdminQuery<T>(fn: () => Promise<T>, deps: unknown[], opts: { 
   const fnRef = useRef(fn);
   fnRef.current = fn;
   const hasData = useRef(false);
+  const keep = useRef(opts.keep);
+  keep.current = opts.keep;
 
   const run = useCallback(async (silent = false) => {
     const id = ++seq.current;
-    if (silent && hasData.current) setRefreshing(true);
+    // عند تغيّر المعطيات (مثل رقم عنصر آخر) لا نعرض بيانات العنصر السابق، إلا في القوائم (keep)
+    if (!silent && !keep.current && hasData.current) {
+      setData(null);
+      hasData.current = false;
+    }
+    if (hasData.current) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {

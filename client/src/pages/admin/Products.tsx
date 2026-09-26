@@ -19,6 +19,7 @@ export default function Products() {
   const list = useAdminQuery(
     () => api.get<Paged<AdminProduct>>('/admin/store/products', { ...v, page, pageSize: 20 }),
     [JSON.stringify(v), page],
+    { keep: true },
   );
   const m = useMutation();
 
