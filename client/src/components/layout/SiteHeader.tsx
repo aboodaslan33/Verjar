@@ -1,0 +1,144 @@
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { useCart } from '../../context/CartContext';
+import { useSite } from '../../context/SiteContext';
+import { useTheme } from '../../context/ThemeContext';
+import { cx, displayPhone } from '../../lib/format';
+import { Icon } from '../ui';
+import { Logo } from './Logo';
+
+export const NAV = [
+  { to: '/', label: 'الرئيسية', end: true },
+  { to: '/bookings', label: 'الحجوزات' },
+  { to: '/corporate', label: 'عقود الشركات' },
+  { to: '/store', label: 'المتجر' },
+  { to: '/about', label: 'نبذة عنا' },
+  { to: '/contact', label: 'تواصل' },
+];
+
+export function SiteHeader() {
+  const { settings } = useSite();
+  const { count } = useCart();
+  const { theme, toggle } = useTheme();
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => setOpen(false), [location.pathname]);
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
+      {/* شريط التواصل العلوي */}
+      <div className="hidden border-b border-line bg-brand-800 text-sand-100 md:block">
+        <div className="container flex h-9 items-center justify-between text-[13px]">
+          <span>{settings.workingHoursText}</span>
+          <div className="flex items-center gap-5">
+            <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 hover:text-white">
+              <Icon name="phone" className="h-3.5 w-3.5" />
+              <span className="ltr">{settings.phone}</span>
+            </a>
+            <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 hover:text-white">
+              <Icon name="mail" className="h-3.5 w-3.5" />
+              <span className="ltr">{settings.email}</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="container flex h-16 items-center justify-between gap-4">
+        <Logo />
+
+        <nav className="hidden lg:block" aria-label="القائمة الرئيسية">
+          <ul className="flex items-center gap-1">
+            {NAV.map((n) => (
+              <li key={n.to}>
+                <NavLink
+                  to={n.to}
+                  end={n.end}
+                  className={({ isActive }) =>
+                    cx(
+                      'rounded-lg px-3 py-2 text-[15px] font-medium transition-colors',
+                      isActive ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-100' : 'text-ink/80 hover:text-ink',
+                    )
+                  }
+                >
+                  {n.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={toggle}
+            className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink"
+            aria-label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+          </button>
+          <Link to="/account" className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink" aria-label="حسابي">
+            <Icon name="user" />
+          </Link>
+          <Link to="/cart" className="relative grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink" aria-label={`السلة (${count})`}>
+            <Icon name="cart" />
+            {count > 0 && (
+              <span className="absolute -top-0.5 end-0 grid h-5 min-w-5 place-items-center rounded-full bg-sand-400 px-1 text-[11px] font-bold text-brand-900">
+                {count}
+              </span>
+            )}
+          </Link>
+          <Link
+            to="/bookings"
+            className="ms-2 hidden h-10 items-center rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:inline-flex dark:bg-brand-500"
+          >
+            احجز موعد
+          </Link>
+          <button
+            type="button"
+            className="grid h-10 w-10 place-items-center rounded-lg hover:bg-subtle lg:hidden"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label="القائمة"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <Icon name={open ? 'close' : 'menu'} />
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <nav id="mobile-nav" className="border-t border-line bg-bg lg:hidden" aria-label="القائمة">
+          <ul className="container space-y-1 py-3">
+            {NAV.map((n) => (
+              <li key={n.to}>
+                <NavLink
+                  to={n.to}
+                  end={n.end}
+                  className={({ isActive }) =>
+                    cx('block rounded-xl px-4 py-3 text-base font-medium', isActive ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-100' : 'hover:bg-subtle')
+                  }
+                >
+                  {n.label}
+                </NavLink>
+              </li>
+            ))}
+            <li className="grid grid-cols-2 gap-2 pt-2">
+              <a href={`tel:${settings.phone}`} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-line font-medium">
+                <Icon name="phone" className="h-4 w-4" /> <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
+              </a>
+              <a
+                href={`https://wa.me/${settings.whatsappNumber}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1f7a4d] font-medium text-white"
+              >
+                <Icon name="whatsapp" className="h-4 w-4" /> واتساب
+              </a>
+            </li>
+          </ul>
+        </nav>
+      )}
+    </header>
+  );
+}

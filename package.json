@@ -1,0 +1,15 @@
+{
+  "name": "verjar",
+  "private": true,
+  "version": "1.0.0",
+  "description": "فيرجار — منصة خدمات الصيانة والمقاولات والمتجر",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n server,client -c green,yellow \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "test": "npm --prefix server test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,54 @@
+import { lazy, Suspense } from 'react';
+import { Route, Routes } from 'react-router-dom';
+import { PublicLayout } from './components/layout/PublicLayout';
+import { PageLoader } from './components/ui';
+import Home from './pages/public/Home';
+
+// الصفحات العامة — تحميل عند الطلب
+const Bookings = lazy(() => import('./pages/public/Bookings'));
+const BookingForm = lazy(() => import('./pages/public/BookingForm'));
+const Corporate = lazy(() => import('./pages/public/Corporate'));
+const CorporateForm = lazy(() => import('./pages/public/CorporateForm'));
+const Store = lazy(() => import('./pages/public/Store'));
+const ProductPage = lazy(() => import('./pages/public/ProductPage'));
+const Cart = lazy(() => import('./pages/public/Cart'));
+const Checkout = lazy(() => import('./pages/public/Checkout'));
+const About = lazy(() => import('./pages/public/About'));
+const Contact = lazy(() => import('./pages/public/Contact'));
+const NotFound = lazy(() => import('./pages/public/NotFound'));
+const AccountLogin = lazy(() => import('./pages/account/Login'));
+const Account = lazy(() => import('./pages/account/Account'));
+
+// لوحة الأدمن — حزمة منفصلة لا تُحمّل للزوار
+const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
+
+export default function App() {
+  return (
+    <Routes>
+      <Route
+        path="/admin/*"
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <AdminApp />
+          </Suspense>
+        }
+      />
+      <Route element={<PublicLayout />}>
+        <Route index element={<Home />} />
+        <Route path="bookings" element={<Bookings />} />
+        <Route path="bookings/:type" element={<BookingForm />} />
+        <Route path="corporate" element={<Corporate />} />
+        <Route path="corporate/:type" element={<CorporateForm />} />
+        <Route path="store" element={<Store />} />
+        <Route path="store/:slug" element={<ProductPage />} />
+        <Route path="cart" element={<Cart />} />
+        <Route path="checkout" element={<Checkout />} />
+        <Route path="about" element={<About />} />
+        <Route path="contact" element={<Contact />} />
+        <Route path="account/login" element={<AccountLogin />} />
+        <Route path="account" element={<Account />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
+  );
+}

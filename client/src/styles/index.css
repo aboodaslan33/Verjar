@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --c-bg: 250 248 243;
+    --c-surface: 255 255 255;
+    --c-subtle: 243 240 232;
+    --c-line: 226 221 208;
+    --c-ink: 28 36 32;
+    --c-muted: 99 108 102;
+    color-scheme: light;
+  }
+  .dark {
+    --c-bg: 17 22 20;
+    --c-surface: 25 31 28;
+    --c-subtle: 33 41 37;
+    --c-line: 48 58 53;
+    --c-ink: 234 236 231;
+    --c-muted: 158 168 161;
+    color-scheme: dark;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    font-feature-settings: 'kern';
+    line-height: 1.7;
+  }
+  h1, h2, h3, h4 {
+    @apply font-bold text-ink;
+    line-height: 1.35;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-sand-400 ring-offset-2 ring-offset-bg;
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+  /* الأرقام والهواتف تُكتب من اليسار لليمين */
+  .ltr {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+  .input {
+    @apply block w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink placeholder:text-muted/70
+      transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
+      disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .input-error {
+    @apply border-danger focus:border-danger focus:ring-danger/20;
+  }
+  .section {
+    @apply py-14 md:py-20;
+  }
+  .eyebrow {
+    @apply text-sm font-semibold text-sand-600 dark:text-sand-300;
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-subtle;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0;
+    transform: translateX(100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--c-surface) / 0.6), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+}
+
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
