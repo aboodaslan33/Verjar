@@ -24,7 +24,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             role="status"
             className={cx(
               'pointer-events-auto w-full max-w-sm animate-fade-up rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lift',
-              t.tone === 'success' && 'bg-brand-700',
+              t.tone === 'success' && 'bg-inverse',
               t.tone === 'error' && 'bg-danger',
               t.tone === 'info' && 'bg-ink text-bg',
             )}

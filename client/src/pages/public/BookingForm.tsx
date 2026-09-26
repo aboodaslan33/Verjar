@@ -839,10 +839,10 @@ function BookingWizard({ type }: { type: BookingType }) {
                   ]}
                 />
                 {type === 'INSPECTION' && fee != null && (
-                  <div className="flex items-center justify-between rounded-xl bg-brand-700 px-4 py-4 text-white dark:bg-brand-800">
+                  <div className="flex items-center justify-between rounded-xl border border-brand-300 bg-brand-50 px-4 py-4 text-ink dark:border-brand-600 dark:bg-brand-500/10">
                     <div>
                       <p className="font-semibold">رسوم الكشف</p>
-                      <p className="text-sm text-white/80">تُدفع للفني عند الزيارة</p>
+                      <p className="text-sm text-muted">تُدفع للفني عند الزيارة</p>
                     </div>
                     <p className="text-2xl font-bold">{formatJOD(fee)}</p>
                   </div>

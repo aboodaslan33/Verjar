@@ -116,15 +116,15 @@ export function SlotPicker({ date, time, onChange, error, reloadKey = 0 }: Props
               className={cx(
                 'relative flex min-h-[4.75rem] w-[4.25rem] shrink-0 snap-start flex-col items-center justify-center rounded-xl border text-center transition-colors',
                 active
-                  ? 'border-brand-700 bg-brand-700 text-white dark:border-brand-500 dark:bg-brand-500'
+                  ? 'border-primary bg-primary text-primary-fg'
                   : working
                     ? 'border-line bg-surface hover:border-brand-400'
                     : 'cursor-not-allowed border-transparent bg-subtle text-muted/70',
               )}
             >
-              <span className={cx('text-xs', active ? 'text-white/85' : 'text-muted')}>{i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : WEEKDAYS_SHORT[weekdayOf(d)]}</span>
+              <span className={cx('text-xs', active ? 'text-primary-fg/80' : 'text-muted')}>{i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : WEEKDAYS_SHORT[weekdayOf(d)]}</span>
               <span className="text-xl font-bold leading-tight">{dayNum(d)}</span>
-              <span className={cx('text-[10px]', active ? 'text-white/80' : 'text-muted', !showMonth && !active && 'opacity-0')}>
+              <span className={cx('text-[10px]', active ? 'text-primary-fg/75' : 'text-muted', !showMonth && !active && 'opacity-0')}>
                 {working ? monthShort(d) : 'عطلة'}
               </span>
             </button>
@@ -203,7 +203,7 @@ function SlotGrid({ data, time, onPick }: { data: DaySlots; time: string; onPick
             onClick={() => onPick(s.time)}
             className={cx(
               'flex min-h-[3.5rem] flex-col items-center justify-center rounded-xl border px-2 py-1.5 transition-colors',
-              active && 'border-brand-700 bg-brand-700 text-white dark:border-brand-500 dark:bg-brand-500',
+              active && 'border-primary bg-primary text-primary-fg',
               !active && s.available && 'border-line bg-surface font-semibold hover:border-brand-400',
               !s.available && 'cursor-not-allowed border-transparent bg-subtle text-muted',
             )}

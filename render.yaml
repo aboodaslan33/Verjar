@@ -1,4 +1,4 @@
-# Render Blueprint — فيرجار
+# Render Blueprint — مجموعة فرجا (Farja Group)
 # الاستخدام: Render Dashboard → New → Blueprint → اختر هذا المستودع
 # بعد الإنشاء راجع قسم "النشر على Render" في README.md
 
@@ -43,12 +43,13 @@ services:
         value: lax
       - key: ADMIN_WHATSAPP
         value: "962780192930"
+      # حساب الأدمن: يُنشأ عند كل تشغيل إن لم يوجد، وتُحدَّث كلمة مروره إن تغيّرت هنا (farjarweb@gmail.com)
       - key: ADMIN_EMAIL
-        value: admin@verjar.jo
+        sync: false
       - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_NAME
-        value: إدارة فيرجار
+        value: إدارة مجموعة فرجا
       # لا تُنشأ بيانات تجريبية في الإنتاج
       - key: SEED_DEMO
         value: "false"

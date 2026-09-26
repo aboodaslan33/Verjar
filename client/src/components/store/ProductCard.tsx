@@ -63,7 +63,7 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
           className="transition-opacity group-hover:opacity-95"
         />
         {product.discountPercent > 0 && (
-          <span className="absolute start-2 top-2 rounded-md bg-sand-200 px-2 py-0.5 text-xs font-bold text-brand-900">
+          <span className="absolute start-2 top-2 rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-fg">
             خصم <span className="ltr">{product.discountPercent}%</span>
           </span>
         )}

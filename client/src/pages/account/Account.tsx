@@ -223,7 +223,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
                 >
                   {t.label}
                   {data && counts[t.key] > 0 && (
-                    <span className={cx('rounded-full px-1.5 text-xs', active ? 'bg-brand-700 text-white dark:bg-brand-500' : 'bg-subtle text-muted')}>
+                    <span className={cx('rounded-full px-1.5 text-xs', active ? 'bg-primary text-primary-fg' : 'bg-subtle text-muted')}>
                       <span className="ltr">{counts[t.key]}</span>
                     </span>
                   )}
@@ -303,7 +303,7 @@ function StatusProgress({ status }: { status: RequestStatus }) {
     <div className="mt-4" aria-label={`المرحلة: ${STATUS_LABEL[status]}`}>
       <ol className="flex gap-1" aria-hidden>
         {PROGRESS.map((s, i) => (
-          <li key={s} className={cx('h-1.5 flex-1 rounded-full', i <= idx ? 'bg-brand-600 dark:bg-brand-400' : 'bg-subtle')} title={STATUS_LABEL[s]} />
+          <li key={s} className={cx('h-1.5 flex-1 rounded-full', i <= idx ? 'bg-primary' : 'bg-subtle')} title={STATUS_LABEL[s]} />
         ))}
       </ol>
       <div className="mt-1.5 flex justify-between text-xs text-muted">

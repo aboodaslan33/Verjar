@@ -32,6 +32,6 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
 
 export function useDocumentTitle(title: string) {
   useEffect(() => {
-    document.title = title ? `${title} — فيرجار` : 'فيرجار — صيانة وبناء ودهان وأعمال معدنية في الأردن';
+    document.title = title ? `${title} — مجموعة فرجا` : 'مجموعة فرجا | Farja Group — صيانة وبناء ودهان وأعمال معدنية في الأردن';
   }, [title]);
 }

@@ -1,6 +1,6 @@
-# فيرجار (Verjar)
+# مجموعة فرجا (Farja Group)
 
-منصة شركة فيرجار: حجوزات خدمات البناء والصيانة والدهان والأعمال المعدنية، طلبات وعقود صيانة الشركات، متجر منتجات، صفحة للعميل، ولوحة تحكم كاملة للإدارة.
+منصة مجموعة فرجا: حجوزات خدمات البناء والصيانة والدهان والأعمال المعدنية، طلبات وعقود صيانة الشركات، متجر منتجات، صفحة للعميل، ولوحة تحكم كاملة للإدارة.
 الواجهة بالعربية (RTL) بالكامل، والمشروع جاهز للنشر على Render.
 
 - **Backend:** Node.js 20+ · Express · TypeScript · Prisma · PostgreSQL
@@ -51,9 +51,9 @@ npm run dev
 ```
 
 - الموقع: http://localhost:5173
-- لوحة التحكم: http://localhost:5173/admin — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا `admin@verjar.jo` / `Verjar@2026`)
+- لوحة التحكم: http://localhost:5173/admin/login — الدخول بـ `ADMIN_EMAIL` / `ADMIN_PASSWORD` (افتراضيًا في التطوير `farjarweb@gmail.com` / `FarjaGroup@2026`)
 - حساب عميل: أنشئه من http://localhost:5173/register ثم ادخل من http://localhost:5173/login (بالهاتف أو البريد + كلمة المرور)
-- حجز تجريبي بدون حساب: http://localhost:5173/account/login — الهاتف `0791234567` ورقم المرجع `B-DEMO01`
+- عميل تجريبي (من `npm run seed`): الهاتف `0791234567` وكلمة المرور `Demo@12345`
 
 في التطوير يمرر Vite الطلبات من `/api` و `/uploads` إلى السيرفر (راجع `client/vite.config.ts`)، ولا حاجة لإعداد `VITE_API_URL`.
 بدون `CLOUDINARY_URL` تُحفظ الملفات المرفوعة في `server/uploads`، وهذا للتطوير فقط.
@@ -84,7 +84,7 @@ npm run dev
 | `CLIENT_URL` | ✔ إنتاج | رابط الواجهة للـ CORS، ويمكن وضع أكثر من رابط مفصولة بفاصلة |
 | `PUBLIC_API_URL` | | رابط الـ API العام، ويُستخدم لروابط الملفات المحلية فقط |
 | `COOKIE_SAMESITE` | | `lax` (الافتراضي، عندما تمرر الواجهة `/api` عبر rewrite)، أو `none` إذا كانت الواجهة والـ API على دومينين مختلفين |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | seed | بيانات حساب الأدمن الأولي، ويُنشأ مرة واحدة فقط |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | ✔ في الإنتاج | حساب الأدمن. عند كل تشغيل للـ seed: يُنشأ إن لم يوجد، وتُحدَّث كلمة المرور إن تغيّرت. `ADMIN_EMAIL` افتراضيًا `farjarweb@gmail.com`. في الإنتاج بدون `ADMIN_PASSWORD` لا يُنشأ الحساب |
 | `SEED_DEMO` | | `false` لتخطي البيانات التجريبية |
 | `ADMIN_WHATSAPP` | | رقم واتساب الإدارة الافتراضي بصيغة دولية بدون `+` (`962780192930`)، ويمكن تغييره من الإعدادات |
 | `CLOUDINARY_URL` | ✔ إنتاج | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
@@ -126,7 +126,8 @@ git push origin main
 1. في Render Dashboard اختر **New ← Blueprint**.
 2. اربط المستودع. سيقرأ Render ملف `render.yaml` ويعرض الخدمات الثلاث.
 3. سيطلب قيم المتغيرات المعلّمة `sync: false`:
-   - `ADMIN_PASSWORD`: كلمة مرور قوية لحساب الأدمن الأول
+   - `ADMIN_EMAIL`: `farjarweb@gmail.com`
+   - `ADMIN_PASSWORD`: كلمة مرور قوية لحساب الأدمن (8 أحرف على الأقل). لتغييرها لاحقًا عدّلها هنا وأعد النشر
    - `CLOUDINARY_URL`: القيمة من الخطوة 1
    - `WA_TOKEN` و `WA_PHONE_ID`: اتركهما فارغين إذا لم تفعّل Cloud API
 4. اضغط **Apply**. سيُنشئ Render قاعدة البيانات ويربط `DATABASE_URL` بالسيرفر تلقائيًا، ويولّد `JWT_SECRET`.
@@ -137,7 +138,7 @@ git push origin main
 
 ```
 prisma migrate deploy   →  يطبّق أي migration جديدة
-tsx prisma/seed.ts      →  ينشئ الأدمن والتصنيفات وخدمات الشركات إن لم تكن موجودة (لا يغيّر بياناتك)
+tsx prisma/seed.ts      →  ينشئ/يحدّث الأدمن من ADMIN_EMAIL و ADMIN_PASSWORD، والتصنيفات وخدمات الشركات إن لم تكن موجودة
 node dist/index.js      →  يشغّل السيرفر
 ```
 
@@ -161,12 +162,12 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 ### 6. التحقق
 
 - `https://verjar-api.onrender.com/health` يجب أن يعيد `{"ok":true,...}`.
-- افتح `https://verjar-web.onrender.com/admin` وادخل بـ `admin@verjar.jo` وكلمة المرور التي اخترتها.
+- افتح `https://verjar-web.onrender.com/admin` وادخل بـ `farjarweb@gmail.com` وكلمة المرور التي اخترتها في `ADMIN_PASSWORD`.
 - من **الإعدادات** في لوحة التحكم راجع رقم الواتساب ورسوم الكشف وساعات العمل ومحتوى "نبذة عنا".
 
 ### 7. دومين خاص (اختياري)
 
-أضف الدومين في verjar-web ← Settings ← Custom Domains، ثم أضفه إلى `CLIENT_URL` في verjar-api (مثال: `https://verjar.jo,https://verjar-web.onrender.com`).
+أضف الدومين في verjar-web ← Settings ← Custom Domains، ثم أضفه إلى `CLIENT_URL` في verjar-api (مثال: `https://your-domain.com,https://verjar-web.onrender.com`).
 
 > **ملاحظات Render:**
 > - الخطة المجانية للـ Web Service تتوقف بعد فترة خمول، وأول طلب بعدها يأخذ ~30–50 ثانية. للاستخدام الفعلي اختر خطة Starter.
@@ -189,7 +190,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 مثال رسالة طلب المتجر:
 
 ```
-طلب جديد #1042 — فيرجار
+طلب جديد #1042 — مجموعة فرجا
 العميل: سارة خليل  الهاتف: 0771234567
 العنوان: عمّان — عبدون
 المنتجات:
@@ -208,7 +209,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 - **رسوم الكشف:** 15 دينار داخل عمّان و25 خارجها، والطلب الطارئ له رسوم منفصلة. كل الرسوم قابلة للتعديل من الإعدادات، وتُعرض للعميل قبل التأكيد وتُحسب في السيرفر.
 - **الأسعار:** يُحسب السعر النهائي بعد الخصم في السيرفر عند حفظ المنتج (`finalPrice`)، ويُعاد حسابه عند الطلب من قاعدة البيانات وليس من المتصفح. المخزون يُخصم داخل المعاملة ويرجع عند إلغاء الطلب.
 - **الملفات:** يُفحص نوع الملف من محتواه الفعلي (magic bytes) وليس من الامتداد. الحدود: صور الحجز حتى 5 صور بحد 5MB لكل صورة، ملفات التصميم والسجل التجاري صور أو PDF حتى 10MB، ملفات عروض الأسعار PDF حتى 15MB، ووسائط المنتجات صور حتى 8MB وفيديو واحد حتى 60MB.
-- **العملاء:** يُنشأ حساب العميل تلقائيًا من رقم هاتفه عند أول حجز أو طلب. يدخل العميل برقم الهاتف مع **رقم المرجع** لأي حجز أو طلب (يظهر في شاشة التأكيد ورسالة واتساب)، أو بكلمة مرور يعيّنها من صفحته، أو برمز OTP عبر واتساب عند تفعيل Cloud API.
+- **العملاء:** الحجز والطلب من المتجر وطلبات الشركات للعملاء المسجّلين فقط (`/register` ثم `/login` بالهاتف أو البريد + كلمة المرور)، وكل حجز أو طلب يُربط بحساب العميل. التصفح (الخدمات، المنتجات، الأسعار، من نحن) مفتوح للجميع. الزائر الذي يفتح صفحة حجز أو السلة يُحوَّل إلى `/login?next=<الصفحة>` ويعود إليها بعد الدخول.
 - **العقود:** يرسل السيرفر تذكيرًا واتساب للإدارة قبل انتهاء العقد بعدد الأيام المحدد، مرة واحدة لكل عقد، ويحوّل العقود المنتهية إلى `EXPIRED` تلقائيًا.
 - **الحذف:** كل الحذف في لوحة التحكم حذف منطقي (`deletedAt`)، وكل تعديلات الأدمن تُسجل في `AuditLog`.
 - **الأمان:** Helmet، CORS مقيد بـ `CLIENT_URL`، rate limiting (20 نموذجًا لكل 15 دقيقة لكل IP، و10 محاولات دخول)، تحقق Zod من كل المدخلات برسائل عربية، كوكيز httpOnly.
@@ -232,13 +233,13 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 |---|---|---|
 | GET | `/site/settings` | الإعدادات العامة (التواصل، الرسوم، أيام العمل، المحتوى) |
 | GET | `/bookings/slots?date=YYYY-MM-DD` | أوقات اليوم: `{ open, reason, gapHours, slots:[{time, available, reason}] }` |
-| POST | `/bookings` | إنشاء حجز. `multipart/form-data`: `data` (JSON) + `photos[]` (حتى 5) + `designFiles[]`، أو JSON بدون ملفات |
+| POST | `/bookings` | **(عميل مسجّل)** إنشاء حجز. `multipart/form-data`: `data` (JSON) + `photos[]` (حتى 5) + `designFiles[]`، أو JSON بدون ملفات |
 | GET | `/store/categories` | التصنيفات مع عدد المنتجات |
 | GET | `/store/products?category=&q=&featured=&sort=new\|price_asc\|price_desc\|discount` | المنتجات |
 | GET | `/store/products/:slug` | منتج + منتجات مشابهة |
-| POST | `/store/orders` | `{ name, phone, address, notes?, items:[{productId, quantity}] }` |
+| POST | `/store/orders` | **(عميل مسجّل)** `{ name, phone, address, notes?, items:[{productId, quantity}] }` |
 | GET | `/corporate/services` | خدمات الشركات (ANNUAL / URGENT) |
-| POST | `/corporate/requests` | طلب شركة. `multipart`: `data` (JSON) + `commercialRegister` + `license` |
+| POST | `/corporate/requests` | **(عميل مسجّل)** طلب شركة. `multipart`: `data` (JSON) + `commercialRegister` + `license` |
 
 **جسم الحجز (`data`)**: الحقول المشتركة هي `type, name, phone, locationText, lat?, lng?, floor?, date, time, notes?` إضافة إلى `details` حسب النوع:
 
@@ -263,20 +264,16 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 |---|---|---|
 | GET | `/auth/me` | المستخدم الحالي `{ role: CUSTOMER\|ADMIN\|STAFF, id, name, ... }` أو 401 |
 | POST | `/auth/logout` | يمسح الجلسة |
-| POST | `/auth/register` | تسجيل عميل `{ name, phone (07XXXXXXXX), email?, password (8+), ref? }`. إن كان للرقم حجوزات سابقة كضيف يُعاد `409 CLAIM_REQUIRED` ويُطلب `ref` (رقم مرجع أحدها) لإثبات ملكية الرقم |
+| POST | `/auth/register` | تسجيل عميل `{ name, phone (07XXXXXXXX), email?, password (8+), ref? }`. إن كان للرقم حجوزات سابقة من قبل التسجيل (بيانات قديمة) يُعاد `409 CLAIM_REQUIRED` ويُطلب `ref` (رقم مرجع أحدها) لإثبات ملكية الرقم |
 | POST | `/auth/login` | دخول العميل `{ identifier, password }` حيث `identifier` رقم الهاتف أو البريد |
 | PATCH | `/auth/profile` | تعديل `{ name?, email? }` للعميل |
 | POST | `/auth/admin/login` | `{ email, password }` — حسابات الأدمن تُنشأ من الـ seed فقط |
 | POST | `/auth/admin/logout` | |
 | GET | `/auth/admin/me` | |
 | POST | `/auth/admin/password` | `{ current, next }` |
-| GET | `/auth/customer/methods` | طرق الدخول المتاحة |
-| POST | `/auth/customer/login` | `{ phone, secret }`، حيث `secret` هو كلمة المرور أو رقم مرجع حجز/طلب |
-| POST | `/auth/customer/otp/request` | `{ phone }`، ويُرسل الرمز عبر واتساب Cloud API. في التطوير يُعاد `devCode` |
-| POST | `/auth/customer/otp/verify` | `{ phone, code }` |
 | POST | `/auth/customer/logout` | |
 | GET | `/auth/customer/me` | |
-| POST | `/auth/customer/password` | `{ password }` تعيين كلمة مرور |
+| POST | `/auth/customer/password` | `{ password }` تغيير كلمة المرور |
 
 ### العميل (جلسة بدور `CUSTOMER`)
 

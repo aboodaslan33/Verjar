@@ -214,7 +214,7 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
                   onClick={() => toggleDay(i)}
                   className={cx(
                     'h-10 min-w-[5.5rem] rounded-xl border px-3 text-sm transition-colors',
-                    on ? 'border-brand-600 bg-brand-700 font-semibold text-white dark:bg-brand-500' : 'border-line bg-surface text-muted hover:border-brand-300',
+                    on ? 'border-primary bg-primary font-semibold text-primary-fg' : 'border-line bg-surface text-muted hover:border-brand-300',
                   )}
                 >
                   {d}

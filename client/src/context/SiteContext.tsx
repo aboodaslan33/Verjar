@@ -6,7 +6,7 @@ import type { SiteSettings } from '../lib/types';
 export const FALLBACK_SETTINGS: SiteSettings = {
   whatsappNumber: '962780192930',
   phone: '0780192930',
-  email: 'info@verjar.jo',
+  email: 'farjarweb@gmail.com',
   address: 'عمّان — الأردن',
   inspectionFeeInside: 15,
   inspectionFeeOutside: 25,
@@ -18,7 +18,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   workEnd: '18:00',
   bookingGapHours: 3,
   maxDaysAhead: 60,
-  aboutTitle: 'فيرجار للمقاولات والصيانة',
+  aboutTitle: 'مجموعة فرجا للمقاولات والصيانة',
   aboutContent: '',
   heroTitle: 'صيانة وبناء ودهان في عمّان وكل المحافظات',
   heroSubtitle: 'احجز كشفًا على موقعك، واستلم سعرًا واضحًا قبل البدء.',

@@ -66,7 +66,7 @@ function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNaviga
                       cx(
                         'flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[15px] transition-colors',
                         isActive
-                          ? 'bg-brand-700 font-semibold text-white dark:bg-brand-500'
+                          ? 'bg-primary font-semibold text-primary-fg'
                           : 'text-ink/85 hover:bg-subtle hover:text-ink',
                       )
                     }
@@ -78,7 +78,7 @@ function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNaviga
                           <span
                             className={cx(
                               'min-w-[1.5rem] rounded-full px-1.5 text-center text-xs font-bold tabular-nums',
-                              isActive ? 'bg-white/20 text-white' : 'bg-sand-200 text-brand-900',
+                              isActive ? 'bg-primary-fg/15 text-primary-fg' : 'bg-subtle text-ink',
                             )}
                           >
                             {count}
@@ -166,7 +166,7 @@ function Shell() {
               onClick={clearUnseen}
               className={cx(
                 'flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm',
-                unseen > 0 ? 'bg-sand-200 font-semibold text-brand-900' : 'text-muted hover:bg-subtle',
+                unseen > 0 ? 'bg-brand-100 font-semibold text-brand-900 dark:bg-brand-500/20 dark:text-brand-200' : 'text-muted hover:bg-subtle',
               )}
               title={connected ? 'الإشعارات اللحظية متصلة' : 'الإشعارات اللحظية غير متصلة'}
             >

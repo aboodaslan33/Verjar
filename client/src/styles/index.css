@@ -3,22 +3,33 @@
 @tailwind utilities;
 
 @layer base {
+  /* الهوية اللونية — مكان واحد لكل الألوان (قيم RGB بدون فواصل) */
   :root {
-    --c-bg: 250 248 243;
+    --c-bg: 255 255 255; /* #FFFFFF */
     --c-surface: 255 255 255;
-    --c-subtle: 243 240 232;
-    --c-line: 226 221 208;
-    --c-ink: 28 36 32;
-    --c-muted: 99 108 102;
+    --c-subtle: 249 250 251; /* #F9FAFB */
+    --c-line: 229 231 235; /* #E5E7EB */
+    --c-ink: 31 41 55; /* #1F2937 */
+    --c-muted: 107 114 128; /* #6B7280 */
+    --c-primary: 232 180 11; /* #E8B40B */
+    --c-primary-hover: 212 161 6; /* #D4A106 */
+    --c-on-primary: 31 41 55; /* نص داكن على الأصفر (تباين 7.6:1) */
+    --c-inverse: 31 41 55; /* الفوتر */
+    --c-on-inverse: 243 244 246;
     color-scheme: light;
   }
   .dark {
-    --c-bg: 17 22 20;
-    --c-surface: 25 31 28;
-    --c-subtle: 33 41 37;
-    --c-line: 48 58 53;
-    --c-ink: 234 236 231;
-    --c-muted: 158 168 161;
+    --c-bg: 17 24 39; /* #111827 */
+    --c-surface: 31 41 55; /* #1F2937 */
+    --c-subtle: 39 49 65;
+    --c-line: 55 65 81; /* #374151 */
+    --c-ink: 243 244 246; /* #F3F4F6 */
+    --c-muted: 156 163 175; /* #9CA3AF */
+    --c-primary: 232 180 11;
+    --c-primary-hover: 240 196 50;
+    --c-on-primary: 17 24 39;
+    --c-inverse: 11 15 25;
+    --c-on-inverse: 229 231 235;
     color-scheme: dark;
   }
   html {
@@ -35,7 +46,7 @@
     line-height: 1.35;
   }
   :focus-visible {
-    @apply outline-none ring-2 ring-sand-400 ring-offset-2 ring-offset-bg;
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-bg;
   }
   /* العناوين التي تستقبل التركيز برمجيًا (بين خطوات النماذج) لا تحتاج إطارًا */
   [tabindex='-1']:focus,
@@ -77,7 +88,7 @@
     @apply py-14 md:py-20;
   }
   .eyebrow {
-    @apply text-sm font-semibold text-sand-600 dark:text-sand-300;
+    @apply text-sm font-semibold text-brand-700 dark:text-brand-300;
   }
   .skeleton {
     @apply relative overflow-hidden rounded-lg bg-subtle;

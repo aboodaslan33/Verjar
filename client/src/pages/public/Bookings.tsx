@@ -67,7 +67,7 @@ export default function Bookings() {
                       <h2 className="mt-1 text-xl">{BOOKING_TYPE_LABEL[type]}</h2>
                     </div>
                     {type === 'INSPECTION' && (
-                      <span className="shrink-0 rounded-lg bg-sand-100 px-2.5 py-1 text-sm font-semibold text-brand-900 dark:bg-sand-700/25 dark:text-sand-100">
+                      <span className="shrink-0 rounded-lg border border-line bg-subtle px-2.5 py-1 text-sm font-semibold text-ink">
                         من {formatJOD(settings.inspectionFeeInside)}
                       </span>
                     )}

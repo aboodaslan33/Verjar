@@ -62,7 +62,7 @@ export default function Bookings() {
               onClick={() => setView(v)}
               className={cx(
                 'rounded-lg px-4 py-1.5 text-sm font-medium',
-                view === v ? 'bg-brand-700 text-white dark:bg-brand-500' : 'text-muted hover:text-ink',
+                view === v ? 'bg-primary text-primary-fg' : 'text-muted hover:text-ink',
               )}
             >
               {l}
@@ -284,7 +284,7 @@ function BookingsCalendar() {
                           <span
                             className={cx(
                               'grid h-6 min-w-[1.5rem] place-items-center rounded-full text-xs font-semibold tabular-nums',
-                              date === today ? 'bg-brand-700 text-white dark:bg-brand-500' : 'text-muted',
+                              date === today ? 'bg-primary text-primary-fg' : 'text-muted',
                             )}
                           >
                             {Number(date.slice(8))}

@@ -255,7 +255,7 @@ export function Switch({
       }}
       className={cx(
         'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
-        checked ? 'bg-brand-600' : 'bg-line',
+        checked ? 'bg-primary' : 'bg-line',
       )}
     >
       <span

@@ -81,7 +81,7 @@ export function FileUploadForm({
           type="file"
           accept="application/pdf,.pdf"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-muted file:me-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-900 hover:file:bg-sand-300"
+          className="block w-full text-sm text-muted file:me-3 file:rounded-lg file:border-0 file:bg-subtle file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink hover:file:bg-brand-100"
         />
         <FieldError message={fileError} />
       </div>

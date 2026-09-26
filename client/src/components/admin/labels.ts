@@ -64,7 +64,7 @@ export const STATUS_DOT: Record<string, string> = {
   UNDER_REVIEW: 'bg-amber-500',
   PRICED: 'bg-sky-500',
   CONFIRMED: 'bg-brand-400',
-  IN_PROGRESS: 'bg-brand-600',
+  IN_PROGRESS: 'bg-brand-500',
   COMPLETED: 'bg-brand-800 dark:bg-brand-200',
   CANCELLED: 'bg-line',
 };

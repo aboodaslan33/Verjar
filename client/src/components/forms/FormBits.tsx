@@ -112,14 +112,14 @@ export function SubmissionSuccess({
   return (
     <div className="container max-w-2xl py-10 md:py-14">
       <div className="card animate-fade-up overflow-hidden">
-        <div className="border-b border-line bg-brand-700 px-6 py-8 text-center text-white dark:bg-brand-800">
-          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-white/15 ring-4 ring-white/10">
+        <div className="border-b border-line bg-subtle px-6 py-8 text-center">
+          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-fg ring-4 ring-brand-100 dark:ring-brand-500/20">
             <Icon name="check" className="h-7 w-7" />
           </span>
-          <h1 ref={ref} tabIndex={-1} className="text-2xl text-white outline-none md:text-3xl">
+          <h1 ref={ref} tabIndex={-1} className="text-2xl text-ink outline-none md:text-3xl">
             {title}
           </h1>
-          <p className="mt-2 text-lg text-white/90">
+          <p className="mt-2 text-lg text-muted">
             رقم {noun} <span className="ltr font-bold">#{number}</span>
           </p>
         </div>

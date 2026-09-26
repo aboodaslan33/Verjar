@@ -220,7 +220,7 @@ function Gallery({ media, name }: { media: Media[]; name: string }) {
               )}
             >
               {m.kind === 'VIDEO' ? (
-                <span className="grid h-full w-full place-items-center bg-brand-900 text-white">
+                <span className="grid h-full w-full place-items-center bg-inverse text-inverse-fg">
                   <Icon name="play" className="h-6 w-6" />
                 </span>
               ) : (

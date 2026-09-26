@@ -177,23 +177,66 @@ const PRODUCTS: {
   },
 ];
 
-async function main() {
-  const email = (process.env.ADMIN_EMAIL ?? 'admin@verjar.jo').toLowerCase();
-  const password = process.env.ADMIN_PASSWORD ?? 'Verjar@2026';
-  const existingAdmin = await prisma.user.findUnique({ where: { email } });
-  if (!existingAdmin) {
-    await prisma.user.create({
-      data: {
-        email,
-        name: process.env.ADMIN_NAME ?? 'إدارة فيرجار',
-        passwordHash: await bcrypt.hash(password, 11),
-        role: 'ADMIN',
-      },
-    });
-    console.log(`✓ حساب الأدمن: ${email}`);
-  } else {
-    console.log(`• حساب الأدمن موجود مسبقًا: ${email} (لم تتغير كلمة المرور)`);
+const DEFAULT_ADMIN_EMAIL = 'farjarweb@gmail.com';
+const DEV_ADMIN_PASSWORD = 'FarjaGroup@2026';
+
+/**
+ * حساب الأدمن من متغيرات البيئة عند كل تشغيل:
+ * - غير موجود ← يُنشأ
+ * - موجود وكلمة المرور في البيئة مختلفة عن المحفوظة ← تُحدَّث (ويُعاد تفعيل الحساب)
+ * في الإنتاج لا تُستخدم كلمة مرور افتراضية: بدون ADMIN_PASSWORD لا يُنشأ الحساب ولا يُعدَّل.
+ */
+async function syncAdmin() {
+  const email = (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+  const isProd = process.env.NODE_ENV === 'production';
+  const password = process.env.ADMIN_PASSWORD || (isProd ? '' : DEV_ADMIN_PASSWORD);
+  if (!password) {
+    console.warn(`! ADMIN_PASSWORD غير مضبوط — لم يُنشأ/يُحدَّث حساب الأدمن (${email}). أضفه في متغيرات البيئة.`);
+    return;
   }
+  if (password.length < 8) {
+    console.warn('! ADMIN_PASSWORD أقصر من 8 أحرف — لم يُحدَّث حساب الأدمن.');
+    return;
+  }
+  const name = process.env.ADMIN_NAME || 'إدارة مجموعة فرجا';
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (!existing) {
+    await prisma.user.create({ data: { email, name, passwordHash: await bcrypt.hash(password, 11), role: 'ADMIN' } });
+    console.log(`✓ أُنشئ حساب الأدمن: ${email}`);
+    return;
+  }
+  if (!(await bcrypt.compare(password, existing.passwordHash))) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { passwordHash: await bcrypt.hash(password, 11), active: true },
+    });
+    console.log(`✓ حُدّثت كلمة مرور الأدمن من متغيرات البيئة: ${email}`);
+  } else if (!existing.active) {
+    await prisma.user.update({ where: { id: existing.id }, data: { active: true } });
+    console.log(`✓ أُعيد تفعيل حساب الأدمن: ${email}`);
+  } else {
+    console.log(`• حساب الأدمن جاهز: ${email}`);
+  }
+}
+
+/** إعدادات محفوظة بالقيم القديمة للاسم/البريد تُحدَّث للهوية الجديدة (ولا تُلمس إن عدّلها الأدمن لقيمة أخرى) */
+async function migrateBrandSettings() {
+  const updates: [string, string, string][] = [
+    ['email', 'info@verjar.jo', 'farjarweb@gmail.com'],
+    ['aboutTitle', 'فيرجار للمقاولات والصيانة', 'مجموعة فرجا للمقاولات والصيانة'],
+  ];
+  for (const [key, from, to] of updates) {
+    const row = await prisma.setting.findUnique({ where: { key } });
+    if (row && row.value === from) {
+      await prisma.setting.update({ where: { key }, data: { value: to } });
+      console.log(`✓ حُدّث إعداد ${key} للهوية الجديدة`);
+    }
+  }
+}
+
+async function main() {
+  await syncAdmin();
+  await migrateBrandSettings();
 
   for (const c of CATEGORIES) {
     await prisma.category.upsert({ where: { slug: c.slug }, create: c, update: {} });
@@ -254,7 +297,12 @@ async function main() {
   if ((await prisma.booking.count()) === 0) {
     const customer = await prisma.customer.upsert({
       where: { phone: '962791234567' },
-      create: { phone: '962791234567', name: 'أحمد السعدي' },
+      create: {
+        phone: '962791234567',
+        name: 'أحمد السعدي',
+        passwordHash: await bcrypt.hash('Demo@12345', 11),
+        registeredAt: new Date(),
+      },
       update: {},
     });
     const in3days = new Date(Date.now() + 3 * 86400_000);
@@ -307,7 +355,7 @@ async function main() {
         },
       });
     }
-    console.log('✓ حجز وطلب تجريبي (الدخول: 0791234567 + المرجع B-DEMO01)');
+    console.log('✓ حجز وطلب تجريبي (دخول العميل: 0791234567 / Demo@12345)');
   }
 }
 

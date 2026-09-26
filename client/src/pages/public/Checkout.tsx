@@ -263,7 +263,7 @@ function Confirmation({ order }: { order: OrderCreated }) {
   return (
     <div className="container max-w-2xl py-10 md:py-14">
       <div className="text-center">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand-700 text-white dark:bg-brand-500">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-primary text-primary-fg">
           <Icon name="check" className="h-8 w-8" />
         </div>
         <h1 className="mt-5 text-2xl md:text-3xl">تم استلام طلبك</h1>

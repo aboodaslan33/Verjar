@@ -47,54 +47,49 @@ export default function Home() {
   return (
     <>
       {/* ——— الواجهة ——— */}
-      <section className="bg-brand-800 text-sand-50 dark:bg-brand-900">
+      <section className="border-b border-line bg-surface">
         <div className="container grid gap-10 py-14 md:py-20 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-7">
-            <p className="text-sm font-semibold text-sand-300">فيرجار — مقاولات وصيانة</p>
-            <h1 className="mt-3 text-3xl leading-tight text-white sm:text-4xl md:text-5xl md:leading-tight">
+            <p className="eyebrow">مجموعة فرجا — مقاولات وصيانة</p>
+            <h1 className="mt-3 text-3xl leading-tight sm:text-4xl md:text-5xl md:leading-tight">
               {settings.heroTitle}
             </h1>
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-sand-100/85">{settings.heroSubtitle}</p>
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted">{settings.heroSubtitle}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <ButtonLink to="/bookings/inspection" variant="secondary" size="lg" className="sm:min-w-[11rem]">
+              <ButtonLink to="/bookings/inspection" size="lg" className="sm:min-w-[11rem]">
                 احجز كشفًا
               </ButtonLink>
-              <ButtonLink
-                to="/corporate"
-                variant="ghost"
-                size="lg"
-                className="border border-white/25 text-white hover:bg-white/10"
-              >
+              <ButtonLink to="/corporate" variant="outline" size="lg">
                 خدمات الشركات والمصانع
               </ButtonLink>
             </div>
-            <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sand-100/85">
-              <a href={`tel:${settings.phone}`} className="inline-flex min-h-[44px] items-center gap-2 hover:text-white">
-                <Icon name="phone" className="h-4 w-4 text-sand-300" />
+            <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-muted">
+              <a href={`tel:${settings.phone}`} className="inline-flex min-h-[44px] items-center gap-2 hover:text-ink">
+                <Icon name="phone" className="h-4 w-4 text-brand-600" />
                 <span className="ltr">{settings.phone}</span>
               </a>
-              <span className="h-4 w-px bg-white/20" aria-hidden />
-              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-2 hover:text-white">
-                <Icon name="whatsapp" className="h-4 w-4 text-sand-300" />
+              <span className="h-4 w-px bg-line" aria-hidden />
+              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-2 hover:text-ink">
+                <Icon name="whatsapp" className="h-4 w-4 text-brand-600" />
                 واتساب <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
               </a>
             </p>
           </div>
 
           <aside className="lg:col-span-5" aria-label="رسوم الكشف">
-            <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-6">
-              <h2 className="text-base font-semibold text-white">رسوم الكشف على الموقع</h2>
-              <dl className="mt-4 divide-y divide-white/10">
+            <div className="card p-6">
+              <h2 className="text-base font-semibold">رسوم الكشف على الموقع</h2>
+              <dl className="mt-4 divide-y divide-line">
                 <div className="flex items-baseline justify-between py-3">
-                  <dt className="text-sand-100/85">داخل عمّان</dt>
-                  <dd className="text-2xl font-bold text-white">{formatJOD(settings.inspectionFeeInside)}</dd>
+                  <dt className="text-muted">داخل عمّان</dt>
+                  <dd className="text-2xl font-bold text-ink">{formatJOD(settings.inspectionFeeInside)}</dd>
                 </div>
                 <div className="flex items-baseline justify-between py-3">
-                  <dt className="text-sand-100/85">خارج عمّان</dt>
-                  <dd className="text-2xl font-bold text-white">{formatJOD(settings.inspectionFeeOutside)}</dd>
+                  <dt className="text-muted">خارج عمّان</dt>
+                  <dd className="text-2xl font-bold text-ink">{formatJOD(settings.inspectionFeeOutside)}</dd>
                 </div>
               </dl>
-              <p className="mt-3 text-sm leading-relaxed text-sand-100/70">
+              <p className="mt-3 text-sm leading-relaxed text-muted">
                 تدفع رسوم الكشف مرة واحدة، وتستلم بعدها عرض سعر مكتوبًا للعمل كاملًا. لا يبدأ أي عمل قبل موافقتك.
               </p>
             </div>
@@ -116,7 +111,7 @@ export default function Home() {
               { t: 'تنفيذ بمواعيد', d: 'بعد موافقتك نحدد تاريخ البدء والتسليم، ومسؤول واحد يتابع معك حتى نهاية العمل.' },
             ].map((s, i) => (
               <li key={s.t} className="flex gap-4">
-                <span className="ltr shrink-0 pt-0.5 text-sm font-bold text-sand-600 dark:text-sand-300">
+                <span className="ltr shrink-0 pt-0.5 text-sm font-bold text-brand-700 dark:text-brand-300">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <div>
@@ -149,8 +144,8 @@ export default function Home() {
                   to={`/bookings/${s.slug}`}
                   className="card group flex h-full flex-col p-6 transition-colors hover:border-brand-300 dark:hover:border-brand-500"
                 >
-                  <span className="ltr text-sm font-bold text-sand-600 dark:text-sand-300">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="mt-3 block h-px w-10 bg-sand-300 transition-all group-hover:w-16 dark:bg-sand-600" aria-hidden />
+                  <span className="ltr text-sm font-bold text-brand-700 dark:text-brand-300">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="mt-3 block h-px w-10 bg-brand-400 transition-all group-hover:w-16" aria-hidden />
                   <h3 className="mt-4 text-xl">{s.title}</h3>
                   <p className="mt-2 flex-1 text-muted">{s.text}</p>
                   <span className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 dark:text-brand-200">
@@ -164,7 +159,7 @@ export default function Home() {
       </section>
 
       {/* ——— الشركات ——— */}
-      <section className="bg-sand-100 dark:bg-subtle">
+      <section className="border-y border-line bg-subtle">
         <div className="container grid gap-8 py-12 md:grid-cols-12 md:items-center md:py-16">
           <div className="md:col-span-7">
             <p className="eyebrow">للمصانع والشركات</p>

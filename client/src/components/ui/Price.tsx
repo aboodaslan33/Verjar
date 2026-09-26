@@ -32,7 +32,7 @@ export function Price({
           <s className={cx('text-muted', size === 'lg' ? 'text-lg' : 'text-sm')} aria-label={`السعر قبل الخصم ${formatJOD(price)}`}>
             {formatJOD(price)}
           </s>
-          <span className="rounded-md bg-sand-200 px-1.5 py-0.5 text-xs font-bold text-brand-900">خصم {discountPercent}%</span>
+          <span className="rounded-md bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-fg">خصم {discountPercent}%</span>
         </>
       )}
     </div>

@@ -38,7 +38,7 @@ export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = {
   whatsappNumber: env.ADMIN_WHATSAPP,
   phone: '0780192930',
-  email: 'info@verjar.jo',
+  email: 'farjarweb@gmail.com',
   address: 'عمّان — الأردن',
   inspectionFeeInside: 15,
   inspectionFeeOutside: 25,
@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bookingGapHours: 3,
   maxDaysAhead: 60,
   contractReminderDays: 30,
-  aboutTitle: 'فيرجار للمقاولات والصيانة',
+  aboutTitle: 'مجموعة فرجا للمقاولات والصيانة',
   aboutContent:
     'نحن فريق أردني يعمل في البناء والصيانة والدهان والأعمال المعدنية. نزور الموقع، نكشف على المشكلة، ونعطيك سعرًا مكتوبًا قبل أن نبدأ.\n\nنعمل مع البيوت والشقق والفلل، ومع المصانع والشركات بعقود صيانة سنوية تشمل المرافق والكهرباء والأرضيات الإيبوكسي ومتطلبات GMP وISO.\n\nكل عمل نستلمه يكون له مسؤول واحد يتابعه معك من الكشف حتى التسليم، وتقدر تشوف حالة طلبك وعروض الأسعار من صفحتك على الموقع.',
   heroTitle: 'صيانة وبناء ودهان في عمّان وكل المحافظات',

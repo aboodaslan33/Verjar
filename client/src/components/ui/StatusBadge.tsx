@@ -7,7 +7,7 @@ const styles: Record<RequestStatus, string> = {
   PRICED: 'bg-sky-50 text-sky-800 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-700',
   CONFIRMED: 'bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/15 dark:text-brand-100 dark:ring-brand-600',
   IN_PROGRESS: 'bg-brand-100 text-brand-800 ring-brand-300 dark:bg-brand-500/25 dark:text-brand-50 dark:ring-brand-500',
-  COMPLETED: 'bg-brand-700 text-white ring-brand-700',
+  COMPLETED: 'bg-primary text-primary-fg ring-primary',
   CANCELLED: 'bg-subtle text-muted ring-line line-through decoration-1',
 };
 

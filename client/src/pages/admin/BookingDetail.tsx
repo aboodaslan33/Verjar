@@ -372,7 +372,7 @@ function ReschedulePanel({ booking: b, onSaved }: { booking: Booking; onSaved: (
                     title={sl.reason === 'booked' ? 'محجوز/قريب من موعد آخر' : sl.reason === 'past' ? 'وقت مضى' : undefined}
                     className={cx(
                       'h-9 rounded-lg border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                      time === sl.time ? 'border-brand-600 bg-brand-700 font-semibold text-white' : 'border-line bg-surface hover:border-brand-300',
+                      time === sl.time ? 'border-primary bg-primary font-semibold text-primary-fg' : 'border-line bg-surface hover:border-brand-300',
                       !sl.available && 'line-through',
                     )}
                   >

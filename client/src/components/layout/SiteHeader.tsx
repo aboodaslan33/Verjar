@@ -36,15 +36,15 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
       {/* شريط التواصل العلوي */}
-      <div className="hidden border-b border-line bg-brand-800 text-sand-100 md:block">
+      <div className="hidden border-b border-line bg-subtle text-muted md:block">
         <div className="container flex h-9 items-center justify-between text-[13px]">
           <span>{settings.workingHoursText}</span>
           <div className="flex items-center gap-5">
-            <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 hover:text-white">
+            <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 hover:text-ink">
               <Icon name="phone" className="h-3.5 w-3.5" />
               <span className="ltr">{settings.phone}</span>
             </a>
-            <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 hover:text-white">
+            <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 hover:text-ink">
               <Icon name="mail" className="h-3.5 w-3.5" />
               <span className="ltr">{settings.email}</span>
             </a>
@@ -108,14 +108,14 @@ export function SiteHeader() {
           <Link to="/cart" className="relative grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink" aria-label={`السلة (${count})`}>
             <Icon name="cart" />
             {count > 0 && (
-              <span className="absolute -top-0.5 end-0 grid h-5 min-w-5 place-items-center rounded-full bg-sand-400 px-1 text-[11px] font-bold text-brand-900">
+              <span className="absolute -top-0.5 end-0 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-fg">
                 {count}
               </span>
             )}
           </Link>
           <Link
             to="/bookings"
-            className="ms-2 hidden h-10 items-center rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:inline-flex dark:bg-brand-500"
+            className="ms-2 hidden h-10 items-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-fg hover:bg-primary-hover sm:inline-flex"
           >
             احجز موعد
           </Link>

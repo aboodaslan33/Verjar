@@ -197,7 +197,7 @@ function CatTab({ active, onClick, label, count }: { active: boolean; onClick: (
         className={cx(
           'inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 text-[15px] transition-colors',
           active
-            ? 'border-brand-700 bg-brand-700 font-semibold text-white dark:border-brand-500 dark:bg-brand-500'
+            ? 'border-primary bg-primary font-semibold text-primary-fg'
             : 'border-line bg-surface text-ink hover:border-brand-300',
         )}
       >
@@ -206,7 +206,7 @@ function CatTab({ active, onClick, label, count }: { active: boolean; onClick: (
           <span
             className={cx(
               'ltr rounded-full px-1.5 text-xs',
-              active ? 'bg-white/20 text-white' : 'bg-subtle text-muted',
+              active ? 'bg-primary-fg/15 text-primary-fg' : 'bg-subtle text-muted',
             )}
           >
             {count}

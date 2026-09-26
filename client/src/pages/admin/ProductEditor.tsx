@@ -155,7 +155,7 @@ function Editor({ product, categories, onReload }: { product: AdminProduct | nul
                   {discN > 0 && priceN > 0 && !discountInvalid && (
                     <>
                       <s className="text-sm text-muted">{formatJOD(priceN)}</s>
-                      <span className="rounded-md bg-sand-200 px-1.5 py-0.5 text-xs font-bold text-brand-900">خصم {discN}%</span>
+                      <span className="rounded-md bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-fg">خصم {discN}%</span>
                     </>
                   )}
                 </div>
@@ -282,7 +282,7 @@ function MediaManager({ product, onChanged }: { product: AdminProduct; onChanged
                 ) : (
                   <img src={x.url} alt="" loading="lazy" className="h-full w-full object-cover" />
                 )}
-                {i === 0 && <span className="absolute start-1.5 top-1.5 rounded bg-brand-700 px-1.5 text-[11px] font-semibold text-white">الغلاف</span>}
+                {i === 0 && <span className="absolute start-1.5 top-1.5 rounded bg-primary px-1.5 text-[11px] font-semibold text-primary-fg">الغلاف</span>}
                 {x.kind === 'VIDEO' && <span className="absolute end-1.5 top-1.5 rounded bg-black/60 px-1.5 text-[11px] text-white">فيديو</span>}
               </div>
               <div className="flex items-center justify-between gap-1 p-1.5">
