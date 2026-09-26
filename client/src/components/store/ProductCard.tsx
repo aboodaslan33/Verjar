@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useEnsureCustomer } from '../auth/RequireCustomer';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { cx } from '../../lib/format';
@@ -48,6 +49,7 @@ export function ProductImage({
 
 export function ProductCard({ product, headingLevel = 3 }: { product: Product; headingLevel?: 2 | 3 }) {
   const { add } = useCart();
+  const ensureCustomer = useEnsureCustomer();
   const { toast } = useToast();
   const out = product.stock <= 0;
   const H = headingLevel === 2 ? 'h2' : 'h3';
@@ -92,6 +94,7 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
             disabled={out}
             className="min-h-[44px] text-sm"
             onClick={() => {
+              if (!ensureCustomer()) return;
               add(product, 1);
               toast(`أُضيف "${product.name}" إلى السلة`);
             }}

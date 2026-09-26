@@ -131,11 +131,11 @@ export function SubmissionSuccess({
             <p className="text-sm text-muted">رقم المرجع</p>
             <p className="ltr mt-0.5 text-2xl font-bold tracking-wider text-ink">{refCode}</p>
             <p className="mt-2 text-sm text-muted">
-              احتفظ بهذا الرقم. تدخل به إلى{' '}
+              تجده مع الحالة وعروض الأسعار والدفعات في{' '}
               <Link to="/account" className="font-medium text-brand-700 underline underline-offset-4 dark:text-brand-200">
-                صفحتك
-              </Link>{' '}
-              مع رقم هاتفك لمتابعة الحالة وعروض الأسعار والدفعات.
+                حسابك
+              </Link>
+              .
             </p>
           </div>
 

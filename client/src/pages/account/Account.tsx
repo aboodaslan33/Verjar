@@ -659,7 +659,7 @@ function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent
           <p className="mt-0.5 text-sm text-muted">
             {customer.hasPassword
               ? 'ستحتاجها للدخول مع رقم هاتفك.'
-              : 'حتى تدخل لاحقًا برقم هاتفك وكلمة المرور، دون البحث عن رقم المرجع.'}
+              : 'حتى تدخل لاحقًا برقم هاتفك أو بريدك وكلمة المرور.'}
           </p>
         </div>
         {prominent && (
@@ -684,11 +684,6 @@ function PasswordCard({ customer, prominent }: { customer: CustomerMe; prominent
         <button type="button" onClick={() => setOpen(false)} className="mt-2 min-h-[44px] text-sm text-muted hover:text-ink">
           إلغاء
         </button>
-      )}
-      {prominent && (
-        <p className="mt-3 text-xs text-muted">
-          يمكنك دائمًا الدخول برقم المرجع أيضًا.
-        </p>
       )}
     </section>
   );

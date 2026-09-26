@@ -5,9 +5,10 @@ import { asyncHandler, badRequest, ok } from '../../lib/http';
 import { makeRef } from '../../lib/ids';
 import { CORPORATE_TYPE_AR } from '../../lib/labels';
 import { prisma } from '../../lib/prisma';
+import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
 import { memoryUpload } from '../../middleware/upload';
-import { resolveCustomer } from '../../services/customer.service';
+import { accountCustomer } from '../../services/customer.service';
 import { corporateMessage, customerConfirmationMessage } from '../../services/messages';
 import { POLICIES, storeFile, validateFile } from '../../services/upload.service';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
@@ -38,6 +39,7 @@ const upload = memoryUpload(10, 2).fields([
  */
 corporateRouter.post(
   '/requests',
+  requireCustomer,
   formLimiter,
   upload,
   asyncHandler(async (req, res) => {
@@ -71,11 +73,7 @@ corporateRouter.post(
     ]);
 
     const request = await prisma.$transaction(async (tx) => {
-      const customer = await resolveCustomer(tx, req.auth, {
-        phone: input.managerPhone,
-        name: input.contactName,
-        companyName: input.companyName,
-      });
+      const customer = await accountCustomer(tx, req.auth!.sub, { companyName: input.companyName });
       const created = await tx.corporateRequest.create({
         data: {
           ref: makeRef('C'),

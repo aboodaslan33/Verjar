@@ -99,10 +99,6 @@ export function customerConfirmationMessage(kind: string, number: number, ref: s
   return `مرحبًا ${name}،\nوصلنا ${kind} رقم #${number} (المرجع ${ref}). سنتواصل معك لتأكيد التفاصيل.\n— ${BRAND}`;
 }
 
-export function otpMessage(code: string): string {
-  return `رمز الدخول إلى حسابك في ${BRAND}: ${code}\nصالح لمدة 10 دقائق. لا تشاركه مع أحد.`;
-}
-
 export function contractReminderMessage(companyName: string, number: number, endDate: Date, days: number): string {
   return `تذكير: عقد الصيانة #${number} مع ${companyName} ينتهي بتاريخ ${endDate.toISOString().slice(0, 10)} (بعد ${days} يوم). يُنصح بالتواصل للتجديد.`;
 }

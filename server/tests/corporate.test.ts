@@ -1,8 +1,10 @@
 import request from 'supertest';
-import { app, createAdmin, PNG_1PX, prisma, resetDb } from './helpers';
+import { app, createAdmin, createCustomer, PNG_1PX, prisma, resetDb } from './helpers';
 
+let user: Awaited<ReturnType<typeof createCustomer>>;
 beforeEach(async () => {
   await resetDb();
+  user = await createCustomer({ name: 'م. خالد يوسف', phone: '0795555555' });
   await prisma.corporateService.createMany({
     data: [
       { key: 'gmp', name: 'مطابقة GMP', kind: 'ANNUAL' },
@@ -22,15 +24,22 @@ const company = {
 };
 
 describe('طلبات الشركات', () => {
-  it('العقد السنوي يتطلب السجل التجاري والرخصة', async () => {
+  it('لا طلب بدون تسجيل دخول', async () => {
     const res = await request(app)
+      .post('/api/v1/corporate/requests')
+      .field('data', JSON.stringify({ type: 'URGENT', ...company, services: ['u-argon'] }));
+    expect(res.status).toBe(401);
+  });
+
+  it('العقد السنوي يتطلب السجل التجاري والرخصة', async () => {
+    const res = await user
       .post('/api/v1/corporate/requests')
       .field('data', JSON.stringify({ type: 'ANNUAL', ...company, services: ['gmp'] }));
     expect(res.status).toBe(400);
   });
 
   it('ينشئ طلبًا عاجلًا ويحوله الأدمن إلى عقد نشط', async () => {
-    const res = await request(app)
+    const res = await user
       .post('/api/v1/corporate/requests')
       .field(
         'data',
@@ -63,7 +72,7 @@ describe('طلبات الشركات', () => {
   });
 
   it('يرفض خدمة لا تخص نوع الطلب', async () => {
-    const res = await request(app)
+    const res = await user
       .post('/api/v1/corporate/requests')
       .send({ type: 'URGENT', ...company, services: ['gmp'], workLocation: 'x', productionImpact: 'CANNOT_STOP', productionLineAffected: false, urgencyLevel: 'LOW' });
     expect(res.status).toBe(400);

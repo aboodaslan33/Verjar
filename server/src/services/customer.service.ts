@@ -1,46 +1,20 @@
 import type { Prisma } from '@prisma/client';
+import { unauthorized } from '../lib/http';
 import { prisma } from '../lib/prisma';
 
 type Tx = Prisma.TransactionClient;
 
-/** يجد العميل برقم الهاتف أو ينشئه. يُحدّث الاسم إن كان فارغًا فقط */
-export async function upsertCustomer(
-  tx: Tx,
-  data: { phone: string; name: string; companyName?: string | null },
-) {
-  const existing = await tx.customer.findUnique({ where: { phone: data.phone } });
-  if (existing) {
-    if (existing.deletedAt) {
-      return tx.customer.update({ where: { id: existing.id }, data: { deletedAt: null, name: data.name } });
-    }
-    if (data.companyName && !existing.companyName) {
-      return tx.customer.update({ where: { id: existing.id }, data: { companyName: data.companyName } });
-    }
-    return existing;
-  }
-  return tx.customer.create({ data: { phone: data.phone, name: data.name, companyName: data.companyName ?? null } });
-}
-
 /**
- * العميل الذي يُربط به حجز/طلب جديد:
- * - إن كان العميل مسجّل الدخول يُربط بحسابه مباشرة (حتى لو أدخل رقمًا آخر للتواصل)
- * - وإلا (ضيف) يُبحث عنه برقم الهاتف أو يُنشأ
+ * حساب العميل المسجّل الذي يُربط به حجز/طلب جديد (الحجز كضيف غير مسموح).
+ * يُكمل اسم الشركة في الحساب إن كان فارغًا.
  */
-export async function resolveCustomer(
-  tx: Tx,
-  auth: { sub: string; role: string } | undefined,
-  data: { phone: string; name: string; companyName?: string | null },
-) {
-  if (auth?.role === 'CUSTOMER') {
-    const own = await tx.customer.findUnique({ where: { id: auth.sub } });
-    if (own && !own.deletedAt) {
-      if (data.companyName && !own.companyName) {
-        return tx.customer.update({ where: { id: own.id }, data: { companyName: data.companyName } });
-      }
-      return own;
-    }
+export async function accountCustomer(tx: Tx, customerId: string, extra: { companyName?: string | null } = {}) {
+  const c = await tx.customer.findUnique({ where: { id: customerId } });
+  if (!c || c.deletedAt) throw unauthorized('انتهت الجلسة، سجّل الدخول مجددًا');
+  if (extra.companyName && !c.companyName) {
+    return tx.customer.update({ where: { id: c.id }, data: { companyName: extra.companyName } });
   }
-  return upsertCustomer(tx, data);
+  return c;
 }
 
 /** ملخص مالي لعميل: إجمالي المطلوب، المدفوع، المتبقي */

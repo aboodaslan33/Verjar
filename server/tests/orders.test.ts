@@ -1,9 +1,13 @@
 import request from 'supertest';
-import { app, createAdmin, createProduct, prisma, resetDb } from './helpers';
+import { app, createAdmin, createCustomer, createProduct, prisma, resetDb } from './helpers';
 
 const customer = { name: 'سارة خليل', phone: '0771234567', address: 'عمّان — عبدون', notes: 'الاتصال قبل التوصيل' };
 
-beforeEach(resetDb);
+let user: Awaited<ReturnType<typeof createCustomer>>;
+beforeEach(async () => {
+  await resetDb();
+  user = await createCustomer({ name: customer.name, phone: customer.phone });
+});
 afterAll(() => prisma.$disconnect());
 
 describe('المتجر', () => {
@@ -23,7 +27,7 @@ describe('المتجر', () => {
 describe('POST /api/v1/store/orders', () => {
   it('ينشئ الطلب بأسعار السيرفر ويولّد رسالة واتساب بالصيغة المعتمدة ويخصم المخزون', async () => {
     const chair = await createProduct({ name: 'كرسي حديقة', price: 50, discountPercent: 10, stock: 5 });
-    const res = await request(app)
+    const res = await user
       .post('/api/v1/store/orders')
       .send({ ...customer, items: [{ productId: chair.id, quantity: 2 }] });
     expect(res.status).toBe(201);
@@ -46,7 +50,7 @@ describe('POST /api/v1/store/orders', () => {
 
   it('يرفض الطلب إذا تجاوزت الكمية المخزون ولا يُنشئ شيئًا', async () => {
     const p = await createProduct({ stock: 1 });
-    const res = await request(app).post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 3 }] });
+    const res = await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 3 }] });
     expect(res.status).toBe(400);
     expect(res.body.error.message).toContain('1 فقط');
     expect(await prisma.order.count()).toBe(0);
@@ -54,21 +58,28 @@ describe('POST /api/v1/store/orders', () => {
   });
 
   it('يرفض سلة فارغة وهاتفًا غير صحيح', async () => {
-    const res = await request(app).post('/api/v1/store/orders').send({ ...customer, phone: '12', items: [] });
+    const res = await user.post('/api/v1/store/orders').send({ ...customer, phone: '12', items: [] });
     expect(res.status).toBe(400);
     expect(res.body.error.fields.items).toBe('السلة فارغة');
     expect(res.body.error.fields.phone).toBeDefined();
   });
 
+  it('لا طلب بدون تسجيل دخول', async () => {
+    const p = await createProduct();
+    const res = await request(app).post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 1 }] });
+    expect(res.status).toBe(401);
+    expect(await prisma.order.count()).toBe(0);
+  });
+
   it('يرفض المنتجات المخفية', async () => {
     const p = await createProduct({ visible: false });
-    const res = await request(app).post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 1 }] });
+    const res = await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 1 }] });
     expect(res.status).toBe(400);
   });
 
   it('الأدمن يلغي الطلب فيعود المخزون، والعميل يرى الطلب في حسابه', async () => {
     const p = await createProduct({ stock: 4, price: 20, discountPercent: 0 });
-    const order = await request(app).post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 4 }] });
+    const order = await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 4 }] });
     expect(order.status).toBe(201);
     expect((await prisma.product.findUnique({ where: { id: p.id } }))?.stock).toBe(0);
 
@@ -83,16 +94,14 @@ describe('POST /api/v1/store/orders', () => {
     const resend = await admin.post(`/api/v1/admin/orders/${order.body.data.id}/whatsapp`).send({ to: 'admin' });
     expect(resend.body.data.link).toContain('wa.me/962780192930');
 
-    const agent = request.agent(app);
-    await agent.post('/api/v1/auth/customer/login').send({ phone: customer.phone, secret: order.body.data.ref });
-    const overview = await agent.get('/api/v1/account/overview');
+    const overview = await user.get('/api/v1/account/overview');
     expect(overview.body.data.orders[0].status).toBe('CANCELLED');
     expect(overview.body.data.finance.billed).toBe(0);
   });
 
   it('المالية: إضافة دفعة وحساب المتبقي', async () => {
     const p = await createProduct({ stock: 10, price: 100, discountPercent: 0 });
-    const order = await request(app).post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 2 }] });
+    const order = await user.post('/api/v1/store/orders').send({ ...customer, items: [{ productId: p.id, quantity: 2 }] });
     const admin = await createAdmin();
     const c = await prisma.customer.findUniqueOrThrow({ where: { phone: '962771234567' } });
     const pay = await admin

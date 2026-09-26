@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { RequireCustomer } from './components/auth/RequireCustomer';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { Splash, shouldShowSplash } from './components/layout/Splash';
 import { PageLoader } from './components/ui';
@@ -17,7 +18,6 @@ const Checkout = lazy(() => import('./pages/public/Checkout'));
 const About = lazy(() => import('./pages/public/About'));
 const Contact = lazy(() => import('./pages/public/Contact'));
 const NotFound = lazy(() => import('./pages/public/NotFound'));
-const AccountLogin = lazy(() => import('./pages/account/Login'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const Account = lazy(() => import('./pages/account/Account'));
@@ -43,19 +43,24 @@ export default function App() {
         />
         <Route element={<PublicLayout />}>
           <Route index element={<Home />} />
+          {/* التصفح مفتوح للجميع */}
           <Route path="bookings" element={<Bookings />} />
-          <Route path="bookings/:type" element={<BookingForm />} />
           <Route path="corporate" element={<Corporate />} />
-          <Route path="corporate/:type" element={<CorporateForm />} />
           <Route path="store" element={<Store />} />
           <Route path="store/:slug" element={<ProductPage />} />
-          <Route path="cart" element={<Cart />} />
-          <Route path="checkout" element={<Checkout />} />
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
-          <Route path="account/login" element={<AccountLogin />} />
+          <Route path="account/login" element={<Navigate to="/login" replace />} />
+          {/* الحجز والطلب والحساب للعملاء المسجّلين فقط */}
+          <Route element={<RequireCustomer />}>
+            <Route path="bookings/:type" element={<BookingForm />} />
+            <Route path="corporate/:type" element={<CorporateForm />} />
+            <Route path="cart" element={<Cart />} />
+            <Route path="checkout" element={<Checkout />} />
+          </Route>
+          {/* صفحة الحساب لها حماية خاصة: الأدمن يُحوَّل للوحة التحكم */}
           <Route path="account" element={<Account />} />
           <Route path="*" element={<NotFound />} />
         </Route>

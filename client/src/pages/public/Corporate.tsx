@@ -115,7 +115,7 @@ export default function Corporate() {
           </div>
           <div>
             <h2 className="text-lg">المتابعة</h2>
-            <p className="mt-1 text-sm text-muted">عروض الأسعار والعقود والدفعات تظهر في صفحة الشركة على الموقع برقم المرجع.</p>
+            <p className="mt-1 text-sm text-muted">عروض الأسعار والعقود والدفعات تظهر في حسابك على الموقع.</p>
           </div>
         </section>
       </div>

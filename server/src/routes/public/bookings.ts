@@ -7,9 +7,10 @@ import { asyncHandler, badRequest, ok } from '../../lib/http';
 import { makeRef } from '../../lib/ids';
 import { BOOKING_TYPE_AR } from '../../lib/labels';
 import { prisma } from '../../lib/prisma';
+import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
 import { memoryUpload } from '../../middleware/upload';
-import { resolveCustomer } from '../../services/customer.service';
+import { accountCustomer } from '../../services/customer.service';
 import { bookingMessage, customerConfirmationMessage } from '../../services/messages';
 import { assertSlotAvailable, getDaySlots, inspectionFee } from '../../services/schedule.service';
 import { getSettings } from '../../services/settings.service';
@@ -50,6 +51,7 @@ function parseDataField(raw: unknown) {
  */
 bookingsRouter.post(
   '/',
+  requireCustomer,
   formLimiter,
   upload,
   asyncHandler(async (req, res) => {
@@ -100,7 +102,7 @@ bookingsRouter.post(
     const booking = await prisma.$transaction(
       async (tx) => {
         const scheduledAt = await assertSlotAvailable(tx, input.date, input.time);
-        const customer = await resolveCustomer(tx, req.auth, { phone: input.phone, name: input.name });
+        const customer = await accountCustomer(tx, req.auth!.sub);
         const created = await tx.booking.create({
           data: {
             ref: makeRef('B'),

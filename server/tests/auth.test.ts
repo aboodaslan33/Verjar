@@ -63,9 +63,13 @@ describe('POST /api/auth/register', () => {
     expect(dupEmail.body.error.details.field).toBe('email');
   });
 
-  it('رقم له حجوزات كضيف: يطلب رقم المرجع ثم يربط الحجوزات بالحساب', async () => {
-    const guest = await request(app).post('/api/v1/bookings').send(booking(account.phone, '10:00'));
+  it('رقم له حجوزات سابقة من النظام القديم (بدون كلمة مرور): يطلب رقم المرجع ثم يربط الحجوزات بالحساب', async () => {
+    // محاكاة عميل قديم أُنشئ من حجز كضيف قبل إلغاء الحجز بدون حساب
+    const legacy = request.agent(app);
+    await legacy.post('/api/auth/register').send(account);
+    const guest = await legacy.post('/api/v1/bookings').send(booking(account.phone, '10:00'));
     expect(guest.status).toBe(201);
+    await prisma.customer.update({ where: { phone: '962791112233' }, data: { passwordHash: null, registeredAt: null, email: null } });
 
     const noRef = await request(app).post('/api/auth/register').send(account);
     expect(noRef.status).toBe(409);
@@ -162,7 +166,7 @@ describe('الصلاحيات', () => {
 });
 
 describe('ربط الحجز بالحساب', () => {
-  it('حجز المسجّل يرتبط بحسابه حتى لو أدخل رقم تواصل آخر، والضيف يعمل كما هو', async () => {
+  it('حجز المسجّل يرتبط بحسابه حتى لو أدخل رقم تواصل آخر، والزائر لا يستطيع الحجز', async () => {
     const agent = request.agent(app);
     const reg = await agent.post('/api/auth/register').send(account);
     const date = nextWorkingDate();
@@ -170,11 +174,10 @@ describe('ربط الحجز بالحساب', () => {
     expect(own.status).toBe(201);
     const row = await prisma.booking.findUniqueOrThrow({ where: { id: own.body.data.id } });
     expect(row.customerId).toBe(reg.body.data.id);
+    expect(row.phone).toBe('962785556677');
 
     const guest = await request(app).post('/api/v1/bookings').send(booking('0785556677', '14:00', date));
-    expect(guest.status).toBe(201);
-    const guestRow = await prisma.booking.findUniqueOrThrow({ where: { id: guest.body.data.id } });
-    expect(guestRow.customerId).not.toBe(reg.body.data.id);
+    expect(guest.status).toBe(401);
   });
 });
 

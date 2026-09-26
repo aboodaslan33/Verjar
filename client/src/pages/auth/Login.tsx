@@ -55,19 +55,13 @@ export default function Login() {
     <AuthShell
       eyebrow="حسابي"
       title="تسجيل الدخول"
-      subtitle="تابع حجوزاتك وطلباتك وعروض الأسعار من مكان واحد."
+      subtitle="سجّل الدخول لحجز المواعيد والطلب من المتجر ومتابعة كل شيء من مكان واحد."
       footer={
         <>
           <p>
             ليس لديك حساب؟{' '}
             <Link to={`/register${qs}`} className={linkClass}>
               أنشئ حسابًا
-            </Link>
-          </p>
-          <p>
-            حجزت بدون حساب؟{' '}
-            <Link to={`/account/login${qs}`} className={linkClass}>
-              ادخل برقم المرجع
             </Link>
           </p>
         </>
@@ -80,9 +74,6 @@ export default function Login() {
             <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
               <Link to={`/register${qs}`} className={linkClass}>
                 إنشاء حساب بهذا الرقم
-              </Link>
-              <Link to={`/account/login${qs}`} className={linkClass}>
-                الدخول برقم المرجع
               </Link>
             </span>
           )}

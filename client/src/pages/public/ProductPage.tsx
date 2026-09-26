@@ -1,5 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEnsureCustomer } from '../../components/auth/RequireCustomer';
 import { PRODUCT_GRID, ProductCard, ProductImage } from '../../components/store/ProductCard';
 import { QtyStepper } from '../../components/store/QtyStepper';
 import { Button, ButtonLink, EmptyState, ErrorState, Icon, Price, Skeleton } from '../../components/ui';
@@ -49,7 +50,10 @@ function ProductView({ product, related }: ProductResponse) {
   const [qty, setQty] = useState(1);
   const out = product.stock <= 0;
 
+  const ensureCustomer = useEnsureCustomer();
+
   const addToCart = () => {
+    if (!ensureCustomer()) return;
     add(product, qty);
     toast(`أُضيف "${product.name}" إلى السلة`);
   };
@@ -126,6 +130,7 @@ function ProductView({ product, related }: ProductResponse) {
                   variant="secondary"
                   block
                   onClick={() => {
+                    if (!ensureCustomer()) return;
                     add(product, qty);
                     navigate('/checkout');
                   }}

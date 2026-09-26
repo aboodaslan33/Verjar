@@ -49,6 +49,19 @@ export async function createAdmin() {
   return agent;
 }
 
+/** عميل مسجّل الدخول (الحجز والطلبات متاحة للمسجّلين فقط) */
+export async function createCustomer(data: Partial<{ name: string; phone: string; email: string; password: string }> = {}) {
+  const agent = request.agent(app);
+  const res = await agent.post('/api/v1/auth/register').send({
+    name: data.name ?? 'عميل تجريبي',
+    phone: data.phone ?? '0790000001',
+    email: data.email,
+    password: data.password ?? 'Customer@123',
+  });
+  if (res.status !== 201) throw new Error(`customer register failed: ${JSON.stringify(res.body)}`);
+  return agent;
+}
+
 export async function createProduct(overrides: Partial<{ name: string; price: number; discountPercent: number; stock: number; visible: boolean }> = {}) {
   const category = await prisma.category.upsert({
     where: { slug: 'outdoor' },

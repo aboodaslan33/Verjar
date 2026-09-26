@@ -8,8 +8,9 @@ import { makeRef } from '../../lib/ids';
 import { round3, toNum } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
+import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
-import { resolveCustomer } from '../../services/customer.service';
+import { accountCustomer } from '../../services/customer.service';
 import { customerConfirmationMessage, orderMessage } from '../../services/messages';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
 import { orderSchema } from '../../validators/order';
@@ -102,6 +103,7 @@ storeRouter.get(
 /** إنشاء طلب من السلة — الأسعار تُحسب من قاعدة البيانات وليس من المتصفح */
 storeRouter.post(
   '/orders',
+  requireCustomer,
   formLimiter,
   asyncHandler(async (req, res) => {
     const input = orderSchema.parse(req.body);
@@ -148,7 +150,7 @@ storeRouter.post(
         if (updated.count === 0) throw badRequest(`الكمية المطلوبة من "${it.name}" لم تعد متوفرة`);
       }
 
-      const customer = await resolveCustomer(tx, req.auth, { phone: input.phone, name: input.name });
+      const customer = await accountCustomer(tx, req.auth!.sub);
       subtotal = round3(subtotal);
       total = round3(total);
       const created = await tx.order.create({

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import request from 'supertest';
 import { LOCAL_UPLOAD_DIR } from '../src/services/upload.service';
-import { app, createAdmin, nextWorkingDate, PNG_1PX, prisma, resetDb } from './helpers';
+import { app, createAdmin, createCustomer, nextWorkingDate, PNG_1PX, prisma, resetDb } from './helpers';
 
 const base = {
   name: 'أحمد السعدي',
@@ -23,7 +23,11 @@ function inspection(date: string, time: string, extra: Record<string, unknown> =
   };
 }
 
-beforeEach(resetDb);
+let user: Awaited<ReturnType<typeof createCustomer>>;
+beforeEach(async () => {
+  await resetDb();
+  user = await createCustomer({ name: base.name, phone: base.phone });
+});
 afterAll(async () => {
   await prisma.$disconnect();
   fs.rmSync(LOCAL_UPLOAD_DIR, { recursive: true, force: true });
@@ -52,7 +56,7 @@ describe('GET /api/v1/bookings/slots', () => {
 describe('POST /api/v1/bookings', () => {
   it('ينشئ حجز كشف ويحسب رسوم الكشف داخل عمّان ويولّد رابط واتساب', async () => {
     const date = nextWorkingDate();
-    const res = await request(app).post('/api/v1/bookings').send(inspection(date, '10:00'));
+    const res = await user.post('/api/v1/bookings').send(inspection(date, '10:00'));
     expect(res.status).toBe(201);
     expect(res.body.ok).toBe(true);
     const d = res.body.data;
@@ -72,13 +76,13 @@ describe('POST /api/v1/bookings', () => {
 
   it('يحسب 25 دينار خارج عمّان ورسوم الطارئ من الإعدادات', async () => {
     const date = nextWorkingDate();
-    const outside = await request(app)
+    const outside = await user
       .post('/api/v1/bookings')
       .send(inspection(date, '08:00', { zone: 'OUTSIDE_AMMAN' }));
     expect(outside.status).toBe(201);
     expect(outside.body.data.inspectionFee).toBe(25);
 
-    const emergency = await request(app)
+    const emergency = await user
       .post('/api/v1/bookings')
       .send(inspection(date, '12:00', { zone: 'INSIDE_AMMAN', urgency: 'EMERGENCY' }));
     expect(emergency.status).toBe(201);
@@ -87,10 +91,10 @@ describe('POST /api/v1/bookings', () => {
 
   it('يمنع حجزين بفارق أقل من 3 ساعات ويعطّل الأوقات في جدول المواعيد', async () => {
     const date = nextWorkingDate();
-    const first = await request(app).post('/api/v1/bookings').send(inspection(date, '10:00'));
+    const first = await user.post('/api/v1/bookings').send(inspection(date, '10:00'));
     expect(first.status).toBe(201);
 
-    const tooClose = await request(app)
+    const tooClose = await user
       .post('/api/v1/bookings')
       .send(inspection(date, '12:00', { phone: '0781111111' }));
     expect(tooClose.status).toBe(400);
@@ -103,7 +107,7 @@ describe('POST /api/v1/bookings', () => {
     expect(byTime['12:00'].reason).toBe('booked');
     expect(byTime['13:00'].available).toBe(true);
 
-    const ok = await request(app)
+    const ok = await user
       .post('/api/v1/bookings')
       .send(inspection(date, '13:00', { phone: '0781111111' }));
     expect(ok.status).toBe(201);
@@ -112,8 +116,8 @@ describe('POST /api/v1/bookings', () => {
   it('لا يسمح بحجزين متزامنين لنفس الوقت', async () => {
     const date = nextWorkingDate(3);
     const [a, b] = await Promise.all([
-      request(app).post('/api/v1/bookings').send(inspection(date, '14:00')),
-      request(app).post('/api/v1/bookings').send(inspection(date, '14:00', { phone: '0782222222' })),
+      user.post('/api/v1/bookings').send(inspection(date, '14:00')),
+      user.post('/api/v1/bookings').send(inspection(date, '14:00', { phone: '0782222222' })),
     ]);
     const statuses = [a.status, b.status].sort();
     expect(statuses[0]).toBe(201);
@@ -132,12 +136,12 @@ describe('POST /api/v1/bookings', () => {
         break;
       }
     }
-    const res = await request(app).post('/api/v1/bookings').send(inspection(date, '10:00'));
+    const res = await user.post('/api/v1/bookings').send(inspection(date, '10:00'));
     expect(res.status).toBe(400);
   });
 
   it('يعيد أخطاء الحقول بالعربي', async () => {
-    const res = await request(app)
+    const res = await user
       .post('/api/v1/bookings')
       .send({ type: 'PAINTING', ...base, phone: '123', date: nextWorkingDate(), time: '10:00', details: { rooms: 0 } });
     expect(res.status).toBe(400);
@@ -155,7 +159,7 @@ describe('POST /api/v1/bookings', () => {
       time: '09:00',
       details: { paintType: 'بلاستيك', jobKind: 'RENEW', rooms: 3, area: 120, colors: 'أبيض', decorations: false },
     });
-    const okRes = await request(app)
+    const okRes = await user
       .post('/api/v1/bookings')
       .field('data', data)
       .attach('photos', PNG_1PX, { filename: 'wall.png', contentType: 'image/png' })
@@ -163,7 +167,7 @@ describe('POST /api/v1/bookings', () => {
     expect(okRes.status).toBe(201);
     expect(okRes.body.data.mediaCount).toBe(2);
 
-    const bad = await request(app)
+    const bad = await user
       .post('/api/v1/bookings')
       .field('data', JSON.stringify({ ...JSON.parse(data), time: '15:00' }))
       .attach('photos', Buffer.from('#!/bin/sh\necho hacked'), { filename: 'x.png', contentType: 'image/png' });
@@ -173,7 +177,7 @@ describe('POST /api/v1/bookings', () => {
 
   it('يرفض أكثر من 5 صور', async () => {
     const date = nextWorkingDate();
-    let req = request(app)
+    let req = user
       .post('/api/v1/bookings')
       .field('data', JSON.stringify({ type: 'GENERAL', ...base, date, time: '09:00', details: { description: 'تركيب رفوف' } }));
     for (let i = 0; i < 6; i++) req = req.attach('photos', PNG_1PX, { filename: `p${i}.png`, contentType: 'image/png' });
@@ -191,15 +195,15 @@ describe('POST /api/v1/bookings', () => {
       time: '09:00',
       details: { tiles: true, buildingType: 'VILLA', landArea: 500, buildArea: 300, floors: 2, hasDesign: true },
     };
-    const noGps = await request(app).post('/api/v1/bookings').send(body);
+    const noGps = await user.post('/api/v1/bookings').send(body);
     expect(noGps.status).toBe(400);
 
-    const noDesign = await request(app).post('/api/v1/bookings').send({ ...body, lat: 31.95, lng: 35.91 });
+    const noDesign = await user.post('/api/v1/bookings').send({ ...body, lat: 31.95, lng: 35.91 });
     expect(noDesign.status).toBe(400);
     expect(noDesign.body.error.details.field).toBe('designFiles');
 
     const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
-    const ok = await request(app)
+    const ok = await user
       .post('/api/v1/bookings')
       .field('data', JSON.stringify({ ...body, lat: 31.95, lng: 35.91 }))
       .attach('designFiles', pdf, { filename: 'plan.pdf', contentType: 'application/pdf' });
@@ -214,8 +218,8 @@ describe('POST /api/v1/bookings', () => {
 describe('إدارة الحجوزات', () => {
   it('الأدمن يغيّر الحالة ويعيد الجدولة مع احترام فارق الساعات', async () => {
     const date = nextWorkingDate();
-    const a = await request(app).post('/api/v1/bookings').send(inspection(date, '08:00'));
-    await request(app).post('/api/v1/bookings').send(inspection(date, '14:00', { phone: '0781111111' }));
+    const a = await user.post('/api/v1/bookings').send(inspection(date, '08:00'));
+    await user.post('/api/v1/bookings').send(inspection(date, '14:00', { phone: '0781111111' }));
 
     expect((await request(app).patch(`/api/v1/admin/bookings/${a.body.data.id}`).send({ status: 'CONFIRMED' })).status).toBe(401);
 
@@ -232,17 +236,28 @@ describe('إدارة الحجوزات', () => {
     expect(moved.status).toBe(200);
   });
 
-  it('العميل يدخل برقم الهاتف ورقم المرجع ويرى حجوزاته', async () => {
+  it('العميل المسجّل يرى حجوزاته في حسابه', async () => {
     const date = nextWorkingDate();
-    const created = await request(app).post('/api/v1/bookings').send(inspection(date, '10:00'));
-    const agent = request.agent(app);
-    const bad = await agent.post('/api/v1/auth/customer/login').send({ phone: '0791234567', secret: 'B-WRONG1' });
-    expect(bad.status).toBe(401);
-    const login = await agent.post('/api/v1/auth/customer/login').send({ phone: '0791234567', secret: created.body.data.ref });
-    expect(login.status).toBe(200);
-    const overview = await agent.get('/api/v1/account/overview');
+    await user.post('/api/v1/bookings').send(inspection(date, '10:00'));
+    const overview = await user.get('/api/v1/account/overview');
     expect(overview.status).toBe(200);
     expect(overview.body.data.bookings).toHaveLength(1);
     expect(overview.body.data.finance.billed).toBe(15);
+  });
+
+  it('لا حجز بدون تسجيل دخول، ولا حجز بحساب أدمن', async () => {
+    const date = nextWorkingDate();
+    const guest = await request(app).post('/api/v1/bookings').send(inspection(date, '10:00'));
+    expect(guest.status).toBe(401);
+    expect(guest.body.error.message).toBe('يجب تسجيل الدخول');
+    const admin = await createAdmin();
+    const asAdmin = await admin.post('/api/v1/bookings').send(inspection(date, '10:00'));
+    expect(asAdmin.status).toBe(403);
+    expect(await prisma.booking.count()).toBe(0);
+  });
+
+  it('مسار الدخول برقم المرجع لم يعد موجودًا', async () => {
+    const res = await request(app).post('/api/v1/auth/customer/login').send({ phone: '0791234567', secret: 'B-ABCDEF' });
+    expect(res.status).toBe(404);
   });
 });
