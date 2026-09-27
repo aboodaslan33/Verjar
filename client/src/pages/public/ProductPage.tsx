@@ -1,13 +1,13 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useEnsureCustomer } from '../../components/auth/RequireCustomer';
 import { PRODUCT_GRID, ProductCard, ProductImage } from '../../components/store/ProductCard';
 import { QtyStepper } from '../../components/store/QtyStepper';
-import { Button, ButtonLink, EmptyState, ErrorState, Icon, Price, Skeleton } from '../../components/ui';
+import { Breadcrumbs, Button, ButtonLink, EmptyState, ErrorState, Icon, Price, SectionHeading, Skeleton, type Crumb } from '../../components/ui';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../lib/api';
-import { cx } from '../../lib/format';
+import { cx, formatJOD } from '../../lib/format';
 import type { Media, Product } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
@@ -30,7 +30,7 @@ export default function ProductPage() {
           <EmptyState
             title="المنتج غير موجود"
             description="ربما حُذف المنتج أو تغيّر رابطه. تصفح المنتجات المتوفرة في السوق."
-            action={<ButtonLink to="/store">العودة إلى المتجر</ButtonLink>}
+            action={<ButtonLink to="/store">العودة إلى السوق</ButtonLink>}
           />
         ) : (
           <ErrorState message={error.message} onRetry={reload} />
@@ -48,152 +48,152 @@ function ProductView({ product, related }: ProductResponse) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
   const out = product.stock <= 0;
-
   const ensureCustomer = useEnsureCustomer();
+  const buyRef = useRef<HTMLDivElement>(null);
+  const [buyVisible, setBuyVisible] = useState(true);
+
+  // شريط الشراء السفلي على الجوال يظهر فقط عندما يختفي زر الإضافة الأساسي عن الشاشة
+  useEffect(() => {
+    const el = buyRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setBuyVisible(e.isIntersecting), { rootMargin: '0px 0px -80px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!added) return;
+    const t = window.setTimeout(() => setAdded(false), 1600);
+    return () => window.clearTimeout(t);
+  }, [added]);
 
   const addToCart = () => {
     if (!ensureCustomer()) return;
     add(product, qty);
-    toast(`أُضيف "${product.name}" إلى السلة`);
+    setAdded(true);
+    toast(`أُضيف «${product.name}» إلى السلة`);
   };
+  const buyNow = () => {
+    if (!ensureCustomer()) return;
+    add(product, qty);
+    navigate('/checkout');
+  };
+
+  const crumbs: Crumb[] = [
+    { to: '/store', label: 'السوق' },
+    ...(product.category.parent ? [{ to: `/store?category=${product.category.parent.slug}`, label: product.category.parent.name }] : []),
+    { to: `/store?category=${product.category.slug}`, label: product.category.name },
+    { label: product.name },
+  ];
 
   return (
     <>
       <div className="container py-6 md:py-10">
-        <nav aria-label="مسار التصفح" className="mb-5 text-sm text-muted">
-          <ol className="flex flex-wrap items-center gap-1.5">
-            <li>
-              <Link to="/store" className="hover:text-ink">
-                السوق
-              </Link>
-            </li>
-            <li aria-hidden>/</li>
-            {product.category.parent && (
-              <>
-                <li>
-                  <Link to={`/store?category=${product.category.parent.slug}`} className="hover:text-ink">
-                    {product.category.parent.name}
-                  </Link>
-                </li>
-                <li aria-hidden>/</li>
-              </>
-            )}
-            <li>
-              <Link to={`/store?category=${product.category.slug}`} className="hover:text-ink">
-                {product.category.name}
-              </Link>
-            </li>
-            <li aria-hidden>/</li>
-            <li aria-current="page" className="truncate text-ink">
-              {product.name}
-            </li>
-          </ol>
-        </nav>
+        <Breadcrumbs items={crumbs} className="mb-6" />
 
-        <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
+        <div className="grid gap-8 lg:grid-cols-12 lg:gap-14">
           <div className="lg:col-span-7">
             <Gallery media={product.media} name={product.name} />
           </div>
 
           <div className="lg:col-span-5">
-            <p className="eyebrow">{product.category.name}</p>
-            <h1 className="mt-3 text-2xl md:text-3xl">{product.name}</h1>
-            {product.vendor && (
-              <Link to={`/store/vendor/${product.vendor.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm text-muted hover:text-ink">
-                <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full border border-line bg-subtle">
-                  {product.vendor.logoUrl ? (
-                    <img src={product.vendor.logoUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-semibold text-ink">{product.vendor.name.slice(0, 1)}</span>
-                  )}
-                </span>
-                يبيعه <span className="font-semibold text-ink underline-offset-4 hover:underline">{product.vendor.name}</span>
-              </Link>
-            )}
-
-            <Price
-              price={product.price}
-              finalPrice={product.finalPrice}
-              discountPercent={product.discountPercent}
-              size="lg"
-              className="mt-4"
-            />
-
-            <p className={cx('mt-3 flex items-center gap-2 text-sm font-medium', out ? 'text-danger' : 'text-success')}>
-              <span className={cx('h-2 w-2 rounded-full', out ? 'bg-danger' : 'bg-success')} aria-hidden />
-              {out ? (
-                'نفد المخزون حاليًا'
-              ) : product.stock <= 5 ? (
-                <>
-                  متوفر — بقي <span className="ltr">{product.stock}</span> فقط
-                </>
-              ) : (
-                'متوفر'
-              )}
-            </p>
-
-            {!out && (
-              <div className="mt-6">
-                <span id="qty-label" className="label">
-                  الكمية
-                </span>
-                <QtyStepper value={qty} max={Math.min(product.stock, 20)} onChange={setQty} labelledBy="qty-label" />
-              </div>
-            )}
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" block disabled={out} onClick={addToCart}>
-                <Icon name="cart" /> {out ? 'نفد المخزون' : 'أضف للسلة'}
-              </Button>
-              {!out && (
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  block
-                  onClick={() => {
-                    if (!ensureCustomer()) return;
-                    add(product, qty);
-                    navigate('/checkout');
-                  }}
+            <div className="lg:sticky lg:top-32">
+              {product.vendor && (
+                <Link
+                  to={`/store/vendor/${product.vendor.slug}`}
+                  className="group inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-ink"
                 >
-                  اطلب الآن
-                </Button>
+                  <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full border border-line bg-subtle">
+                    {product.vendor.logoUrl ? (
+                      <img src={product.vendor.logoUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-semibold text-ink">{product.vendor.name.slice(0, 1)}</span>
+                    )}
+                  </span>
+                  <span className="font-medium text-ink underline-offset-4 group-hover:underline">{product.vendor.name}</span>
+                  <span aria-hidden>·</span>
+                  <span>{product.category.name}</span>
+                </Link>
+              )}
+              <h1 className="mt-3 text-[1.75rem] leading-[1.35] md:text-[2.125rem]">{product.name}</h1>
+
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Price price={product.price} finalPrice={product.finalPrice} discountPercent={product.discountPercent} size="lg" />
+              </div>
+              <StockLine stock={product.stock} />
+
+              {product.specList && product.specList.length > 0 && (
+                <section className="mt-7" aria-labelledby="specs-title">
+                  <h2 id="specs-title" className="text-sm font-semibold">
+                    المواصفات
+                  </h2>
+                  <dl className="mt-3 grid grid-cols-2 gap-2">
+                    {product.specList.map((sp) => (
+                      <div key={sp.key} className="rounded-lg border border-line px-3 py-2.5">
+                        <dt className="text-xs text-muted">{sp.label}</dt>
+                        <dd className="mt-0.5 font-semibold">{sp.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
+
+              <div ref={buyRef} className="mt-7 border-t border-line pt-7">
+                {!out && (
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <span id="qty-label" className="text-sm font-semibold">
+                      الكمية
+                    </span>
+                    <QtyStepper value={qty} max={Math.min(product.stock, 20)} onChange={setQty} labelledBy="qty-label" />
+                  </div>
+                )}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button size="lg" block disabled={out} onClick={addToCart} className={cx(added && '!bg-ink !text-bg')}>
+                    <span key={String(added)} className="anim-fade inline-flex items-center gap-2">
+                      <Icon name={added ? 'check' : 'bag'} className="h-5 w-5" />
+                      {out ? 'نفد المخزون' : added ? 'أُضيف للسلة' : 'أضف للسلة'}
+                    </span>
+                  </Button>
+                  {!out && (
+                    <Button size="lg" variant="outline" block onClick={buyNow}>
+                      اطلب الآن
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <ul className="mt-7 space-y-3 text-sm text-muted">
+                <li className="flex items-start gap-3">
+                  <Icon name="truck" className="mt-0.5 h-5 w-5 shrink-0 text-ink" />
+                  <span>نتواصل معك بعد الطلب لتأكيده وتحديد موعد التوصيل.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Icon name="shield" className="mt-0.5 h-5 w-5 shrink-0 text-ink" />
+                  <span>كل منتج في السوق تراجعه الإدارة قبل عرضه، والسعر النهائي يُحسب عند إرسال الطلب.</span>
+                </li>
+              </ul>
+
+              {product.description && (
+                <details className="group mt-7 border-t border-line pt-2" open>
+                  <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between font-semibold">
+                    الوصف
+                    <Icon name="chevronDown" className="h-4 w-4 text-muted transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <p className="anim-fade whitespace-pre-line pb-2 leading-relaxed text-muted">{product.description}</p>
+                </details>
               )}
             </div>
-            <p className="mt-3 text-sm text-muted">
-              السعر النهائي يُؤكَّد عند إرسال الطلب، ونتواصل معك لتحديد موعد التوصيل.
-            </p>
-
-            {product.specList && product.specList.length > 0 && (
-              <section className="mt-8 border-t border-line pt-6">
-                <h2 className="text-lg">المواصفات</h2>
-                <dl className="mt-3 divide-y divide-line rounded-xl border border-line">
-                  {product.specList.map((sp) => (
-                    <div key={sp.key} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
-                      <dt className="text-muted">{sp.label}</dt>
-                      <dd className="font-medium">{sp.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            )}
-
-            {product.description && (
-              <section className="mt-8 border-t border-line pt-6">
-                <h2 className="text-lg">الوصف</h2>
-                <p className="mt-2 whitespace-pre-line leading-relaxed text-muted">{product.description}</p>
-              </section>
-            )}
           </div>
         </div>
       </div>
 
       {related.length > 0 && (
-        <section className="border-t border-line bg-surface">
-          <div className="container py-10 md:py-14">
-            <h2 className="text-xl md:text-2xl">منتجات من نفس القسم</h2>
-            <div className={cx(PRODUCT_GRID, 'mt-6')} data-reveal-group>
+        <section className="section border-t border-line">
+          <div className="container">
+            <SectionHeading eyebrow="من نفس القسم" title="قد يعجبك أيضًا" link={{ to: `/store?category=${product.category.slug}`, label: `كل ${product.category.name}` }} />
+            <div className={cx(PRODUCT_GRID, 'mt-10')} data-reveal-group>
               {related.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -201,7 +201,47 @@ function ProductView({ product, related }: ProductResponse) {
           </div>
         </section>
       )}
+
+      {/* شريط الشراء على الجوال */}
+      {!out && (
+        <div
+          className={cx(
+            'fixed inset-x-0 z-30 border-t border-line bg-surface px-4 py-3 transition-transform duration-300 ease-out lg:hidden',
+            buyVisible ? 'pointer-events-none translate-y-[calc(100%+var(--tabbar-h))]' : 'translate-y-0',
+          )}
+          style={{ bottom: 'var(--tabbar-h)' }}
+          aria-hidden={buyVisible}
+        >
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-muted">{product.name}</p>
+              <p className="font-display text-lg font-semibold">{formatJOD(product.finalPrice * qty)}</p>
+            </div>
+            <Button onClick={addToCart} tabIndex={buyVisible ? -1 : 0}>
+              <Icon name={added ? 'check' : 'bag'} className="h-5 w-5" /> {added ? 'أُضيف' : 'أضف للسلة'}
+            </Button>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+function StockLine({ stock }: { stock: number }) {
+  const out = stock <= 0;
+  return (
+    <p className={cx('mt-3 flex items-center gap-2 text-sm font-medium', out ? 'text-danger' : stock <= 5 ? 'text-warn' : 'text-success')}>
+      <span className={cx('h-2 w-2 rounded-full', out ? 'bg-danger' : stock <= 5 ? 'bg-warn' : 'bg-success')} aria-hidden />
+      {out ? (
+        'نفد المخزون حاليًا'
+      ) : stock <= 5 ? (
+        <>
+          متوفر — بقي <span className="num">{stock}</span> فقط
+        </>
+      ) : (
+        'متوفر'
+      )}
+    </p>
   );
 }
 
@@ -221,11 +261,11 @@ function Gallery({ media, name }: { media: Media[]; name: string }) {
 
   return (
     <div>
-      <div className="card overflow-hidden">
+      <div className="overflow-hidden rounded-xl bg-subtle">
         {!current ? (
-          <ProductImage src={null} alt={name} />
+          <ProductImage src={null} alt={name} ratio="aspect-square" />
         ) : current.kind === 'VIDEO' ? (
-          <div className="aspect-[4/3] bg-black">
+          <div className="aspect-square bg-black">
             <video
               key={current.id}
               src={current.url}
@@ -237,12 +277,14 @@ function Gallery({ media, name }: { media: Media[]; name: string }) {
             />
           </div>
         ) : (
-          <ProductImage src={current.url} alt={name} eager />
+          <div key={current.id} className="anim-fade">
+            <ProductImage src={current.url} alt={name} eager ratio="aspect-square" />
+          </div>
         )}
       </div>
 
       {items.length > 1 && (
-        <div role="group" aria-label="صور المنتج" className="mt-3 flex gap-2 overflow-x-auto pb-1" onKeyDown={onKey}>
+        <div role="group" aria-label="صور المنتج" className="scroll-x mt-3 flex gap-2 pb-1" onKeyDown={onKey}>
           {items.map((m, i) => (
             <button
               key={m.id}
@@ -251,8 +293,8 @@ function Gallery({ media, name }: { media: Media[]; name: string }) {
               aria-label={m.kind === 'VIDEO' ? `عرض الفيديو ${i + 1}` : `عرض الصورة ${i + 1}`}
               aria-current={i === index ? 'true' : undefined}
               className={cx(
-                'relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border-2 bg-subtle transition-colors sm:h-20 sm:w-24',
-                i === index ? 'border-brand-600 dark:border-brand-300' : 'border-transparent hover:border-line',
+                'relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-subtle ring-offset-2 ring-offset-bg transition-[box-shadow,opacity] sm:h-20 sm:w-20',
+                i === index ? 'ring-2 ring-ink' : 'opacity-70 hover:opacity-100',
               )}
             >
               {m.kind === 'VIDEO' ? (
@@ -276,7 +318,7 @@ function ProductSkeleton() {
       <Skeleton className="mb-5 h-4 w-48" />
       <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
         <div className="lg:col-span-7">
-          <Skeleton className="aspect-[4/3] w-full rounded-2xl" />
+          <Skeleton className="aspect-square w-full rounded-xl" />
           <div className="mt-3 flex gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-16 w-20 rounded-lg sm:h-20 sm:w-24" />

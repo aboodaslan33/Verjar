@@ -86,10 +86,10 @@ export function SlotPicker({ date, time, onChange, error, reloadKey = 0 }: Props
           <p className="text-sm text-muted">{date ? longDate(date) : 'اختر يومًا'}</p>
         </div>
         <div className="hidden gap-1 sm:flex">
-          <button type="button" onClick={() => scroll(-1)} className="grid h-10 w-10 place-items-center rounded-lg border border-line hover:bg-subtle" aria-label="الأيام السابقة">
+          <button type="button" onClick={() => scroll(-1)} className="grid h-10 w-10 place-items-center rounded-lg border border-line-strong transition-colors hover:border-ink" aria-label="الأيام السابقة">
             <Icon name="chevronRight" className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => scroll(1)} className="grid h-10 w-10 place-items-center rounded-lg border border-line hover:bg-subtle" aria-label="الأيام التالية">
+          <button type="button" onClick={() => scroll(1)} className="grid h-10 w-10 place-items-center rounded-lg border border-line-strong transition-colors hover:border-ink" aria-label="الأيام التالية">
             <Icon name="chevronLeft" className="h-4 w-4" />
           </button>
         </div>
@@ -97,7 +97,7 @@ export function SlotPicker({ date, time, onChange, error, reloadKey = 0 }: Props
 
       <div
         ref={strip}
-        className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:px-0"
+        className="scroll-x -mx-4 flex snap-x gap-2 px-4 pb-2 pt-1 sm:mx-0 sm:px-0"
         role="group"
         aria-label="الأيام المتاحة للحجز"
       >
@@ -114,17 +114,18 @@ export function SlotPicker({ date, time, onChange, error, reloadKey = 0 }: Props
               aria-label={`${longDate(d)}${working ? '' : ' — عطلة'}`}
               onClick={() => onChange(d, '')}
               className={cx(
-                'relative flex min-h-[4.75rem] w-[4.25rem] shrink-0 snap-start flex-col items-center justify-center rounded-xl border text-center transition-colors',
+                'relative flex min-h-[4.75rem] w-[4.25rem] shrink-0 snap-start flex-col items-center justify-center rounded-lg border text-center transition-[background-color,border-color,color,transform] duration-200 active:scale-95',
                 active
-                  ? 'border-primary bg-primary text-primary-fg'
+                  ? 'border-ink bg-ink text-bg'
                   : working
-                    ? 'border-line bg-surface hover:border-brand-400'
-                    : 'cursor-not-allowed border-transparent bg-subtle text-muted/70',
+                    ? 'border-line-strong bg-surface hover:border-ink'
+                    : 'cursor-not-allowed border-dashed border-line bg-transparent text-muted/60',
               )}
             >
-              <span className={cx('text-xs', active ? 'text-primary-fg/80' : 'text-muted')}>{i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : WEEKDAYS_SHORT[weekdayOf(d)]}</span>
-              <span className="text-xl font-bold leading-tight">{dayNum(d)}</span>
-              <span className={cx('text-[10px]', active ? 'text-primary-fg/75' : 'text-muted', !showMonth && !active && 'opacity-0')}>
+              {active && <span className="absolute -top-px inset-x-3 h-[3px] rounded-b-full bg-primary" aria-hidden />}
+              <span className={cx('text-xs', active ? 'text-bg/70' : 'text-muted')}>{i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : WEEKDAYS_SHORT[weekdayOf(d)]}</span>
+              <span className="num font-display text-xl font-semibold leading-tight">{dayNum(d)}</span>
+              <span className={cx('text-[10px]', active ? 'text-bg/70' : 'text-muted', !showMonth && !active && 'opacity-0')}>
                 {working ? monthShort(d) : 'عطلة'}
               </span>
             </button>
@@ -145,24 +146,24 @@ export function SlotPicker({ date, time, onChange, error, reloadKey = 0 }: Props
         {loading ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="status" aria-label="جاري تحميل الأوقات">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 rounded-xl" />
+              <Skeleton key={i} className="h-14 rounded-lg" />
             ))}
           </div>
         ) : loadError ? (
-          <div className="rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm" role="alert">
+          <div className="rounded-lg border border-danger/30 bg-danger/[0.04] p-4 text-sm" role="alert">
             <p>{loadError}</p>
             <Button variant="outline" size="sm" className="mt-3" onClick={() => setRetry((r) => r + 1)}>
               <Icon name="refresh" className="h-4 w-4" /> إعادة المحاولة
             </Button>
           </div>
         ) : !data ? null : !data.open ? (
-          <p className="rounded-xl bg-subtle p-4 text-sm text-muted">
+          <p className="rounded-lg bg-subtle p-4 text-sm text-muted">
             {data.reason === 'closed' ? 'هذا اليوم عطلة. اختر يومًا آخر.' : `الحجز متاح حتى ${settings.maxDaysAhead} يومًا من اليوم فقط.`}
           </p>
         ) : available === 0 ? (
           <>
             <SlotGrid data={data} time={time} onPick={(t) => onChange(date, t)} />
-            <p className="mt-3 rounded-xl bg-sand-50 p-3 text-sm text-ink dark:bg-sand-700/15">
+            <p className="mt-3 rounded-lg bg-subtle p-3 text-sm text-ink">
               لا توجد أوقات متاحة في هذا اليوم. اختر يومًا آخر من الشريط أعلاه.
             </p>
           </>
@@ -190,7 +191,7 @@ export function SlotPicker({ date, time, onChange, error, reloadKey = 0 }: Props
 
 function SlotGrid({ data, time, onPick }: { data: DaySlots; time: string; onPick: (t: string) => void }) {
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="الأوقات">
+    <div className="anim-fade grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="الأوقات">
       {data.slots.map((s) => {
         const active = s.time === time;
         return (
@@ -202,12 +203,13 @@ function SlotGrid({ data, time, onPick }: { data: DaySlots; time: string; onPick
             disabled={!s.available}
             onClick={() => onPick(s.time)}
             className={cx(
-              'flex min-h-[3.5rem] flex-col items-center justify-center rounded-xl border px-2 py-1.5 transition-colors',
-              active && 'border-primary bg-primary text-primary-fg',
-              !active && s.available && 'border-line bg-surface font-semibold hover:border-brand-400',
-              !s.available && 'cursor-not-allowed border-transparent bg-subtle text-muted',
+              'relative flex min-h-[3.5rem] flex-col items-center justify-center rounded-lg border px-2 py-1.5 transition-[background-color,border-color,color,transform] duration-200 active:scale-95',
+              active && 'border-primary bg-primary font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)]',
+              !active && s.available && 'border-line-strong bg-surface font-semibold hover:border-ink',
+              !s.available && 'cursor-not-allowed border-dashed border-line text-muted/70',
             )}
           >
+            {active && <Icon name="check" className="absolute end-1.5 top-1.5 h-3.5 w-3.5" />}
             <span className={cx('text-[15px]', !s.available && 'line-through decoration-muted/60')}>{formatSlot(s.time)}</span>
             {!s.available && <span className="text-[11px]">{s.reason === 'booked' ? 'محجوز' : 'مضى'}</span>}
           </button>

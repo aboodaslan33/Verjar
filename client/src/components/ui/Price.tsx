@@ -19,10 +19,10 @@ export function Price({
     <div className={cx('flex flex-wrap items-baseline gap-x-2 gap-y-1', className)}>
       <span
         className={cx(
-          'font-bold text-ink',
+          'font-display font-semibold text-ink',
           size === 'sm' && 'text-base',
           size === 'md' && 'text-lg',
-          size === 'lg' && 'text-3xl',
+          size === 'lg' && 'text-[2rem] leading-none',
         )}
       >
         {formatJOD(finalPrice)}
@@ -32,7 +32,9 @@ export function Price({
           <s className={cx('text-muted', size === 'lg' ? 'text-lg' : 'text-sm')} aria-label={`السعر قبل الخصم ${formatJOD(price)}`}>
             {formatJOD(price)}
           </s>
-          <span className="rounded-md bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-fg">خصم {discountPercent}%</span>
+          <span className="rounded-md bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-fg">
+            وفّر <span className="num">{discountPercent}%</span>
+          </span>
         </>
       )}
     </div>

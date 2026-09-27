@@ -8,3 +8,4 @@ export * from './Pagination';
 export * from './Price';
 export * from './StatusBadge';
 export * from './Stepper';
+export * from './Section';

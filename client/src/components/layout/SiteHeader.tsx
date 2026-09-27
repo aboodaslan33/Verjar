@@ -4,30 +4,51 @@ import { homeFor, useAuth } from '../../context/Auth';
 import { useCart } from '../../context/CartContext';
 import { useSite } from '../../context/SiteContext';
 import { useTheme } from '../../context/ThemeContext';
-import { cx } from '../../lib/format';
-import { Icon } from '../ui';
+import { cx, displayPhone } from '../../lib/format';
+import { Icon, type IconName } from '../ui';
 import { Logo } from './Logo';
 
 export const NAV = [
   { to: '/', label: 'الرئيسية', end: true },
-  { to: '/work', label: 'أعمالنا' },
   { to: '/bookings', label: 'الحجوزات' },
-  { to: '/corporate', label: 'عقود الشركات' },
   { to: '/store', label: 'السوق' },
+  { to: '/work', label: 'أعمالنا' },
+  { to: '/corporate', label: 'الشركات' },
   { to: '/about', label: 'من نحن' },
   { to: '/contact', label: 'تواصل' },
 ];
 
+/** عدّاد السلة — يقفز قليلًا عند كل إضافة */
+function CartCount({ count, className }: { count: number; className?: string }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      key={count}
+      className={cx(
+        'anim-bump absolute grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[11px] font-bold leading-none text-primary-fg ring-2 ring-bg',
+        className,
+      )}
+    >
+      <span className="num">{count > 99 ? '99+' : count}</span>
+    </span>
+  );
+}
+
+/**
+ * الهيدر:
+ * - سطح المكتب (xl): الشعار، القائمة، الحساب، السلة، والإجراء الرئيسي "احجز موعدًا"
+ * - الجوال والتابلت: الشعار وزر الحجز فقط، والتنقل في الشريط السفلي (MobileTabBar)
+ */
 export function SiteHeader() {
   const { settings } = useSite();
   const { count } = useCart();
   const { theme, toggle } = useTheme();
   const { user, loading: authLoading, logout } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => setMenu(false), [location.pathname]);
 
   // ظل خفيف للهيدر بعد بدء التمرير
   const [scrolled, setScrolled] = useState(false);
@@ -44,156 +65,324 @@ export function SiteHeader() {
   }
 
   return (
-    <header className={cx('sticky top-0 z-40 border-b bg-bg transition-[box-shadow,border-color] duration-300', scrolled ? 'border-line shadow-lift' : 'border-transparent')}>
-      {/* شريط التواصل العلوي */}
-      <div className="hidden bg-inverse text-inverse-fg/75 md:block">
-        <div className="container flex h-9 items-center justify-between text-[13px]">
-          <span>{settings.workingHoursText}</span>
-          <div className="flex items-center gap-5">
-            <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 hover:text-primary">
-              <Icon name="phone" className="h-3.5 w-3.5" />
-              <span className="ltr">{settings.phone}</span>
-            </a>
-            <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 hover:text-primary">
-              <Icon name="mail" className="h-3.5 w-3.5" />
-              <span className="ltr">{settings.email}</span>
-            </a>
+    <>
+      <header className={cx('sticky top-0 z-40 bg-bg/100 transition-shadow duration-300', scrolled ? 'shadow-[0_1px_0_rgb(var(--c-line)),0_10px_30px_-20px_rgb(var(--c-shadow)/0.35)]' : 'shadow-[0_1px_0_rgb(var(--c-line))]')}>
+        {/* شريط التواصل العلوي — فحمي كخلفية الشعار */}
+        <div className="hidden bg-inverse text-inverse-fg/70 lg:block">
+          <div className="container flex h-9 items-center justify-between text-[13px]">
+            <span className="flex items-center gap-2">
+              <Icon name="clock" className="h-3.5 w-3.5 text-primary" />
+              {settings.workingHoursText}
+            </span>
+            <div className="flex items-center gap-6">
+              <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 transition-colors hover:text-inverse-fg">
+                <Icon name="phone" className="h-3.5 w-3.5" />
+                <span className="ltr">{settings.phone}</span>
+              </a>
+              <a
+                href={`https://wa.me/${settings.whatsappNumber}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 transition-colors hover:text-inverse-fg"
+              >
+                <Icon name="whatsapp" className="h-3.5 w-3.5" />
+                <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
+              </a>
+              <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 transition-colors hover:text-inverse-fg">
+                <Icon name="mail" className="h-3.5 w-3.5" />
+                <span className="ltr">{settings.email}</span>
+              </a>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="container flex h-[4.5rem] items-center justify-between gap-4">
-        <Logo splashAnchor />
+        <div className="container flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
+          <Logo splashAnchor />
 
-        <nav className="hidden xl:block" aria-label="القائمة الرئيسية">
-          <ul className="flex items-center gap-0.5">
-            {NAV.map((n) => (
-              <li key={n.to}>
-                <NavLink
-                  to={n.to}
-                  end={n.end}
-                  className={({ isActive }) =>
-                    cx(
-                      'relative block px-3 py-2 text-[15px] font-medium transition-colors',
-                      'after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:origin-center after:rounded-full after:bg-primary after:transition-transform after:duration-300',
-                      isActive ? 'text-ink after:scale-x-100' : 'text-muted after:scale-x-0 hover:text-ink',
-                    )
-                  }
-                >
-                  {n.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+          <nav className="hidden xl:block" aria-label="القائمة الرئيسية">
+            <ul className="flex items-center">
+              {NAV.map((n) => (
+                <li key={n.to}>
+                  <NavLink
+                    to={n.to}
+                    end={n.end}
+                    className={({ isActive }) =>
+                      cx(
+                        'relative block px-3.5 py-2 text-[15px] font-medium transition-colors',
+                        'after:absolute after:inset-x-3.5 after:-bottom-[15px] after:h-[3px] after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-out',
+                        isActive ? 'text-ink after:scale-x-100' : 'text-muted after:scale-x-0 hover:text-ink',
+                      )
+                    }
+                  >
+                    {n.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
 
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={toggle}
-            className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink"
-            aria-label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}
-          >
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-          </button>
-          {authLoading ? (
-            <span className="hidden w-16 sm:block" aria-hidden />
-          ) : user ? (
-            <div className="hidden items-center sm:flex">
-              {user.role === 'CUSTOMER' && user.vendor && (
-                <Link to="/vendor" className="flex h-10 items-center rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-subtle">
-                  متجري
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggle}
+              className="grid h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-subtle hover:text-ink"
+              aria-label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            </button>
+
+            {/* الحساب والسلة — على الشاشات الكبيرة فقط (على الجوال في الشريط السفلي) */}
+            <div className="hidden items-center gap-1 lg:flex">
+              {authLoading ? (
+                <span className="w-24" aria-hidden />
+              ) : user ? (
+                <>
+                  {user.role === 'CUSTOMER' && user.vendor && (
+                    <Link to="/vendor" className="flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle">
+                      <Icon name="store" className="h-4 w-4 text-muted" /> متجري
+                    </Link>
+                  )}
+                  <Link
+                    to={homeFor(user)}
+                    className="flex h-10 max-w-[11rem] items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle"
+                    title={user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}
+                  >
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-bg">{user.name.slice(0, 1)}</span>
+                    <span className="truncate">{user.name}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="grid h-10 w-10 place-items-center rounded-lg text-muted transition-colors hover:bg-subtle hover:text-ink"
+                    aria-label="تسجيل الخروج"
+                    title="تسجيل الخروج"
+                  >
+                    <Icon name="logout" className="h-[18px] w-[18px]" />
+                  </button>
+                </>
+              ) : (
+                <Link to="/login" className="flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle">
+                  <Icon name="user" className="h-[18px] w-[18px] text-muted" /> دخول
                 </Link>
               )}
               <Link
-                to={homeFor(user)}
-                className="flex h-10 max-w-[10rem] items-center rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-subtle"
-                title={user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}
+                to="/cart"
+                className="relative grid h-10 w-10 place-items-center rounded-lg text-ink transition-colors hover:bg-subtle"
+                aria-label={`السلة (${count})`}
               >
-                <span className="truncate">{user.name}</span>
+                <Icon name="bag" />
+                <CartCount count={count} className="-top-0.5 end-0" />
               </Link>
-              <button type="button" onClick={onLogout} className="flex h-10 items-center rounded-lg px-2.5 text-sm text-muted hover:bg-subtle hover:text-ink">
-                خروج
-              </button>
             </div>
-          ) : (
-            <Link to="/login" className="hidden h-10 items-center rounded-lg px-3 text-sm font-medium text-ink hover:bg-subtle sm:flex">
-              دخول
+
+            <Link
+              to="/bookings"
+              className="ms-1 inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover active:translate-y-px"
+            >
+              <Icon name="calendar" className="hidden h-4 w-4 sm:block" />
+              احجز موعدًا
             </Link>
-          )}
-          <Link to="/cart" className="relative grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-ink" aria-label={`السلة (${count})`}>
-            <Icon name="cart" />
-            {count > 0 && (
-              <span className="absolute -top-0.5 end-0 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-fg">
-                {count}
-              </span>
-            )}
-          </Link>
-          <Link
-            to="/bookings"
-            className="ms-2 hidden h-10 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-fg transition-colors hover:bg-primary-hover sm:inline-flex"
-          >
-            احجز موعد
-          </Link>
-          <button
-            type="button"
-            className="grid h-10 w-10 place-items-center rounded-lg hover:bg-subtle xl:hidden"
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            aria-label="القائمة"
-            onClick={() => setOpen((v) => !v)}
-          >
-            <Icon name={open ? 'close' : 'menu'} />
+
+            {/* بين الجوال وسطح المكتب (1024–1279): قائمة كاملة */}
+            <button
+              type="button"
+              className="ms-1 hidden h-10 w-10 place-items-center rounded-lg transition-colors hover:bg-subtle lg:grid xl:hidden"
+              aria-expanded={menu}
+              aria-label="القائمة"
+              onClick={() => setMenu(true)}
+            >
+              <Icon name="menu" />
+            </button>
+          </div>
+        </div>
+      </header>
+      <MenuSheet open={menu} onClose={() => setMenu(false)} />
+    </>
+  );
+}
+
+type TabItem = { to: string; label: string; icon: IconName; end?: boolean; match?: (p: string) => boolean };
+
+const TABS: TabItem[] = [
+  { to: '/', label: 'الرئيسية', icon: 'home', end: true },
+  { to: '/bookings', label: 'احجز', icon: 'calendar', match: (p) => p.startsWith('/bookings') },
+  { to: '/store', label: 'السوق', icon: 'store', match: (p) => p.startsWith('/store') },
+  { to: '/cart', label: 'السلة', icon: 'bag', match: (p) => p.startsWith('/cart') || p.startsWith('/checkout') },
+];
+
+/**
+ * الشريط السفلي للجوال والتابلت: أهم أربع وجهات (الحجز والسوق والسلة) في متناول الإبهام،
+ * و"المزيد" يفتح بقية الصفحات والحساب.
+ */
+export function MobileTabBar() {
+  const { count } = useCart();
+  const { pathname } = useLocation();
+  const [more, setMore] = useState(false);
+  useEffect(() => setMore(false), [pathname]);
+  const inMore = ['/work', '/corporate', '/about', '/contact', '/account', '/login', '/register', '/vendor'].some((p) => pathname.startsWith(p));
+
+  const item = 'relative flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors';
+  return (
+    <>
+      <nav
+        aria-label="التنقل السريع"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-saturate-150 lg:hidden"
+      >
+        <ul className="mx-auto flex h-16 max-w-lg">
+          {TABS.map((t) => {
+            const active = t.match ? t.match(pathname) : pathname === t.to;
+            return (
+              <li key={t.to} className="flex flex-1">
+                <Link to={t.to} aria-current={active ? 'page' : undefined} className={cx(item, active ? 'text-ink' : 'text-muted')}>
+                  <span className={cx('absolute top-0 h-[3px] w-8 rounded-b-full bg-primary transition-transform duration-300 ease-out', active ? 'scale-x-100' : 'scale-x-0')} aria-hidden />
+                  <span className="relative">
+                    <Icon name={t.icon} className="h-[22px] w-[22px]" />
+                    {t.to === '/cart' && <CartCount count={count} className="-end-2.5 -top-1.5" />}
+                  </span>
+                  {t.label}
+                </Link>
+              </li>
+            );
+          })}
+          <li className="flex flex-1">
+            <button type="button" onClick={() => setMore(true)} aria-expanded={more} className={cx(item, inMore ? 'text-ink' : 'text-muted')}>
+              <span className={cx('absolute top-0 h-[3px] w-8 rounded-b-full bg-primary transition-transform duration-300', inMore ? 'scale-x-100' : 'scale-x-0')} aria-hidden />
+              <Icon name="grid" className="h-[22px] w-[22px]" />
+              المزيد
+            </button>
+          </li>
+        </ul>
+      </nav>
+      <MenuSheet open={more} onClose={() => setMore(false)} />
+    </>
+  );
+}
+
+/** ورقة القائمة الكاملة: الصفحات، الحساب، والتواصل */
+function MenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user, logout } = useAuth();
+  const { settings } = useSite();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  const link = 'flex min-h-[3.25rem] items-center justify-between gap-3 px-1 text-[16px] font-medium';
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="القائمة">
+      <div className="anim-fade absolute inset-0 bg-[rgb(20_20_21/0.5)]" onClick={onClose} aria-hidden />
+      <div className="anim-sheet absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto rounded-t-2xl bg-surface pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-overlay lg:inset-x-auto lg:end-4 lg:top-4 lg:bottom-auto lg:w-96 lg:rounded-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+          <Logo className="[&_svg]:h-8" />
+          <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-subtle" aria-label="إغلاق القائمة">
+            <Icon name="close" />
           </button>
         </div>
-      </div>
-
-      {open && (
-        <nav id="mobile-nav" className="animate-fade-up border-t border-line bg-bg xl:hidden" aria-label="القائمة">
-          <ul className="container space-y-1 py-3">
+        <nav className="px-5 pt-2" aria-label="كل الصفحات">
+          <ul className="divide-y divide-line">
             {NAV.map((n) => (
               <li key={n.to}>
-                <NavLink
-                  to={n.to}
-                  end={n.end}
-                  className={({ isActive }) =>
-                    cx('flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium', isActive ? 'bg-subtle text-ink before:h-5 before:w-0.5 before:rounded-full before:bg-primary' : 'text-muted hover:bg-subtle hover:text-ink')
-                  }
-                >
-                  {n.label}
+                <NavLink to={n.to} end={n.end} onClick={onClose} className={({ isActive }) => cx(link, isActive ? 'text-ink' : 'text-ink/80')}>
+                  {({ isActive }) => (
+                    <>
+                      <span className="flex items-center gap-3">
+                        <span className={cx('h-5 w-[3px] rounded-full', isActive ? 'bg-primary' : 'bg-transparent')} aria-hidden />
+                        {n.label}
+                      </span>
+                      <Icon name="chevronLeft" className="h-4 w-4 text-muted" />
+                    </>
+                  )}
                 </NavLink>
               </li>
             ))}
-            <li className="mt-2 border-t border-line pt-3">
-              {user ? (
-                <div className="flex items-center justify-between gap-3 px-4">
-                  <Link to={homeFor(user)} className="min-w-0 py-2 font-medium">
-                    <span className="block truncate">{user.name}</span>
-                    <span className="block text-sm text-muted">{user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}</span>
-                  </Link>
-                  {user.role === 'CUSTOMER' && user.vendor && (
-                    <Link to="/vendor" className="inline-flex h-11 shrink-0 items-center rounded-xl border border-line px-4 text-sm font-medium">
-                      متجري
-                    </Link>
-                  )}
-                  <button type="button" onClick={onLogout} className="h-11 shrink-0 rounded-xl border border-line px-4 text-sm font-medium">
-                    تسجيل الخروج
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <Link to="/login" className="flex h-12 items-center justify-center rounded-xl border border-line font-medium">
-                    تسجيل الدخول
-                  </Link>
-                  <Link to="/register" className="flex h-12 items-center justify-center rounded-xl border border-line font-medium">
-                    إنشاء حساب
-                  </Link>
-                </div>
-              )}
-            </li>
           </ul>
         </nav>
-      )}
-    </header>
+
+        <div className="mx-5 mt-4 rounded-xl bg-subtle p-4">
+          {user ? (
+            <>
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-ink font-bold text-bg">{user.name.slice(0, 1)}</span>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">{user.name}</span>
+                  <span className="text-sm text-muted">{user.role === 'CUSTOMER' ? 'حساب عميل' : 'حساب إدارة'}</span>
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link to={homeFor(user)} onClick={onClose} className="flex h-11 items-center justify-center rounded-lg bg-ink text-sm font-semibold text-bg">
+                  {user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}
+                </Link>
+                {user.role === 'CUSTOMER' && user.vendor ? (
+                  <Link to="/vendor" onClick={onClose} className="flex h-11 items-center justify-center rounded-lg border border-line-strong bg-surface text-sm font-semibold">
+                    متجري
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await logout();
+                      onClose();
+                      navigate('/', { replace: true });
+                    }}
+                    className="h-11 rounded-lg border border-line-strong bg-surface text-sm font-semibold"
+                  >
+                    تسجيل الخروج
+                  </button>
+                )}
+              </div>
+              {user.role === 'CUSTOMER' && user.vendor && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await logout();
+                    onClose();
+                    navigate('/', { replace: true });
+                  }}
+                  className="mt-3 w-full text-center text-sm text-muted underline-offset-4 hover:underline"
+                >
+                  تسجيل الخروج
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted">سجّل الدخول لمتابعة حجوزاتك وطلباتك.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link to="/login" onClick={onClose} className="flex h-11 items-center justify-center rounded-lg bg-ink text-sm font-semibold text-bg">
+                  تسجيل الدخول
+                </Link>
+                <Link to="/register" onClick={onClose} className="flex h-11 items-center justify-center rounded-lg border border-line-strong bg-surface text-sm font-semibold">
+                  حساب جديد
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="mx-5 mt-4 grid grid-cols-2 gap-2 text-sm">
+          <a href={`tel:${settings.phone}`} className="flex h-11 items-center justify-center gap-2 rounded-lg border border-line font-medium">
+            <Icon name="phone" className="h-4 w-4" /> اتصال
+          </a>
+          <a
+            href={`https://wa.me/${settings.whatsappNumber}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-11 items-center justify-center gap-2 rounded-lg bg-whatsapp font-medium text-white"
+          >
+            <Icon name="whatsapp" className="h-4 w-4" /> واتساب
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }

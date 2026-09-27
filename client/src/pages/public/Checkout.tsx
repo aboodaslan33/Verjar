@@ -1,7 +1,8 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
-import { Alert, Button, ButtonA, ButtonLink, EmptyState, Icon, Input, PageHeader, Textarea } from '../../components/ui';
+import { CheckoutHeader } from '../../components/store/CheckoutSteps';
+import { Alert, Button, ButtonA, ButtonLink, EmptyState, Icon, Input, SuccessMark, Textarea } from '../../components/ui';
 import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useCart } from '../../context/CartContext';
 import { ApiError, api } from '../../lib/api';
@@ -55,9 +56,10 @@ export default function Checkout() {
   if (cart.items.length === 0) {
     return (
       <>
-        <PageHeader title="إتمام الطلب" />
+        <CheckoutHeader title="إتمام الطلب" current={1} />
         <div className="container py-12">
           <EmptyState
+            icon="bag"
             title="السلة فارغة"
             description="أضف منتجات إلى السلة أولًا ثم أكمل الطلب."
             action={<ButtonLink to="/store">تصفح المتجر</ButtonLink>}
@@ -132,8 +134,8 @@ export default function Checkout() {
 
   return (
     <>
-      <PageHeader title="إتمام الطلب" description="اكتب بياناتك وعنوان التوصيل، ونتواصل معك لتأكيد الطلب." />
-      <div className="container grid gap-8 py-8 md:py-10 lg:grid-cols-12">
+      <CheckoutHeader title="بيانات التوصيل" current={1} description="نتواصل معك بعد الإرسال لتأكيد الطلب وموعد التوصيل." />
+      <div className="container grid gap-8 py-8 md:py-12 lg:grid-cols-12 lg:gap-12">
         <form onSubmit={submit} noValidate className="space-y-5 lg:col-span-7" aria-label="بيانات الطلب">
           {generalError && (
             <Alert tone="error" title="لم يُرسل الطلب">
@@ -143,7 +145,7 @@ export default function Checkout() {
               </Link>
             </Alert>
           )}
-          <div className="card space-y-5 p-5 sm:p-6">
+          <div className="space-y-5">
             <AccountNote what="الطلب" />
             <Input
               ref={(el) => (refs.current.name = el)}
@@ -211,10 +213,10 @@ export default function Checkout() {
         </form>
 
         <aside className="lg:col-span-5" aria-label="ملخص الطلب">
-          <div className="card p-5 lg:sticky lg:top-24">
+          <div className="rounded-xl bg-subtle p-5 sm:p-6 lg:sticky lg:top-32">
             <div className="flex items-center justify-between">
               <h2 className="text-lg">ملخص الطلب</h2>
-              <Link to="/cart" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
+              <Link to="/cart" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-ink underline-offset-4 hover:underline">
                 تعديل السلة
               </Link>
             </div>
@@ -222,7 +224,7 @@ export default function Checkout() {
               {cart.items.map((i) => (
                 <li key={i.productId} className="flex items-center gap-3 py-3">
                   <div className="w-14 shrink-0 overflow-hidden rounded-lg">
-                    <ProductImage src={i.image} alt="" />
+                    <ProductImage src={i.image} alt="" ratio="aspect-square" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{i.name}</p>
@@ -254,9 +256,9 @@ function Totals({ subtotal, discount, total }: { subtotal: number; discount: num
         <dt className="text-muted">الخصم</dt>
         <dd className={discount > 0 ? 'text-success' : undefined}>{discount > 0 ? `− ${formatJOD(discount)}` : formatJOD(0)}</dd>
       </div>
-      <div className="flex justify-between border-t border-line pt-2 text-lg font-bold">
-        <dt>الإجمالي</dt>
-        <dd>{formatJOD(total)}</dd>
+      <div className="flex items-baseline justify-between border-t border-line-strong pt-3">
+        <dt className="font-semibold">الإجمالي</dt>
+        <dd className="font-display text-2xl font-semibold">{formatJOD(total)}</dd>
       </div>
     </dl>
   );
@@ -265,23 +267,21 @@ function Totals({ subtotal, discount, total }: { subtotal: number; discount: num
 function Confirmation({ order }: { order: OrderCreated }) {
   useDocumentTitle(`تم استلام الطلب #${order.number}`);
   return (
+    <>
+    <CheckoutHeader title="تم استلام طلبك" current={2} />
     <div className="container max-w-2xl py-10 md:py-14">
       <div className="text-center">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-primary text-primary-fg">
-          <Icon name="check" className="h-8 w-8" />
-        </div>
-        <h1 className="mt-5 text-2xl md:text-3xl">تم استلام طلبك</h1>
-        <p className="mt-2 text-xl font-bold">
-          رقم الطلب <span className="ltr">#{order.number}</span>
-        </p>
+        <SuccessMark />
+        <p className="mt-5 text-muted">رقم الطلب</p>
+        <p className="num font-display text-4xl font-semibold">#{order.number}</p>
       </div>
 
       <div className="card mt-8 p-5 sm:p-6">
         <p className="text-sm text-muted">الرمز المرجعي</p>
-        <p className="ltr mt-1 select-all text-2xl font-bold tracking-wider">{order.ref}</p>
+        <p className="ltr mt-1 select-all font-display text-2xl font-semibold tracking-wider">{order.ref}</p>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           تجد الطلب وحالته في{' '}
-          <Link to="/account" className="font-semibold text-brand-700 underline dark:text-brand-200">
+          <Link to="/account" className="link">
             حسابك
           </Link>
           .
@@ -351,9 +351,10 @@ function Confirmation({ order }: { order: OrderCreated }) {
           متابعة الطلب من حسابي
         </ButtonLink>
         <ButtonLink to="/store" variant="ghost" size="lg" block>
-          العودة إلى المتجر
+          العودة إلى السوق
         </ButtonLink>
       </div>
     </div>
+    </>
   );
 }

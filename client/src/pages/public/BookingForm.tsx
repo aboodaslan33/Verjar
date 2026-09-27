@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { FilePicker } from '../../components/forms/FilePicker';
 import { ReviewSection, StepActions, StepHeading, SubmissionSuccess, YES_NO } from '../../components/forms/FormBits';
 import { LocationPicker } from '../../components/forms/LocationPicker';
@@ -16,7 +16,7 @@ import {
   toNum,
   useDraftSaver,
 } from '../../components/forms/formUtils';
-import { Alert, ButtonLink, ChoiceGroup, Input, Stepper, Textarea } from '../../components/ui';
+import { Alert, Breadcrumbs, ButtonLink, ChoiceGroup, Icon, Input, Stepper, Textarea } from '../../components/ui';
 import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useSite } from '../../context/SiteContext';
 import { ApiError, api, toFormData } from '../../lib/api';
@@ -50,7 +50,8 @@ const INTRO: Record<BookingType, string> = {
   GENERAL: 'اكتب ما تحتاجه باختصار وأرفق صورًا إن أمكن.',
 };
 
-const STEPS = ['التفاصيل', 'الموقع', 'الموعد', 'المراجعة'];
+// الخدمة ← الموعد ← البيانات ← المراجعة (ثم التأكيد)
+const STEPS = ['تفاصيل العمل', 'الموعد', 'بياناتك والموقع', 'المراجعة'];
 
 const STEP_KEYS: string[][] = [
   [
@@ -60,14 +61,14 @@ const STEP_KEYS: string[][] = [
     'workType', 'dimensions', 'quantity',
     'hasDesign', 'designFiles', 'photos',
   ],
-  ['name', 'phone', 'locationText', 'floor', 'lat'],
   ['time', 'notes'],
+  ['name', 'phone', 'locationText', 'floor', 'lat'],
   [],
 ];
 
 function stepOf(key: string): number {
-  if (key === 'date' || key === 'time') return 2;
-  if (key === 'lng') return 1;
+  if (key === 'date' || key === 'time') return 1;
+  if (key === 'lng') return 2;
   const i = STEP_KEYS.findIndex((ks) => ks.includes(key));
   return i === -1 ? 3 : i;
 }
@@ -379,7 +380,7 @@ function BookingWizard({ type }: { type: BookingType }) {
       setServerErrors({ time: e.message });
       setV((p) => ({ ...p, time: '' }));
       setSlotsReload((n) => n + 1);
-      goTo(2);
+      goTo(1);
       return;
     }
     if (e.field) {
@@ -417,21 +418,17 @@ function BookingWizard({ type }: { type: BookingType }) {
 
   return (
     <>
-      <header className="border-b border-line bg-surface">
-        <div className="container max-w-3xl py-7 md:py-10">
-          <Link to="/bookings" className="inline-flex min-h-[44px] items-center gap-1 text-sm text-muted hover:text-ink">
-            <span aria-hidden>→</span> كل أنواع الحجز
-          </Link>
-          <h1 className="text-2xl md:text-3xl">حجز {BOOKING_TYPE_LABEL[type]}</h1>
-          <p className="mt-2 text-muted">{INTRO[type]}</p>
+      <header className="border-b border-line bg-subtle">
+        <div className="container py-7 md:py-10">
+          <Breadcrumbs items={[{ to: '/bookings', label: 'الحجوزات' }, { label: BOOKING_TYPE_LABEL[type] }]} className="mb-4" />
+          <h1 className="text-[1.75rem] md:text-[2.25rem]">حجز {BOOKING_TYPE_LABEL[type]}</h1>
+          <p className="mt-2 max-w-2xl text-muted">{INTRO[type]}</p>
         </div>
       </header>
 
-      <div className="container max-w-3xl py-8 md:py-10">
-        <Stepper steps={STEPS} current={step} />
-        <p className="-mt-5 mb-6 text-sm text-muted sm:hidden">
-          الخطوة <span className="ltr">{step + 1}</span> من <span className="ltr">{STEPS.length}</span>: {STEPS[step]}
-        </p>
+      <div className="container grid gap-10 py-8 md:py-12 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+        <Stepper steps={STEPS} current={step} onStep={(i) => goTo(i)} />
 
         {showRestored && step === 0 && (
           <Alert tone="info" className="mb-6" title="استرجعنا ما كتبته سابقًا">
@@ -453,6 +450,7 @@ function BookingWizard({ type }: { type: BookingType }) {
         )}
 
         <div ref={formRef} className="card p-4 sm:p-6 md:p-8">
+          <div key={step} className="anim-step">
           <form
             noValidate
             onSubmit={(e) => {
@@ -710,8 +708,8 @@ function BookingWizard({ type }: { type: BookingType }) {
               </div>
             )}
 
-            {/* ── الخطوة 2: الموقع ── */}
-            {step === 1 && (
+            {/* ── الخطوة 3: البيانات والموقع ── */}
+            {step === 2 && (
               <div className="space-y-5">
                 <StepHeading stepKey={step} title="بياناتك وموقع العمل" description="نستخدم الرقم للتواصل وتأكيد الموعد فقط." />
                 <AccountNote />
@@ -769,8 +767,8 @@ function BookingWizard({ type }: { type: BookingType }) {
               </div>
             )}
 
-            {/* ── الخطوة 3: الموعد ── */}
-            {step === 2 && (
+            {/* ── الخطوة 2: الموعد ── */}
+            {step === 1 && (
               <div className="space-y-6">
                 <StepHeading stepKey={step} title="اختر موعد الزيارة" description="اختر اليوم ثم الساعة المناسبة من الأوقات المتاحة." />
                 {serverErrors.time && (
@@ -826,7 +824,7 @@ function BookingWizard({ type }: { type: BookingType }) {
                 />
                 <ReviewSection
                   title="بياناتك والموقع"
-                  onEdit={() => goTo(1)}
+                  onEdit={() => goTo(2)}
                   rows={[
                     ['الاسم', v.name],
                     ['الهاتف', <span className="ltr">{v.phone}</span>],
@@ -846,7 +844,7 @@ function BookingWizard({ type }: { type: BookingType }) {
                 />
                 <ReviewSection
                   title="الموعد"
-                  onEdit={() => goTo(2)}
+                  onEdit={() => goTo(1)}
                   rows={[
                     ['اليوم', v.date ? longDate(v.date) : ''],
                     ['الساعة', v.time ? formatSlot(v.time) : ''],
@@ -880,9 +878,47 @@ function BookingWizard({ type }: { type: BookingType }) {
               loading={submitting}
             />
           </form>
+          </div>
         </div>
+        </div>
+
+        <aside className="hidden lg:col-span-4 lg:block" aria-label="ملخص الحجز">
+          <div className="sticky top-32 rounded-xl bg-subtle p-6">
+            <p className="text-xs font-semibold tracking-wide text-muted">ملخص الحجز</p>
+            <p className="mt-2 font-display text-xl font-semibold">{BOOKING_TYPE_LABEL[type]}</p>
+            <dl className="mt-5 divide-y divide-line border-y border-line text-[15px]">
+              <SummaryLine label="الموعد" value={v.date && v.time ? `${longDate(v.date)} — ${formatSlot(v.time)}` : v.date ? longDate(v.date) : null} />
+              <SummaryLine label="الموقع" value={v.locationText || null} />
+              {type === 'INSPECTION' && <SummaryLine label="التصنيف" value={URGENCY_AR[v.urgency]} />}
+            </dl>
+            <div className="mt-5 flex items-baseline justify-between">
+              <span className="text-sm text-muted">{fee != null ? 'رسوم الكشف' : 'السعر'}</span>
+              <span className="font-display text-2xl font-semibold">{fee != null ? formatJOD(fee) : 'بعد الزيارة'}</span>
+            </div>
+            <ul className="mt-6 space-y-2.5 text-sm text-muted">
+              <li className="flex gap-2.5">
+                <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent" /> سعر العمل مكتوب قبل البدء
+              </li>
+              <li className="flex gap-2.5">
+                <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent" /> تأكيد الموعد بالهاتف أو واتساب
+              </li>
+              <li className="flex gap-2.5">
+                <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent" /> تتابع كل شيء من صفحتك
+              </li>
+            </ul>
+          </div>
+        </aside>
       </div>
     </>
+  );
+}
+
+function SummaryLine({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex justify-between gap-4 py-3">
+      <dt className="shrink-0 text-muted">{label}</dt>
+      <dd className={value ? 'text-end font-medium' : 'text-end text-muted/70'}>{value ?? '—'}</dd>
+    </div>
   );
 }
 

@@ -1,30 +1,33 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEnsureCustomer } from '../auth/RequireCustomer';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
-import { cx } from '../../lib/format';
+import { cx, formatJOD } from '../../lib/format';
 import type { Product } from '../../lib/types';
-import { Button, Icon, Price, Skeleton } from '../ui';
+import { Icon, Skeleton } from '../ui';
 
 /** أول صورة للمنتج (أو null) */
 export function productImage(p: Pick<Product, 'media'>): string | null {
   return p.media.find((m) => m.kind === 'IMAGE')?.url ?? null;
 }
 
-/** صورة المنتج بنسبة ثابتة 4:3 — أو بديل هادئ إن لم توجد صورة */
+/** صورة المنتج بنسبة ثابتة — أو بديل هادئ إن لم توجد صورة */
 export function ProductImage({
   src,
   alt,
   className,
   eager,
+  ratio = 'aspect-[4/3]',
 }: {
   src: string | null;
   alt: string;
   className?: string;
   eager?: boolean;
+  ratio?: string;
 }) {
   return (
-    <div className={cx('relative aspect-[4/3] overflow-hidden bg-subtle', className)}>
+    <div className={cx('relative overflow-hidden bg-subtle', ratio, className)}>
       {src ? (
         <img
           src={src}
@@ -33,12 +36,12 @@ export function ProductImage({
           height={600}
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
-          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          className="h-full w-full object-cover"
         />
       ) : (
         <div className="absolute inset-0 grid place-items-center text-muted" role="img" aria-label={`${alt} — لا توجد صورة`}>
           <div className="flex flex-col items-center gap-2">
-            <span className="block h-px w-12 bg-sand-400" aria-hidden />
+            <Icon name="image" className="h-6 w-6 opacity-60" />
             <span className="text-xs">لا توجد صورة</span>
           </div>
         </div>
@@ -47,70 +50,127 @@ export function ProductImage({
   );
 }
 
+/**
+ * بطاقة المنتج:
+ * - الصورة هي البطل (4:5)، والصورة الثانية تظهر عند المرور إن وُجدت
+ * - الشارات: الخصم، الكمية القليلة، النفاد
+ * - زر إضافة سريع على الصورة يتحول لعلامة صح بعد الإضافة
+ * - تحت الصورة: القسم/المتجر، الاسم، والسعر — بدون إطار بطاقة
+ */
 export function ProductCard({ product, headingLevel = 3 }: { product: Product; headingLevel?: 2 | 3 }) {
   const { add } = useCart();
   const ensureCustomer = useEnsureCustomer();
   const { toast } = useToast();
+  const [added, setAdded] = useState(false);
   const out = product.stock <= 0;
+  const low = !out && product.stock <= 3;
   const H = headingLevel === 2 ? 'h2' : 'h3';
+  const images = product.media.filter((m) => m.kind === 'IMAGE');
+  const hasDiscount = product.discountPercent > 0 && product.finalPrice < product.price;
+  const href = `/store/${product.slug}`;
+
+  useEffect(() => {
+    if (!added) return;
+    const t = window.setTimeout(() => setAdded(false), 1400);
+    return () => window.clearTimeout(t);
+  }, [added]);
+
+  const onAdd = () => {
+    if (!ensureCustomer()) return;
+    add(product, 1);
+    setAdded(true);
+    toast(`أُضيف «${product.name}» إلى السلة`);
+  };
 
   return (
-    <article className="card lift group flex flex-col overflow-hidden">
-      <Link to={`/store/${product.slug}`} className="relative block" tabIndex={-1} aria-hidden>
-        <ProductImage
-          src={productImage(product)}
-          alt=""
-          className="transition-opacity group-hover:opacity-95"
-        />
-        {product.discountPercent > 0 && (
-          <span className="absolute start-2 top-2 rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-fg">
-            خصم <span className="ltr">{product.discountPercent}%</span>
-          </span>
+    <article className="group relative flex flex-col">
+      <div className="relative overflow-hidden rounded-xl bg-subtle">
+        <Link to={href} tabIndex={-1} aria-hidden className="block">
+          <div className="relative aspect-[4/5]">
+            {images[0] ? (
+              <>
+                <img
+                  src={images[0].url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className={cx(
+                    'absolute inset-0 h-full w-full object-cover transition-[transform,opacity] duration-700 ease-out group-hover:scale-[1.04] motion-reduce:transition-none',
+                    images[1] && 'group-hover:opacity-0',
+                    out && 'opacity-60 grayscale-[40%]',
+                  )}
+                />
+                {images[1] && (
+                  <img
+                    src={images[1].url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  />
+                )}
+              </>
+            ) : (
+              <span className="absolute inset-0 grid place-items-center text-muted">
+                <Icon name="image" className="h-7 w-7 opacity-50" />
+              </span>
+            )}
+          </div>
+        </Link>
+
+        <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
+          {hasDiscount ? (
+            <span className="rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-fg">
+              <span className="num">−{product.discountPercent}%</span>
+            </span>
+          ) : (
+            <span />
+          )}
+          {out ? (
+            <span className="rounded-md bg-surface/95 px-2 py-0.5 text-xs font-semibold text-muted">نفد</span>
+          ) : low ? (
+            <span className="rounded-md bg-ink px-2 py-0.5 text-xs font-semibold text-bg">
+              بقي <span className="num">{product.stock}</span>
+            </span>
+          ) : null}
+        </div>
+
+        {!out && (
+          <button
+            type="button"
+            onClick={onAdd}
+            aria-label={added ? `تمت إضافة ${product.name}` : `أضف ${product.name} للسلة`}
+            className={cx(
+              'absolute bottom-2.5 end-2.5 z-10 grid h-11 w-11 place-items-center rounded-full shadow-lift transition-all duration-300 ease-out active:scale-90',
+              added ? 'bg-primary text-primary-fg' : 'bg-surface text-ink hover:bg-ink hover:text-bg',
+              'md:translate-y-2 md:opacity-0 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100 md:group-hover:translate-y-0 md:group-hover:opacity-100',
+              added && 'md:translate-y-0 md:opacity-100',
+            )}
+          >
+            <span key={String(added)} className="anim-fade">
+              <Icon name={added ? 'check' : 'plus'} className="h-5 w-5" />
+            </span>
+          </button>
         )}
-        {out && (
-          <span className="absolute end-2 top-2 rounded-md bg-surface/90 px-2 py-0.5 text-xs font-semibold text-muted">
-            نفد المخزون
-          </span>
-        )}
-      </Link>
-      <div className="flex flex-1 flex-col p-3 sm:p-4">
+      </div>
+
+      <div className="flex flex-1 flex-col pt-3">
         <p className="line-clamp-1 text-xs text-muted">
-          {product.category.name}
-          {product.vendor && !product.vendor.isHouse && <> · {product.vendor.name}</>}
+          {product.vendor && !product.vendor.isHouse ? product.vendor.name : product.category.name}
         </p>
-        <H className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug sm:text-base">
-          <Link to={`/store/${product.slug}`} className="hover:text-brand-700 dark:hover:text-brand-200">
+        <H className="mt-1 line-clamp-2 font-sans text-[15px] font-semibold leading-snug text-ink">
+          <Link to={href} className="after:absolute after:inset-0 after:content-[''] hover:underline hover:underline-offset-4">
             {product.name}
           </Link>
         </H>
-        <Price
-          price={product.price}
-          finalPrice={product.finalPrice}
-          discountPercent={product.discountPercent}
-          size="sm"
-          className="mt-2"
-        />
-        <div className="mt-auto pt-3">
-          <Button
-            variant={out ? 'outline' : 'primary'}
-            block
-            disabled={out}
-            className="min-h-[44px] text-sm"
-            onClick={() => {
-              if (!ensureCustomer()) return;
-              add(product, 1);
-              toast(`أُضيف "${product.name}" إلى السلة`);
-            }}
-          >
-            {out ? (
-              'نفد المخزون'
-            ) : (
-              <>
-                <Icon name="cart" className="h-4 w-4" /> أضف للسلة
-              </>
-            )}
-          </Button>
-        </div>
+        <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <span className="font-display text-[17px] font-semibold text-ink">{formatJOD(product.finalPrice)}</span>
+          {hasDiscount && (
+            <s className="text-sm text-muted" aria-label={`قبل الخصم ${formatJOD(product.price)}`}>
+              {formatJOD(product.price)}
+            </s>
+          )}
+        </p>
       </div>
     </article>
   );
@@ -118,13 +178,12 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
 
 export function ProductCardSkeleton() {
   return (
-    <div className="card overflow-hidden" aria-hidden>
-      <Skeleton className="aspect-[4/3] rounded-none" />
-      <div className="space-y-2 p-3 sm:p-4">
+    <div aria-hidden>
+      <Skeleton className="aspect-[4/5] rounded-xl" />
+      <div className="space-y-2 pt-3">
         <Skeleton className="h-3 w-1/3" />
         <Skeleton className="h-4 w-4/5" />
-        <Skeleton className="h-5 w-1/2" />
-        <Skeleton className="mt-3 h-11 w-full rounded-xl" />
+        <Skeleton className="h-5 w-1/3" />
       </div>
     </div>
   );
@@ -140,4 +199,4 @@ export function ProductGridSkeleton({ count = 8, className }: { count?: number; 
   );
 }
 
-export const PRODUCT_GRID = 'grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4';
+export const PRODUCT_GRID = 'grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 md:grid-cols-3 lg:grid-cols-4';

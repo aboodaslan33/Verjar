@@ -54,7 +54,7 @@ function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNaviga
     <nav aria-label="قائمة لوحة التحكم" className="flex-1 overflow-y-auto px-3 py-4">
       {NAV.map((g, gi) => (
         <div key={gi} className={cx(gi > 0 && 'mt-5')}>
-          {g.group && <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wide text-muted">{g.group}</p>}
+          {g.group && <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wide text-inverse-fg/40">{g.group}</p>}
           <ul className="space-y-0.5">
             {g.items.map((n) => {
               const count = stats && n.badge ? n.badge(stats) : 0;
@@ -66,27 +66,16 @@ function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNaviga
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cx(
-                        'flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[15px] transition-colors',
+                        'relative flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[15px] transition-colors',
                         isActive
-                          ? 'bg-primary font-semibold text-primary-fg'
-                          : 'text-ink/85 hover:bg-subtle hover:text-ink',
+                          ? 'bg-inverse-2 font-semibold text-inverse-fg before:absolute before:inset-y-2 before:start-0 before:w-[3px] before:rounded-full before:bg-primary'
+                          : 'text-inverse-fg/70 hover:bg-inverse-2/60 hover:text-inverse-fg',
                       )
                     }
                   >
-                    {({ isActive }) => (
-                      <>
-                        <span>{n.label}</span>
-                        {count > 0 && (
-                          <span
-                            className={cx(
-                              'min-w-[1.5rem] rounded-full px-1.5 text-center text-xs font-bold tabular-nums',
-                              isActive ? 'bg-primary-fg/15 text-primary-fg' : 'bg-subtle text-ink',
-                            )}
-                          >
-                            {count}
-                          </span>
-                        )}
-                      </>
+                    <span>{n.label}</span>
+                    {count > 0 && (
+                      <span className="min-w-[1.5rem] rounded-full bg-primary px-1.5 text-center text-xs font-bold tabular-nums text-primary-fg">{count}</span>
                     )}
                   </NavLink>
                 </li>
@@ -125,11 +114,11 @@ function Shell() {
   };
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-subtle/50">
       {/* الشريط الجانبي — سطح المكتب (يمين الشاشة في RTL) */}
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col border-e border-line bg-surface lg:flex">
-        <div className="flex h-16 items-center border-b border-line px-5">
-          <Logo to="/admin" />
+      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col bg-inverse lg:flex">
+        <div className="flex h-16 items-center border-b border-inverse-fg/10 px-5">
+          <Logo to="/admin" light className="[&_svg]:h-9" />
         </div>
         <Sidebar stats={stats} />
       </aside>
@@ -138,10 +127,10 @@ function Shell() {
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="القائمة">
           <div className="absolute inset-0 bg-black/45" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] animate-fade-up flex-col bg-surface shadow-lift">
-            <div className="flex h-16 items-center justify-between border-b border-line px-4">
-              <Logo to="/admin" />
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-muted hover:bg-subtle" aria-label="إغلاق القائمة">
+          <aside className="anim-fade absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col bg-inverse shadow-overlay">
+            <div className="flex h-16 items-center justify-between border-b border-inverse-fg/10 px-4">
+              <Logo to="/admin" light className="[&_svg]:h-9" />
+              <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-inverse-fg/70 hover:bg-inverse-2" aria-label="إغلاق القائمة">
                 <Icon name="close" />
               </button>
             </div>

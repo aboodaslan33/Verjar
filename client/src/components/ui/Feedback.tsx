@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { cx } from '../../lib/format';
 import { Button } from './Button';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 
 /** كتلة هيكلية أثناء التحميل */
 export function Skeleton({ className }: { className?: string }) {
@@ -11,51 +11,58 @@ export function Skeleton({ className }: { className?: string }) {
 /** هيكل تحميل لقائمة/جدول */
 export function SkeletonRows({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="space-y-3" role="status" aria-label="جاري التحميل">
+    <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface" role="status" aria-label="جاري التحميل">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 rounded-xl border border-line bg-surface p-4">
+        <div key={i} className="flex items-center gap-4 px-4 py-3.5">
           <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-3.5 w-2/5" />
             <Skeleton className="h-3 w-3/5" />
           </div>
-          <Skeleton className="hidden h-7 w-20 rounded-full sm:block" />
+          <Skeleton className="hidden h-6 w-20 rounded-full sm:block" />
         </div>
       ))}
     </div>
   );
 }
 
+/** حالة فارغة: رسم خطي بسيط (خط القياس من الشعار) بدل أيقونة كبيرة */
 export function EmptyState({
   title,
   description,
   action,
   className,
+  icon = 'search',
 }: {
   title: string;
   description?: ReactNode;
   action?: ReactNode;
   className?: string;
+  icon?: IconName;
 }) {
   return (
-    <div className={cx('rounded-2xl border border-dashed border-line bg-surface/60 px-6 py-12 text-center', className)}>
-      <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-subtle">
-        <span className="block h-3 w-3 rounded-sm bg-sand-400" />
+    <div className={cx('rounded-xl border border-dashed border-line-strong px-6 py-14 text-center anim-fade', className)}>
+      <div className="mx-auto mb-5 flex w-fit flex-col items-center gap-2 text-muted" aria-hidden>
+        <Icon name={icon} className="h-6 w-6" />
+        <span className="block h-[3px] w-8 rounded-full bg-primary" />
       </div>
-      <h3 className="text-lg font-semibold">{title}</h3>
-      {description && <p className="mx-auto mt-1.5 max-w-md text-muted">{description}</p>}
-      {action && <div className="mt-5 flex justify-center">{action}</div>}
+      <h3 className="text-lg">{title}</h3>
+      {description && <p className="mx-auto mt-1.5 max-w-md text-[15px] text-muted">{description}</p>}
+      {action && <div className="mt-6 flex justify-center">{action}</div>}
     </div>
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, title = 'تعذّر التحميل' }: { message: string; onRetry?: () => void; title?: string }) {
   return (
-    <div className="rounded-2xl border border-danger/30 bg-danger/5 px-6 py-10 text-center" role="alert">
-      <Icon name="alert" className="mx-auto mb-3 h-8 w-8 text-danger" />
-      <p className="font-medium text-ink">{message}</p>
+    <div className="rounded-xl border border-danger/25 bg-danger/[0.04] px-6 py-10 text-center anim-fade" role="alert">
+      <span className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-danger/10 text-danger">
+        <Icon name="alert" className="h-5 w-5" />
+      </span>
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-[15px] text-muted">{message}</p>
       {onRetry && (
-        <Button variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+        <Button variant="outline" size="sm" className="mt-5" onClick={onRetry}>
           <Icon name="refresh" className="h-4 w-4" /> إعادة المحاولة
         </Button>
       )}
@@ -63,6 +70,9 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
+const ALERT_ICON: Record<'info' | 'warn' | 'error' | 'success', IconName> = { info: 'info', warn: 'alert', error: 'alert', success: 'check' };
+
+/** تنبيه داخل الصفحة: شريط لوني جانبي + أيقونة، بدون خلفيات صارخة */
 export function Alert({
   tone = 'info',
   title,
@@ -78,17 +88,43 @@ export function Alert({
     <div
       role={tone === 'error' ? 'alert' : undefined}
       className={cx(
-        'rounded-xl border px-4 py-3 text-[15px]',
-        tone === 'info' && 'border-sand-300 bg-sand-50 text-ink dark:border-sand-700 dark:bg-sand-700/15',
-        tone === 'warn' && 'border-warn/40 bg-warn/10 text-ink',
-        tone === 'error' && 'border-danger/40 bg-danger/10 text-ink',
-        tone === 'success' && 'border-success/40 bg-success/10 text-ink',
+        'flex gap-3 rounded-lg border border-s-[3px] bg-surface px-4 py-3 text-[15px] anim-fade',
+        tone === 'info' && 'border-line border-s-ink',
+        tone === 'warn' && 'border-warn/30 border-s-warn bg-warn/[0.05]',
+        tone === 'error' && 'border-danger/30 border-s-danger bg-danger/[0.04]',
+        tone === 'success' && 'border-success/30 border-s-success bg-success/[0.05]',
         className,
       )}
     >
-      {title && <p className="font-semibold">{title}</p>}
-      {children && <div className={cx(title && 'mt-0.5', 'text-muted')}>{children}</div>}
+      <Icon
+        name={ALERT_ICON[tone]}
+        className={cx(
+          'mt-0.5 h-5 w-5 shrink-0',
+          tone === 'info' && 'text-ink',
+          tone === 'warn' && 'text-warn',
+          tone === 'error' && 'text-danger',
+          tone === 'success' && 'text-success',
+        )}
+      />
+      <div className="min-w-0 flex-1">
+        {title && <p className="font-semibold text-ink">{title}</p>}
+        {children && <div className={cx(title && 'mt-0.5', 'text-muted')}>{children}</div>}
+      </div>
     </div>
+  );
+}
+
+/** علامة نجاح متحركة (دائرة ثم صح) لشاشات التأكيد */
+export function SuccessMark({ className }: { className?: string }) {
+  return (
+    <span className={cx('relative inline-grid h-16 w-16 place-items-center', className)} aria-hidden>
+      <span className="success-ring absolute inset-0 rounded-full bg-primary/40" />
+      <span className="absolute inset-0 rounded-full bg-primary" />
+      <svg viewBox="0 0 52 52" className="success-mark relative h-16 w-16 text-primary-fg" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="26" cy="26" r="24" strokeOpacity="0.25" />
+        <path d="M16 27l7 7 13-15" />
+      </svg>
+    </span>
   );
 }
 
@@ -96,11 +132,12 @@ export function Alert({
 export function PageLoader() {
   return (
     <div className="container py-16" role="status" aria-label="جاري التحميل">
-      <Skeleton className="mb-4 h-8 w-1/3" />
-      <Skeleton className="mb-8 h-4 w-1/2" />
+      <Skeleton className="mb-3 h-3 w-24" />
+      <Skeleton className="mb-4 h-9 w-2/5" />
+      <Skeleton className="mb-10 h-4 w-1/2" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 rounded-2xl" />
+          <Skeleton key={i} className="h-48 rounded-xl" />
         ))}
       </div>
     </div>

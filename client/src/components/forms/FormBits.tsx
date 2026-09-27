@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { WhatsAppResult } from '../../lib/types';
-import { Button, ButtonA, ButtonLink, Icon } from '../ui';
+import { Button, ButtonA, ButtonLink, Icon, SuccessMark } from '../ui';
 
 /** شريط أزرار التنقل بين الخطوات — ثابت أسفل الشاشة على الجوال */
 export function StepActions({
@@ -18,7 +18,10 @@ export function StepActions({
   backLabel?: string;
 }) {
   return (
-    <div className="sticky bottom-0 z-40 -mx-4 mt-8 border-t border-line bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-2">
+    <div
+      className="sticky z-30 -mx-4 mt-8 border-t border-line bg-surface px-4 py-3 sm:-mx-6 sm:px-6 md:-mx-8 md:px-8 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-2"
+      style={{ bottom: 'var(--tabbar-h)' }}
+    >
       <div className="flex gap-2 sm:justify-between">
         {onBack ? (
           <Button variant="outline" size="lg" onClick={onBack} disabled={loading} className="shrink-0 px-4 sm:px-6">
@@ -50,7 +53,7 @@ export function StepHeading({ title, description, stepKey }: { title: string; de
   }, [stepKey]);
   return (
     <div className="mb-6">
-      <h2 ref={ref} tabIndex={-1} className="text-xl outline-none md:text-2xl">
+      <h2 ref={ref} tabIndex={-1} className="text-xl outline-none md:text-[1.625rem]">
         {title}
       </h2>
       {description && <p className="mt-1 text-muted">{description}</p>}
@@ -62,11 +65,11 @@ export function StepHeading({ title, description, stepKey }: { title: string; de
 export function ReviewSection({ title, onEdit, rows }: { title: string; onEdit?: () => void; rows: [string, ReactNode][] }) {
   const visible = rows.filter(([, v]) => v !== null && v !== undefined && v !== '');
   return (
-    <section className="rounded-xl border border-line">
-      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+    <section className="overflow-hidden rounded-lg border border-line">
+      <div className="flex items-center justify-between border-b border-line bg-subtle/60 px-4 py-1.5">
         <h3 className="text-base">{title}</h3>
         {onEdit && (
-          <button type="button" onClick={onEdit} className="min-h-[44px] rounded-lg px-2 text-sm font-medium text-brand-700 hover:underline dark:text-brand-200">
+          <button type="button" onClick={onEdit} className="min-h-[44px] rounded-lg px-2 text-sm font-semibold text-ink underline-offset-4 hover:underline">
             تعديل
           </button>
         )}
@@ -110,34 +113,34 @@ export function SubmissionSuccess({
   }, []);
 
   return (
-    <div className="container max-w-2xl py-10 md:py-14">
-      <div className="card animate-fade-up overflow-hidden">
-        <div className="border-b border-line bg-subtle px-6 py-8 text-center">
-          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-fg ring-4 ring-brand-100 dark:ring-brand-500/20">
-            <Icon name="check" className="h-7 w-7" />
-          </span>
-          <h1 ref={ref} tabIndex={-1} className="text-2xl text-ink outline-none md:text-3xl">
+    <div className="container max-w-2xl py-10 md:py-16">
+      <div className="anim-rise overflow-hidden rounded-xl border border-line bg-surface">
+        {/* رأس فحمي كالشعار */}
+        <div className="bg-inverse px-6 pb-8 pt-10 text-center text-inverse-fg">
+          <SuccessMark />
+          <h1 ref={ref} tabIndex={-1} className="mt-5 text-2xl text-inverse-fg outline-none md:text-[2rem]">
             {title}
           </h1>
-          <p className="mt-2 text-lg text-muted">
-            رقم {noun} <span className="ltr font-bold">#{number}</span>
+          <p className="mt-2 text-inverse-fg/65">
+            رقم {noun} <span className="num font-display text-lg font-semibold text-inverse-fg">#{number}</span>
           </p>
+        </div>
+
+        {/* قسيمة المرجع */}
+        <div className="relative flex items-center justify-between gap-4 border-b border-dashed border-line-strong px-6 py-5">
+          <span className="absolute -start-3 -top-3 h-6 w-6 rounded-full bg-bg" aria-hidden />
+          <span className="absolute -end-3 -top-3 h-6 w-6 rounded-full bg-bg" aria-hidden />
+          <div>
+            <p className="text-xs text-muted">رقم المرجع</p>
+            <p className="ltr mt-0.5 select-all font-display text-2xl font-semibold tracking-wider text-ink">{refCode}</p>
+          </div>
+          <Link to="/account" className="text-sm font-semibold text-ink underline-offset-4 hover:underline">
+            تابعه من حسابك
+          </Link>
         </div>
 
         <div className="space-y-5 p-5 md:p-7">
           {intro}
-
-          <div className="rounded-xl bg-sand-50 p-4 dark:bg-sand-700/15">
-            <p className="text-sm text-muted">رقم المرجع</p>
-            <p className="ltr mt-0.5 text-2xl font-bold tracking-wider text-ink">{refCode}</p>
-            <p className="mt-2 text-sm text-muted">
-              تجده مع الحالة وعروض الأسعار والدفعات في{' '}
-              <Link to="/account" className="font-medium text-brand-700 underline underline-offset-4 dark:text-brand-200">
-                حسابك
-              </Link>
-              .
-            </p>
-          </div>
 
           {children}
 

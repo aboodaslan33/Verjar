@@ -51,42 +51,41 @@ export default function Bookings() {
       />
 
       <div className="container py-10 md:py-14">
-        <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
-          <ul className="grid gap-3 sm:grid-cols-2" data-reveal-group>
+        <div className="grid gap-10 lg:grid-cols-[1fr_21rem] lg:gap-14">
+          <ul className="border-t border-line" data-reveal-group>
             {TYPES.map(({ type, text, needs }, i) => (
-              <li key={type} className={i === 0 ? 'sm:col-span-2' : undefined}>
+              <li key={type} className="border-b border-line">
                 <Link
                   to={`/bookings/${BOOKING_TYPE_SLUG[type]}`}
-                  className="lift group flex h-full flex-col rounded-2xl border border-line bg-surface p-5 shadow-card hover:border-brand-400 md:p-6"
+                  className="group grid grid-cols-[2.5rem_1fr_auto] items-start gap-4 py-7 md:grid-cols-[3.5rem_1fr_auto]"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className="text-sm font-semibold text-sand-600 dark:text-sand-300">
-                        <span className="ltr">{String(i + 1).padStart(2, '0')}</span>
-                      </span>
-                      <h2 className="mt-1 text-xl">{BOOKING_TYPE_LABEL[type]}</h2>
-                    </div>
-                    {(type === 'INSPECTION' || type === 'PAINTING') && (
-                      <span className="shrink-0 rounded-lg border border-line bg-subtle px-2.5 py-1 text-sm font-semibold text-ink">
-                        كشف من {formatJOD(type === 'INSPECTION' ? settings.inspectionFeeNormal : settings.paintingFeeInside)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 flex-1 text-muted">{text}</p>
-                  <p className="mt-4 text-sm text-muted">
-                    <span className="font-medium text-ink">تحتاج:</span> {needs}
-                  </p>
-                  <span className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 self-start font-semibold text-brand-700 group-hover:gap-2.5 dark:text-brand-200">
-                    ابدأ الحجز
-                    <Icon name="chevronLeft" className="h-4 w-4 transition-all" />
+                  <span className="num pt-1.5 text-sm font-semibold text-muted transition-colors group-hover:text-accent">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-display text-xl font-semibold md:text-2xl">{BOOKING_TYPE_LABEL[type]}</span>
+                      {(type === 'INSPECTION' || type === 'PAINTING') && (
+                        <span className="rounded-md bg-subtle px-2 py-0.5 text-xs font-semibold text-ink">
+                          كشف من {formatJOD(type === 'INSPECTION' ? settings.inspectionFeeNormal : settings.paintingFeeInside)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-2 block max-w-xl text-[15px] leading-relaxed text-muted">{text}</span>
+                    <span className="mt-3 block text-sm text-muted">
+                      <span className="font-medium text-ink">تحتاج:</span> {needs}
+                    </span>
+                  </span>
+                  <span className="mt-1 grid h-11 w-11 place-items-center rounded-full border border-line-strong transition-all duration-300 group-hover:border-primary group-hover:bg-primary group-hover:text-primary-fg">
+                    <Icon name="arrowLeft" className="h-4 w-4" />
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
 
-          <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start" data-reveal>
-            <section className="card p-5">
+          <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start" data-reveal>
+            <section className="rounded-xl bg-subtle p-5">
               <h2 className="text-lg">رسوم الكشف</h2>
               <p className="mt-1 text-sm text-muted">تُدفع عند الزيارة.</p>
               <h3 className="mt-4 text-sm font-semibold">الكشف الفني — ثابت لكل المحافظات</h3>
@@ -104,7 +103,7 @@ export default function Bookings() {
               <p className="mt-3 text-sm text-muted">البناء والأعمال المعدنية: نزورك ونعطيك عرض سعر مكتوب.</p>
             </section>
 
-            <section className="card p-5">
+            <section className="rounded-xl border border-line p-5">
               <h2 className="text-lg">كيف تُحدَّد المواعيد</h2>
               <ul className="mt-3 space-y-2.5 text-[15px] text-muted">
                 <li>
@@ -124,10 +123,10 @@ export default function Bookings() {
               </ul>
             </section>
 
-            <section className="rounded-2xl border border-line bg-subtle p-5">
-              <h2 className="text-lg">شركة أو مصنع؟</h2>
-              <p className="mt-1 text-sm text-muted">عقود صيانة سنوية وطلبات صيانة عاجلة للمنشآت.</p>
-              <Link to="/corporate" className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 font-semibold text-brand-700 dark:text-brand-200">
+            <section className="rounded-xl bg-inverse p-5 text-inverse-fg">
+              <h2 className="text-lg text-inverse-fg">شركة أو مصنع؟</h2>
+              <p className="mt-1 text-sm text-inverse-fg/65">عقود صيانة سنوية وطلبات صيانة عاجلة للمنشآت.</p>
+              <Link to="/corporate" className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 font-semibold text-primary">
                 خدمات الشركات <Icon name="chevronLeft" className="h-4 w-4" />
               </Link>
             </section>
@@ -142,7 +141,7 @@ function FeeRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between py-2.5">
       <dt className="text-muted">{label}</dt>
-      <dd className="font-bold">
+      <dd className="font-display font-semibold">
         {formatJOD(value)}
       </dd>
     </div>

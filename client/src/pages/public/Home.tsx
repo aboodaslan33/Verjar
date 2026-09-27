@@ -1,41 +1,51 @@
-import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ButtonA, ButtonLink, Icon } from '../../components/ui';
+import { Icon, SectionHeading } from '../../components/ui';
 import { PRODUCT_GRID, ProductCard, ProductGridSkeleton } from '../../components/store/ProductCard';
+
+import { WorkFigure } from '../../components/work/WorkFigure';
 import { useSite } from '../../context/SiteContext';
 import { api } from '../../lib/api';
-import { displayPhone, formatJOD, waLink } from '../../lib/format';
-import type { Paged, Product } from '../../lib/types';
-import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 import { BRAND } from '../../lib/brand';
+import { cx, displayPhone, formatJOD, waLink } from '../../lib/format';
+import type { Paged, Product, SiteSettings } from '../../lib/types';
+import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 import { SPECIALTIES, WORKS } from '../../lib/works';
-import { WorkFigure } from '../../components/work/WorkFigure';
 
-const SERVICES = [
+type Service = { slug: string; title: string; short: string; text: string; fee?: (s: SiteSettings) => string };
+
+const SERVICES: Service[] = [
   {
     slug: 'inspection',
     title: 'كشف أعطال بناء',
+    short: 'كشف أعطال',
     text: 'رطوبة، تسريب مياه، تشققات، مشاكل تمديدات. نحدد السبب ونكتب لك ما يلزم إصلاحه.',
+    fee: (s) => `رسوم الكشف ${formatJOD(s.inspectionFeeNormal)} لكل المحافظات`,
   },
   {
     slug: 'painting',
-    title: 'أعمال دهان',
-    text: 'دهان داخلي وخارجي، تجديد شقق، معالجة جدران قبل الدهان، وديكورات.',
+    title: 'أعمال دهان وديكور',
+    short: 'دهان وديكور',
+    text: 'دهان داخلي وخارجي، تجديد شقق، معالجة جدران قبل الدهان، وديكورات وجدران ثلاثية الأبعاد.',
+    fee: (s) => `كشف ${formatJOD(s.paintingFeeInside)} داخل عمّان`,
   },
   {
     slug: 'construction',
-    title: 'أعمال بناء',
-    text: 'بناء جديد، إضافات وملاحق، تعديلات داخلية، وتشطيبات للبيوت والفلل.',
+    title: 'بناء وتشطيب',
+    short: 'بناء وتشطيب',
+    text: 'بناء جديد، إضافات وملاحق، تعديلات داخلية، وتشطيب كامل للبيوت والفلل من الهيكل حتى التسليم.',
   },
   {
     slug: 'metalwork',
     title: 'أعمال معدنية',
-    text: 'أبواب وبوابات، درابزين، مظلات، حمايات شبابيك، وهياكل حديد حسب القياس.',
+    short: 'أعمال معدنية',
+    text: 'أبواب وبوابات، درابزين، مظلات، حمايات شبابيك، وهياكل حديد حسب القياس أو تصميمك.',
   },
   {
     slug: 'general',
-    title: 'خدمات عامة',
-    text: 'أعمال صيانة متفرقة: تركيب، فك ونقل، إصلاحات صغيرة لا تحتاج مشروعًا كاملًا.',
+    title: 'صيانة عامة',
+    short: 'صيانة عامة',
+    text: 'أعمال صيانة متفرقة: تركيب، فك ونقل، وإصلاحات صغيرة لا تحتاج مشروعًا كاملًا.',
   },
 ];
 
@@ -45,131 +55,108 @@ export default function Home() {
   const featured = useAsync(() => api.get<Paged<Product>>('/store/products', { featured: true, pageSize: 4 }), []);
   const featuredItems = featured.data?.items ?? [];
   const showFeatured = featured.loading || featuredItems.length > 0;
-  const wa = waLink(settings.whatsappNumber, 'مرحبًا، أريد الاستفسار عن خدمة');
-  const [heroWork, ...moreWorks] = WORKS;
 
   return (
     <>
-      {/* ——— الواجهة ——— */}
-      <section className="bg-bg">
-        <div className="container grid gap-12 py-12 md:py-16 lg:grid-cols-12 lg:items-center lg:gap-16 lg:py-20">
-          <div className="lg:col-span-6" data-reveal-group>
-            <p className="eyebrow">{BRAND.ar} — تصميم ومقاولات وصيانة</p>
-            <h1 className="mt-5 text-[2rem] leading-[1.25] sm:text-4xl md:text-5xl md:leading-[1.2]">{settings.heroTitle}</h1>
-            <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted">{settings.heroSubtitle}</p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <ButtonLink to="/bookings/inspection" size="lg" className="sm:min-w-[11rem]">
-                احجز كشفًا
-              </ButtonLink>
-              <ButtonLink to="/work" variant="outline" size="lg">
-                شاهد أعمالنا
-              </ButtonLink>
-            </div>
-            <p className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-muted">
-              <a href={`tel:${settings.phone}`} className="inline-flex min-h-[44px] items-center gap-2 hover:text-ink">
-                <Icon name="phone" className="h-4 w-4 text-accent" />
-                <span className="ltr">{settings.phone}</span>
-              </a>
-              <span className="h-4 w-px bg-line" aria-hidden />
-              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center gap-2 hover:text-ink">
-                <Icon name="whatsapp" className="h-4 w-4 text-accent" />
-                واتساب <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
-              </a>
-            </p>
-          </div>
+      <Hero />
 
-          <div className="lg:col-span-6" data-reveal>
-            <div className="relative">
-              <img
-                src={heroWork.src}
-                width={heroWork.width}
-                height={heroWork.height}
-                alt={heroWork.title}
-                loading="eager"
-                decoding="async"
-                className="aspect-[5/4] w-full rounded-2xl bg-subtle object-cover sm:aspect-[4/3]"
-              />
-              <span className="absolute -bottom-3 start-8 h-1.5 w-24 rounded-full bg-primary" aria-hidden />
+      {/* ——— كيف نعمل: شريط خطوات أفقي على خط قياس ——— */}
+      <section className="border-b border-line bg-bg" aria-labelledby="process-title">
+        <div className="container py-14 md:py-20">
+          <div className="grid gap-10 lg:grid-cols-12">
+            <div className="lg:col-span-4" data-reveal>
+              <p className="eyebrow">كيف نعمل</p>
+              <h2 id="process-title" className="mt-4 text-2xl md:text-[2rem]">
+                سعر مكتوب قبل أي التزام
+              </h2>
+              <p className="mt-3 text-muted">ثلاث خطوات واضحة من أول اتصال حتى التسليم، ومسؤول واحد يتابع معك.</p>
             </div>
-            <p className="mt-6 flex items-baseline justify-between gap-4 text-sm text-muted">
-              <span>{heroWork.title}</span>
-              <Link to="/work" className="link shrink-0">
-                كل الأعمال
-              </Link>
-            </p>
+            <ol className="relative grid gap-8 sm:grid-cols-3 lg:col-span-8" data-reveal-group>
+              <span className="absolute inset-x-0 top-[15px] hidden h-px bg-line sm:block" aria-hidden />
+              {[
+                {
+                  t: 'كشف على الموقع',
+                  d: `فني يزورك في الموعد الذي تختاره. الكشف الفني ${formatJOD(settings.inspectionFeeNormal)} لكل المحافظات.`,
+                },
+                { t: 'عرض سعر مكتوب', d: 'السعر والمواد ومدة التنفيذ على صفحتك في الموقع وعلى واتساب.' },
+                { t: 'تنفيذ بمواعيد', d: 'بعد موافقتك نحدد البدء والتسليم، ونلتزم بهما.' },
+              ].map((s, i) => (
+                <li key={s.t} className="relative">
+                  <span
+                    className={cx(
+                      'num relative grid h-8 w-8 place-items-center rounded-full text-sm font-bold ring-4 ring-bg',
+                      i === 0 ? 'bg-primary text-primary-fg' : 'bg-ink text-bg',
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <h3 className="mt-5 text-lg">{s.t}</h3>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{s.d}</p>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
 
-      {/* ——— رسوم الكشف ——— */}
-      <section className="border-y border-line bg-subtle" aria-labelledby="fees-title">
-        <div className="container grid gap-6 py-8 md:grid-cols-12 md:items-center md:py-10" data-reveal-group>
-          <div className="md:col-span-4">
-            <h2 id="fees-title" className="text-lg">رسوم الكشف الفني</h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted">ثابتة لكل المحافظات، وتستلم بعدها عرض سعر مكتوبًا. لا يبدأ أي عمل قبل موافقتك.</p>
+      {/* ——— الخدمات: قائمة تحريرية بدل بطاقات، والرسوم في العمود الثابت ——— */}
+      <section className="section" aria-labelledby="services-title">
+        <div className="container grid gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <div className="lg:sticky lg:top-32" data-reveal>
+              <SectionHeading id="services-title" eyebrow="الخدمات" title="احجز الخدمة التي تحتاجها" />
+              <p className="mt-3 text-muted">تختار اليوم والساعة بنفسك، ويصلنا الحجز مباشرة.</p>
+              <dl className="mt-8 divide-y divide-line border-y border-line text-[15px]">
+                <p className="py-3 text-sm font-semibold">رسوم الكشف الفني — ثابتة لكل المحافظات</p>
+                {(
+                  [
+                    ['عادي', settings.inspectionFeeNormal],
+                    ['عاجل', settings.inspectionFeeUrgent],
+                    ['طارئ', settings.inspectionFeeEmergency],
+                  ] as const
+                ).map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between py-3">
+                    <dt className="text-muted">{k}</dt>
+                    <dd className="font-display text-lg font-semibold">{formatJOD(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
-          <dl className="grid grid-cols-3 divide-x divide-x-reverse divide-line rounded-xl border border-line bg-surface md:col-span-8">
-            {(
-              [
-                ['عادي', settings.inspectionFeeNormal],
-                ['عاجل', settings.inspectionFeeUrgent],
-                ['طارئ', settings.inspectionFeeEmergency],
-              ] as const
-            ).map(([label, fee]) => (
-              <div key={label} className="px-3 py-4 text-center sm:px-6 sm:py-5">
-                <dt className="text-sm text-muted">{label}</dt>
-                <dd className="mt-1 text-xl font-bold text-ink sm:text-2xl">{formatJOD(fee)}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
-
-      {/* ——— الخدمات ——— */}
-      <section className="section">
-        <div className="container">
-          <SectionHead eyebrow="الخدمات" title="اختر نوع العمل واحجز موعدك" link={{ to: '/bookings', label: 'كل أنواع الحجز' }} />
-          <ul className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3" data-reveal-group>
+          <ul className="border-t border-line lg:col-span-8" data-reveal-group>
             {SERVICES.map((s, i) => (
-              <li key={s.slug} className="bg-bg">
-                <Link to={`/bookings/${s.slug}`} className="group flex h-full flex-col p-6 transition-colors hover:bg-subtle md:p-8">
-                  <span className="ltr text-sm font-semibold text-muted">{String(i + 1).padStart(2, '0')}</span>
-                  <h3 className="mt-4 text-xl">{s.title}</h3>
-                  <p className="mt-2 flex-1 text-muted">{s.text}</p>
-                  <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-accent">
-                    احجز الآن
-                    <Icon name="chevronLeft" className="h-4 w-4 transition-transform group-hover:-translate-x-1 motion-reduce:transition-none" />
+              <li key={s.slug} className="border-b border-line">
+                <Link to={`/bookings/${s.slug}`} className="group grid grid-cols-[2.5rem_1fr_auto] items-start gap-4 py-6 transition-colors md:grid-cols-[3.5rem_1fr_auto] md:py-8">
+                  <span className="num pt-1 text-sm font-semibold text-muted transition-colors group-hover:text-accent">{String(i + 1).padStart(2, '0')}</span>
+                  <span>
+                    <span className="block font-display text-xl font-semibold md:text-2xl">{s.title}</span>
+                    <span className="mt-2 block max-w-xl text-[15px] leading-relaxed text-muted">{s.text}</span>
+                    {s.fee && <span className="mt-3 inline-block rounded-md bg-subtle px-2 py-1 text-xs font-medium text-ink">{s.fee(settings)}</span>}
+                  </span>
+                  <span className="mt-1 grid h-11 w-11 place-items-center rounded-full border border-line-strong transition-all duration-300 group-hover:border-primary group-hover:bg-primary group-hover:text-primary-fg">
+                    <Icon name="arrowLeft" className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" />
                   </span>
                 </Link>
               </li>
             ))}
-            <li className="bg-inverse text-inverse-fg">
-              <Link to="/corporate" className="group flex h-full flex-col p-6 md:p-8">
-                <span className="text-sm font-semibold text-primary">للمصانع والشركات</span>
-                <h3 className="mt-4 text-xl text-inverse-fg">عقود صيانة سنوية</h3>
-                <p className="mt-2 flex-1 text-inverse-fg/70">زيارات مجدولة وتقارير مكتوبة وطلبات عاجلة عند الأعطال.</p>
-                <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-                  خدمات الشركات
-                  <Icon name="chevronLeft" className="h-4 w-4 transition-transform group-hover:-translate-x-1 motion-reduce:transition-none" />
-                </span>
-              </Link>
-            </li>
           </ul>
         </div>
       </section>
 
-      {/* ——— أعمالنا ——— */}
-      <section className="section border-t border-line bg-subtle" aria-labelledby="work-title">
+      {/* ——— أعمالنا: شبكة غير متماثلة ——— */}
+      <section className="section bg-subtle" aria-labelledby="work-title">
         <div className="container">
-          <SectionHead eyebrow="أعمالنا" title="من مشاريعنا المنفّذة" id="work-title" link={{ to: '/work', label: 'كل الأعمال' }} />
-          <div className="mt-10 grid gap-x-6 gap-y-10 md:grid-cols-3" data-reveal-group>
-            {moreWorks.slice(0, 3).map((w) => (
-              <WorkFigure key={w.src} work={w} showText={false} />
-            ))}
+          <SectionHeading id="work-title" eyebrow="أعمالنا" title="من مشاريعنا المنفّذة" link={{ to: '/work', label: 'كل الأعمال' }} />
+          <div className="mt-10 grid gap-x-6 gap-y-10 md:grid-cols-12" data-reveal-group>
+            <WorkFigure work={WORKS[2]} ratio="aspect-[4/3] lg:aspect-[5/4]" className="md:col-span-7" showText={false} />
+            <div className="grid content-start gap-10 md:col-span-5">
+              <WorkFigure work={WORKS[1]} ratio="aspect-[16/10]" showText={false} />
+              <WorkFigure work={WORKS[3]} ratio="aspect-[16/10]" showText={false} />
+            </div>
           </div>
           <ul className="mt-12 flex flex-wrap gap-2" aria-label="تخصصاتنا" data-reveal>
             {SPECIALTIES.map((t) => (
-              <li key={t} className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm text-ink">
+              <li key={t} className="rounded-full border border-line-strong bg-surface px-4 py-1.5 text-sm text-ink">
                 {t}
               </li>
             ))}
@@ -177,68 +164,51 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ——— كيف نعمل ——— */}
-      <section className="section">
-        <div className="container">
-          <SectionHead eyebrow="كيف نعمل" title="ثلاث خطوات واضحة قبل أي التزام" />
-          <ol className="mt-10 grid gap-10 md:grid-cols-3" data-reveal-group>
+      {/* ——— الشركات: قسم فحمي ——— */}
+      <section className="bg-inverse text-inverse-fg" aria-labelledby="corp-title">
+        <div className="container grid gap-10 py-16 md:py-24 lg:grid-cols-12 lg:items-center">
+          <div className="lg:col-span-6" data-reveal>
+            <p className="eyebrow !text-inverse-fg/60">للمصانع والشركات</p>
+            <h2 id="corp-title" className="mt-4 text-2xl text-inverse-fg md:text-[2rem]">
+              عقود صيانة سنوية للمصانع والمنشآت
+            </h2>
+            <p className="mt-4 max-w-prose leading-relaxed text-inverse-fg/65">
+              زيارات مجدولة وتقارير مكتوبة بعد كل زيارة، وطلبات عاجلة عند الأعطال بأولوية حسب أثرها على الإنتاج.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/corporate/annual"
+                className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover"
+              >
+                اطلب عقد صيانة سنوي
+              </Link>
+              <Link to="/corporate/urgent" className="inline-flex h-12 items-center rounded-lg border border-inverse-fg/25 px-5 font-semibold transition-colors hover:border-inverse-fg/60">
+                طلب صيانة عاجل
+              </Link>
+            </div>
+          </div>
+          <ul className="grid gap-px overflow-hidden rounded-xl bg-inverse-fg/10 sm:grid-cols-2 lg:col-span-6" data-reveal-group>
             {[
-              {
-                t: 'كشف على الموقع',
-                d: `فني يزورك في الموعد الذي تختاره ويعاين المشكلة. رسوم الكشف الفني ${formatJOD(settings.inspectionFeeNormal)} في كل المحافظات، والكشف على الدهان ${formatJOD(settings.paintingFeeInside)} داخل عمّان.`,
-              },
-              { t: 'عرض سعر مكتوب', d: 'تستلم السعر وتفاصيل العمل والمواد على صفحتك في الموقع وعلى واتساب، قبل أي التزام.' },
-              { t: 'تنفيذ بمواعيد', d: 'بعد موافقتك نحدد تاريخ البدء والتسليم، ومسؤول واحد يتابع معك حتى نهاية العمل.' },
-            ].map((s, i) => (
-              <li key={s.t} className="border-t-2 border-line pt-6 first:border-primary">
-                <span className="ltr text-sm font-semibold text-muted">{String(i + 1).padStart(2, '0')}</span>
-                <h3 className="mt-3 text-lg">{s.t}</h3>
-                <p className="mt-2 text-muted">{s.d}</p>
+              ['مطابقة GMP وISO', 'تجهيز المرافق حسب متطلبات التدقيق.'],
+              ['أرضيات إيبوكسي', 'تنفيذ وصيانة للأرضيات الصناعية.'],
+              ['كهرباء ومرافق', 'صيانة دورية للتمديدات والمرافق.'],
+              ['طلبات عاجلة', 'استجابة سريعة عند توقف خط إنتاج.'],
+            ].map(([t, d]) => (
+              <li key={t} className="bg-inverse-2 p-6">
+                <Icon name="check" className="h-5 w-5 text-primary" />
+                <p className="mt-3 font-semibold">{t}</p>
+                <p className="mt-1 text-sm text-inverse-fg/60">{d}</p>
               </li>
             ))}
-          </ol>
+          </ul>
         </div>
       </section>
 
-      {/* ——— الشركات ——— */}
-      <section className="bg-inverse text-inverse-fg">
-        <div className="container grid gap-8 py-14 md:grid-cols-12 md:items-center md:py-20" data-reveal-group>
-          <div className="md:col-span-7">
-            <p className="eyebrow !text-inverse-fg/70">للمصانع والشركات</p>
-            <h2 className="mt-4 text-2xl text-inverse-fg md:text-3xl">عقود صيانة سنوية للمصانع والمنشآت</h2>
-            <p className="mt-4 max-w-prose text-inverse-fg/70">
-              صيانة دورية للمباني والمرافق، أرضيات إيبوكسي، تجهيز المرافق حسب متطلبات GMP وISO، وطلبات عاجلة عند الأعطال.
-              زيارات مجدولة وتقارير مكتوبة بعد كل زيارة.
-            </p>
-            <ul className="mt-6 flex flex-wrap gap-2 text-sm">
-              {['GMP', 'ISO', 'أرضيات إيبوكسي', 'كهرباء ومرافق', 'دهانات صناعية', 'طلبات عاجلة'].map((t) => (
-                <li key={t} className="rounded-full border border-inverse-fg/20 px-3 py-1 text-inverse-fg/85">
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex flex-col gap-3 md:col-span-5 md:items-end">
-            <ButtonLink to="/corporate/annual" size="lg" className="w-full md:w-auto">
-              اطلب عقد صيانة سنوي
-            </ButtonLink>
-            <ButtonLink
-              to="/corporate/urgent"
-              variant="outline"
-              size="lg"
-              className="w-full !border-inverse-fg/25 !bg-transparent !text-inverse-fg hover:!bg-inverse-fg/10 md:w-auto"
-            >
-              طلب صيانة عاجل لمنشأة
-            </ButtonLink>
-          </div>
-        </div>
-      </section>
-
-      {/* ——— منتجات مختارة ——— */}
+      {/* ——— من السوق ——— */}
       {showFeatured && !featured.error && (
-        <section className="section">
+        <section className="section" aria-labelledby="store-title">
           <div className="container">
-            <SectionHead eyebrow="المتجر" title="منتجات من ورشتنا" link={{ to: '/store', label: 'كل المنتجات' }} />
+            <SectionHeading id="store-title" eyebrow="السوق" title="منتجات مختارة" link={{ to: '/store', label: 'تصفح السوق' }} />
             <div className="mt-10">
               {featured.loading ? (
                 <ProductGridSkeleton count={4} className={PRODUCT_GRID} />
@@ -253,68 +223,129 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      {/* ——— التواصل ——— */}
-      <section className="border-t border-line bg-subtle">
-        <div className="container grid gap-10 py-14 md:grid-cols-12 md:py-20" data-reveal-group>
-          <div className="md:col-span-5">
-            <p className="eyebrow">تواصل</p>
-            <h2 className="mt-4 text-2xl md:text-3xl">عندك سؤال قبل الحجز؟</h2>
-            <p className="mt-3 text-muted">أرسل صورة للمشكلة على واتساب ونرد عليك خلال ساعات العمل.</p>
-            <ButtonA href={wa} target="_blank" rel="noopener noreferrer" variant="whatsapp" size="lg" className="mt-7 w-full sm:w-auto">
-              <Icon name="whatsapp" /> راسلنا على واتساب
-            </ButtonA>
-          </div>
-          <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2 md:col-span-7">
-            <ContactItem icon="phone" label="الهاتف">
-              <a href={`tel:${settings.phone}`} className="ltr hover:text-accent">
-                {settings.phone}
-              </a>
-            </ContactItem>
-            <ContactItem icon="mail" label="البريد الإلكتروني">
-              <a href={`mailto:${settings.email}`} className="ltr break-all hover:text-accent">
-                {settings.email}
-              </a>
-            </ContactItem>
-            <ContactItem icon="pin" label="العنوان">
-              {settings.address}
-            </ContactItem>
-            <ContactItem icon="clock" label="ساعات العمل">
-              {settings.workingHoursText}
-            </ContactItem>
-          </dl>
-        </div>
-      </section>
     </>
   );
 }
 
-function SectionHead({ eyebrow, title, id, link }: { eyebrow: string; title: string; id?: string; link?: { to: string; label: string } }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h2 id={id} className="mt-4 text-2xl md:text-[2rem]">
-          {title}
-        </h2>
-      </div>
-      {link && (
-        <Link to={link.to} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-accent hover:underline">
-          {link.label} <Icon name="chevronLeft" className="h-4 w-4" />
-        </Link>
-      )}
-    </div>
-  );
-}
+/**
+ * الواجهة: فحمية كمربع الشعار. على اليمين سؤال "ماذا تحتاج؟" باختيار سريع يقود للحجز مباشرة،
+ * وعلى اليسار تكوين صور متراكب مع مسطرة قياس كهرمانية.
+ */
+function Hero() {
+  const { settings } = useSite();
+  const [picked, setPicked] = useState(0);
+  const service = SERVICES[picked];
+  const [main, side] = [WORKS[0], WORKS[2]];
 
-function ContactItem({ icon, label, children }: { icon: 'phone' | 'mail' | 'pin' | 'clock'; label: string; children: ReactNode }) {
   return (
-    <div className="flex gap-3">
-      <Icon name={icon} className="mt-1 h-5 w-5 shrink-0 text-accent" />
-      <div>
-        <dt className="text-sm text-muted">{label}</dt>
-        <dd className="mt-0.5 font-medium">{children}</dd>
+    <section className="relative overflow-hidden bg-inverse text-inverse-fg">
+      {/* شبكة رسم هندسي خافتة خلف الصور (ورقة المهندس) */}
+      <svg className="pointer-events-none absolute inset-y-0 end-0 hidden h-full w-1/2 text-inverse-fg opacity-[0.06] lg:block" aria-hidden>
+        <defs>
+          <pattern id="hero-grid" width="56" height="56" patternUnits="userSpaceOnUse">
+            <path d="M56 0H0V56" fill="none" stroke="currentColor" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#hero-grid)" />
+      </svg>
+      <div className="container relative grid gap-12 py-12 md:py-16 lg:grid-cols-12 lg:gap-10 lg:py-20">
+        <div className="min-w-0 lg:col-span-6 xl:col-span-5">
+          <p className="eyebrow anim-rise !text-inverse-fg/60">{BRAND.ar} — تصميم ومقاولات وصيانة</p>
+          <h1 className="anim-rise mt-5 text-[2rem] leading-[1.3] text-inverse-fg [animation-delay:60ms] sm:text-[2.5rem] xl:text-[3rem]">
+            {settings.heroTitle}
+          </h1>
+          <p className="anim-rise mt-5 max-w-lg text-[17px] leading-relaxed text-inverse-fg/65 [animation-delay:120ms]">{settings.heroSubtitle}</p>
+
+          {/* اختيار سريع للخدمة */}
+          <div className="anim-rise mt-9 rounded-xl border border-inverse-fg/10 bg-inverse-2 p-4 [animation-delay:180ms] sm:p-5">
+            <p id="need-label" className="text-sm font-semibold text-inverse-fg">
+              ماذا تحتاج؟
+            </p>
+            <div role="radiogroup" aria-labelledby="need-label" className="scroll-x -mx-4 mt-3 flex gap-2 px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+              {SERVICES.map((s, i) => (
+                <button
+                  key={s.slug}
+                  type="button"
+                  role="radio"
+                  aria-checked={picked === i}
+                  onClick={() => setPicked(i)}
+                  className={cx(
+                    'h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition-colors duration-200',
+                    picked === i ? 'border-primary bg-primary text-primary-fg' : 'border-inverse-fg/15 text-inverse-fg/80 hover:border-inverse-fg/40',
+                  )}
+                >
+                  {s.short}
+                </button>
+              ))}
+            </div>
+            <div key={service.slug} className="anim-fade mt-4 flex flex-col gap-4 border-t border-inverse-fg/10 pt-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[15px] leading-relaxed text-inverse-fg/70">{service.text}</p>
+                {service.fee && <p className="mt-2 text-sm font-semibold text-primary">{service.fee(settings)}</p>}
+              </div>
+              <Link
+                to={`/bookings/${service.slug}`}
+                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover active:translate-y-px"
+              >
+                احجز موعدًا <Icon name="arrowLeft" className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <p className="anim-rise mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-inverse-fg/60 [animation-delay:240ms]">
+            <a href={`tel:${settings.phone}`} className="inline-flex min-h-[44px] items-center gap-2 transition-colors hover:text-inverse-fg">
+              <Icon name="phone" className="h-4 w-4 text-primary" />
+              <span className="ltr">{settings.phone}</span>
+            </a>
+            <a
+              href={waLink(settings.whatsappNumber, 'مرحبًا، أريد الاستفسار عن خدمة')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[44px] items-center gap-2 transition-colors hover:text-inverse-fg"
+            >
+              <Icon name="whatsapp" className="h-4 w-4 text-primary" />
+              واتساب <span className="ltr">{displayPhone(settings.whatsappNumber)}</span>
+            </a>
+          </p>
+        </div>
+
+        {/* تكوين الصور */}
+        <div className="relative min-w-0 lg:col-span-6 xl:col-span-7 xl:ps-8">
+          <div className="anim-rise relative ms-auto w-[88%] [animation-delay:120ms] lg:w-[90%]">
+            <img
+              src={main.src}
+              width={main.width}
+              height={main.height}
+              alt={main.title}
+              loading="eager"
+              decoding="async"
+              className="aspect-[4/3.4] w-full rounded-2xl object-cover"
+            />
+            <span className="absolute -top-3 end-6 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-fg">{main.category}</span>
+          </div>
+          <figure className="anim-rise absolute -bottom-4 start-0 w-[42%] [animation-delay:260ms] sm:w-[36%]">
+            <img
+              src={side.src}
+              width={side.width}
+              height={side.height}
+              alt={side.title}
+              loading="eager"
+              decoding="async"
+              className="aspect-[4/5] w-full rounded-xl border-4 border-inverse object-cover"
+            />
+            <figcaption className="mt-2 text-xs text-inverse-fg/60">قبل وبعد — {side.title}</figcaption>
+          </figure>
+          {/* مسطرة القياس */}
+          <svg className="absolute -bottom-10 end-0 hidden w-[58%] text-inverse-fg/30 sm:block" viewBox="0 0 300 16" fill="none" aria-hidden>
+            <line x1="0" y1="8" x2="300" y2="8" stroke="currentColor" />
+            {Array.from({ length: 31 }).map((_, i) => (
+              <line key={i} x1={i * 10} x2={i * 10} y1={i % 5 === 0 ? 1 : 5} y2="8" stroke="currentColor" />
+            ))}
+            <rect x="0" y="6.5" width="48" height="3" rx="1.5" className="fill-primary" />
+          </svg>
+        </div>
       </div>
-    </div>
+      <div className="h-10 lg:h-12" aria-hidden />
+    </section>
   );
 }

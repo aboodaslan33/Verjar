@@ -2,84 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  /*
-   * الهوية اللونية — المكان الوحيد لكل ألوان الموقع (قيم RGB بدون فواصل).
-   * أبيض للخلفيات، رمادي للنصوص، والأصفر الدافئ من الشعار للأزرار والتمييز فقط.
-   */
-  :root {
-    /* المحايد */
-    --c-bg: 255 255 255; /* #FFFFFF */
-    --c-surface: 255 255 255;
-    --c-subtle: 248 248 247; /* #F8F8F7 */
-    --c-line: 230 230 228; /* #E6E6E4 */
-    --c-ink: 40 42 46; /* #282A2E */
-    --c-muted: 104 107 112; /* #686B70 */
+/*
+ * نظام التصميم — مجموعة فرجا
+ * ─────────────────────────────
+ * الهوية مأخوذة من الشعار: خلفية فحمية (#353535)، كلمة بيضاء، وأصفر كهرماني (#F1A428)
+ * على رأس الفرجار وخط القياس. لذلك:
+ *   - المحايد (أبيض + درجات رمادي دافئة قليلًا) هو 90% من الواجهة
+ *   - الفحمي للبنية والأسطح القوية (الفوتر، الشريط الجانبي، أقسام مختارة)
+ *   - الكهرماني للإجراء الأساسي والتمييز فقط — ولا يُستخدم كنص على الأبيض (تباين 2.1:1)
+ * الأسلوب: هندسي/معماري — خطوط رفيعة، شبكة دقيقة، زوايا معتدلة، ظلال خفيفة جدًا.
+ */
 
-    /* الأصفر الدافئ (مأخوذ من الشعار #F1A428) — 700 فما فوق يصلح نصًا على الأبيض (تباين ≥ 6:1) */
+@layer base {
+  :root {
+    /* ── المحايد ── */
+    --c-bg: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-subtle: 247 247 245; /* #F7F7F5 — رمادي دافئ خفيف */
+    --c-line: 229 229 225; /* #E5E5E1 */
+    --c-line-strong: 208 208 203;
+    --c-ink: 33 33 34; /* #212122 — أقرب لفحمي الشعار */
+    --c-muted: 107 107 110; /* #6B6B6E — تباين 5.3:1 على الأبيض */
+
+    /* ── الكهرماني (من الشعار #F1A428) — 700 فما فوق يصلح نصًا على الأبيض ── */
     --brand-50: 254 247 234;
     --brand-100: 253 236 204;
     --brand-200: 250 214 145;
     --brand-300: 246 192 90;
     --brand-400: 243 176 58;
-    --brand-500: 241 164 40; /* #F1A428 */
+    --brand-500: 241 164 40;
     --brand-600: 214 138 16;
-    --brand-700: 156 95 0; /* #9C5F00 */
+    --brand-700: 156 95 0;
     --brand-800: 122 74 0;
     --brand-900: 85 51 0;
 
-    /* درجات الرمادي */
-    --gray-50: 249 249 248;
-    --gray-100: 243 243 242;
-    --gray-200: 230 230 228;
-    --gray-300: 210 210 207;
-    --gray-400: 160 162 166;
-    --gray-500: 112 115 120;
-    --gray-600: 80 83 89;
-    --gray-700: 58 61 66;
+    /* ── الرمادي ── */
+    --gray-50: 249 249 247;
+    --gray-100: 242 242 239;
+    --gray-200: 229 229 225;
+    --gray-300: 208 208 203;
+    --gray-400: 160 160 158;
+    --gray-500: 112 112 114;
+    --gray-600: 80 80 83;
+    --gray-700: 58 58 61;
 
-    /* الأدوار */
+    /* ── الأدوار ── */
     --c-primary: var(--brand-500);
-    --c-primary-hover: var(--brand-600);
-    --c-on-primary: 33 34 37; /* نص داكن على الأصفر (تباين 8:1) */
-    --c-accent-text: var(--brand-700); /* روابط ونصوص مميزة على الأبيض */
-    --c-inverse: 38 39 42; /* الفوتر — رمادي الشعار الداكن */
-    --c-on-inverse: 240 240 238;
-    --c-danger: 179 38 30;
-    --c-success: 46 125 79;
-    --c-warn: 168 107 0;
+    --c-primary-hover: var(--brand-400);
+    --c-on-primary: 26 26 27;
+    --c-accent-text: var(--brand-700);
+    --c-inverse: 38 38 39; /* فحمي الشعار */
+    --c-inverse-2: 50 50 52; /* سطح مرتفع فوق الفحمي */
+    --c-on-inverse: 244 244 241;
+    --c-danger: 180 35 24;
+    --c-success: 30 122 70;
+    --c-warn: 164 100 0;
+    --c-info: 43 92 140;
     --c-whatsapp: 31 122 77;
     --c-whatsapp-hover: 25 102 63;
-    --c-shadow: 24 25 28;
+    --c-shadow: 24 24 26;
+
+    /* ── الحركة ── */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --dur-fast: 150ms;
+    --dur: 240ms;
+    --dur-slow: 480ms;
+
+    /* ارتفاع الشريط السفلي على الجوال (يُحجز له مكان أسفل الصفحة) */
+    --tabbar-h: 0px;
     color-scheme: light;
   }
   .dark {
-    --c-bg: 22 23 25;
-    --c-surface: 32 33 36;
-    --c-subtle: 40 41 45;
-    --c-line: 58 60 65;
-    --c-ink: 240 240 238;
-    --c-muted: 160 162 166;
-    --c-primary-hover: var(--brand-400);
-    --c-on-primary: 22 23 25;
+    --c-bg: 20 20 21;
+    --c-surface: 29 29 31;
+    --c-subtle: 36 36 38;
+    --c-line: 52 52 55;
+    --c-line-strong: 70 70 74;
+    --c-ink: 241 241 238;
+    --c-muted: 162 162 165;
+    --c-primary-hover: var(--brand-300);
+    --c-on-primary: 20 20 21;
     --c-accent-text: var(--brand-300);
-    --c-inverse: 14 15 16;
-    --c-on-inverse: 230 230 228;
+    --c-inverse: 14 14 15;
+    --c-inverse-2: 26 26 28;
+    --c-on-inverse: 232 232 229;
     --c-shadow: 0 0 0;
     color-scheme: dark;
   }
+  @media (max-width: 1023.98px) {
+    :root {
+      --tabbar-h: calc(64px + env(safe-area-inset-bottom));
+    }
+  }
+
   html {
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
   body {
-    @apply bg-bg text-ink font-sans antialiased;
+    @apply bg-bg font-sans text-ink antialiased;
     font-feature-settings: 'kern';
     line-height: 1.7;
   }
-  h1, h2, h3, h4 {
-    @apply font-bold text-ink;
-    line-height: 1.35;
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display font-semibold text-ink;
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: rgb(var(--brand-200));
+    color: rgb(var(--c-on-primary));
   }
   :focus-visible {
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-bg;
@@ -106,39 +147,95 @@
 }
 
 @layer components {
+  /* سطح بإطار رفيع — الظل خفيف جدًا ولا يُعتمد عليه للفصل */
   .card {
-    @apply rounded-2xl border border-line bg-surface shadow-card;
+    @apply rounded-xl border border-line bg-surface;
   }
+  .card-hover {
+    transition:
+      border-color var(--dur) var(--ease-out),
+      box-shadow var(--dur) var(--ease-out),
+      transform var(--dur) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .card-hover:hover {
+      border-color: rgb(var(--c-line-strong));
+      box-shadow: 0 18px 40px -28px rgb(var(--c-shadow) / 0.35);
+    }
+  }
+
+  /* ── الحقول ── */
   .label {
     @apply mb-1.5 block text-sm font-medium text-ink;
   }
   .input {
-    @apply block w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink placeholder:text-muted/70
-      transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
-      disabled:cursor-not-allowed disabled:opacity-60;
+    @apply block w-full rounded-lg border border-line-strong bg-surface px-3.5 py-3 text-base text-ink placeholder:text-muted/70
+      disabled:cursor-not-allowed disabled:bg-subtle disabled:opacity-70;
+    transition:
+      border-color var(--dur-fast) ease,
+      box-shadow var(--dur-fast) ease;
   }
-  .input-error {
-    @apply border-danger focus:border-danger focus:ring-danger/20;
+  .input:hover:not(:disabled):not(:focus) {
+    border-color: rgb(var(--gray-400));
   }
+  .input:focus {
+    @apply outline-none;
+    border-color: rgb(var(--c-ink));
+    box-shadow: 0 0 0 3px rgb(var(--brand-500) / 0.28);
+  }
+  .input-error,
+  .input-error:hover:not(:disabled):not(:focus) {
+    border-color: rgb(var(--c-danger));
+  }
+  .input-error:focus {
+    border-color: rgb(var(--c-danger));
+    box-shadow: 0 0 0 3px rgb(var(--c-danger) / 0.18);
+  }
+
+  /* ── الأقسام والعناوين ── */
   .section {
-    @apply py-14 md:py-20;
+    @apply py-16 md:py-24;
   }
-  /* عنوان صغير فوق العناوين: خط أصفر قصير + نص رمادي */
+  /* عنوان صغير فوق العناوين: خط القياس الكهرماني من الشعار + نص رمادي */
   .eyebrow {
-    @apply inline-flex items-center gap-2.5 text-sm font-semibold text-muted;
+    @apply inline-flex items-center gap-2.5 text-[13px] font-semibold tracking-wide text-muted;
   }
   .eyebrow::before {
     content: '';
-    @apply block h-0.5 w-6 rounded-full bg-primary;
+    @apply block h-[3px] w-7 rounded-full bg-primary;
+  }
+  /* خط القياس: خط رفيع بفاصل كهرماني — زخرفة مستوحاة من خط الشعار */
+  .measure {
+    @apply relative h-px bg-line;
+  }
+  .measure::after {
+    content: '';
+    @apply absolute start-0 top-1/2 h-[3px] w-16 -translate-y-1/2 rounded-full bg-primary;
   }
   .link {
     @apply font-semibold text-accent underline-offset-4 hover:underline;
   }
-  .skeleton {
-    @apply relative overflow-hidden rounded-lg bg-subtle;
+  .num {
+    @apply ltr tabular-nums;
   }
+
+  /* ── التحميل ── */
   .skeleton {
+    @apply relative overflow-hidden rounded-md bg-subtle;
     animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+  .spinner {
+    @apply inline-block h-4 w-4 rounded-full border-2 border-current border-t-transparent;
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* شريط أفقي قابل للتمرير بدون شريط تمرير ظاهر */
+  .scroll-x {
+    @apply overflow-x-auto overscroll-x-contain;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -147,79 +244,192 @@
   z-index: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
 /* شاشة البداية: شعار الهيدر مخفي حتى يصل إليه الشعار المتحرك */
 .splash-active [data-splash-anchor] {
   visibility: hidden;
 }
 
-/* ───── الحركة: هادئة وقصيرة، ومعطّلة مع "تقليل الحركة" ───── */
+/* ───── الحركة: قصيرة وهادئة وذات غرض، ومعطّلة مع "تقليل الحركة" ───── */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+@keyframes bump {
+  40% {
+    transform: scale(1.25);
+  }
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ring-out {
+  from {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+@keyframes progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes slide-x {
+  from {
+    opacity: 0;
+    transform: translateX(var(--slide-from, -12px));
+  }
+}
+
+.page-enter {
+  animation: page-in 0.35s var(--ease-out) both;
+}
+.anim-fade {
+  animation: fade-in var(--dur) ease both;
+}
+.anim-rise {
+  animation: rise-in 0.32s var(--ease-out) both;
+}
+.anim-pop {
+  animation: pop-in 0.18s var(--ease-out) both;
+  transform-origin: top;
+}
+.anim-sheet {
+  animation: sheet-in 0.34s var(--ease-out) both;
+}
+/* نافذة الحوار: ورقة من الأسفل على الجوال، ظهور هادئ في المنتصف على الشاشات الأكبر */
+.anim-modal {
+  animation: sheet-in 0.34s var(--ease-out) both;
+}
+@media (min-width: 640px) {
+  .anim-modal {
+    animation: rise-in 0.26s var(--ease-out) both;
+  }
+}
+.anim-toast {
+  animation: toast-in 0.28s var(--ease-out) both;
+}
+.anim-bump {
+  animation: bump 0.4s var(--ease-out);
+}
+.anim-step {
+  animation: slide-x 0.32s var(--ease-out) both;
+}
+[dir='rtl'] .anim-step {
+  --slide-from: 12px;
+}
+
+/* ظهور العناصر عند التمرير */
 .reveal {
   opacity: 0;
   transform: translateY(14px);
   transition:
-    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+    opacity 0.6s var(--ease-out) var(--reveal-delay, 0ms),
+    transform 0.6s var(--ease-out) var(--reveal-delay, 0ms);
 }
 .reveal.is-revealed {
   opacity: 1;
   transform: none;
 }
 
-/* انتقال الصفحات */
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.page-enter {
-  animation: page-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
 /* بطاقات قابلة للنقر: ارتفاع خفيف عند المرور */
 .lift {
   transition:
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.25s ease,
-    border-color 0.2s ease;
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) ease,
+    border-color var(--dur-fast) ease;
 }
 @media (hover: hover) {
   .lift:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 14px 30px -16px rgb(var(--c-shadow) / 0.28);
+    transform: translateY(-2px);
+    box-shadow: 0 18px 36px -24px rgb(var(--c-shadow) / 0.32);
   }
 }
 
+/* علامة النجاح: الدائرة ثم الصح ترسم نفسها */
+.success-mark circle {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: draw 0.5s var(--ease-out) 0.05s forwards;
+}
+.success-mark path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: draw 0.35s var(--ease-out) 0.45s forwards;
+}
+.success-ring {
+  animation: ring-out 0.9s var(--ease-out) 0.35s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
   .reveal,
   .reveal.is-revealed {
     opacity: 1;
     transform: none;
-    transition: none;
   }
-  .page-enter {
-    animation: none;
-  }
-  .lift,
   .lift:hover {
     transform: none;
-    transition: none;
   }
-}
-
-@keyframes skeleton-pulse {
-  50% {
-    opacity: 0.55;
+  .success-mark circle,
+  .success-mark path {
+    stroke-dashoffset: 0;
   }
 }

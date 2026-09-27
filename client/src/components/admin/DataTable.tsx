@@ -82,15 +82,19 @@ export function DataTable<T>({
 
   return (
     <div className={cx('transition-opacity', refreshing && 'opacity-70')}>
-      {total !== undefined && <p className="mb-2 text-xs text-muted">{total.toLocaleString('en-US')} نتيجة</p>}
+      {total !== undefined && (
+        <p className="mb-2 text-xs text-muted">
+          <span className="num font-semibold text-ink">{total.toLocaleString('en-US')}</span> نتيجة
+        </p>
+      )}
 
       {/* جدول — شاشات متوسطة فأكبر */}
       <div className="card hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-line bg-subtle/60 text-xs text-muted">
+            <tr className="border-b border-line bg-subtle text-xs text-muted">
               {columns.map((c) => (
-                <th key={c.key} scope="col" className={cx('whitespace-nowrap px-4 py-2.5 font-medium', alignCls(c.align), c.className)}>
+                <th key={c.key} scope="col" className={cx('whitespace-nowrap px-4 py-3 font-semibold', alignCls(c.align), c.className)}>
                   {c.header}
                 </th>
               ))}
@@ -112,15 +116,15 @@ export function DataTable<T>({
                       : undefined
                   }
                   className={cx(
-                    'border-b border-line align-middle last:border-0',
-                    href && 'cursor-pointer hover:bg-subtle/60',
+                    'border-b border-line align-middle transition-colors last:border-0',
+                    href && 'cursor-pointer hover:bg-subtle/70',
                     rowClassName?.(row),
                   )}
                 >
                   {columns.map((c, i) => (
-                    <td key={c.key} className={cx('px-4 py-3', alignCls(c.align), c.className)}>
+                    <td key={c.key} className={cx('px-4 py-3.5', alignCls(c.align), c.className)}>
                       {i === 0 && href ? (
-                        <Link to={href} className="font-medium text-ink hover:text-brand-700 dark:hover:text-brand-200">
+                        <Link to={href} className="font-medium text-ink underline-offset-4 hover:underline">
                           {c.cell(row)}
                         </Link>
                       ) : (
@@ -155,7 +159,7 @@ export function DataTable<T>({
             </>
           );
           return (
-            <li key={rowKey(row)} className={cx('card p-3.5', rowClassName?.(row))}>
+            <li key={rowKey(row)} className={cx('card p-4 transition-colors active:bg-subtle', rowClassName?.(row))}>
               {href ? (
                 <Link to={href} className="block">
                   {body}

@@ -4,7 +4,7 @@ import { useSite } from '../../context/SiteContext';
 import { useReveal } from '../../lib/useReveal';
 import { Icon, PageLoader } from '../ui';
 import { SiteFooter } from './SiteFooter';
-import { SiteHeader } from './SiteHeader';
+import { MobileTabBar, SiteHeader } from './SiteHeader';
 
 export function PublicLayout() {
   const { pathname } = useLocation();
@@ -12,11 +12,13 @@ export function PublicLayout() {
   const [main, setMain] = useState<HTMLElement | null>(null);
   useReveal(main, pathname);
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, [pathname]);
+  // زر واتساب العائم لا يظهر في صفحات فيها شريط إجراءات سفلي (النماذج والسلة والمنتج)
+  const showFab = !/^\/(bookings\/.+|corporate\/.+|store|cart|checkout)/.test(pathname);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col pb-[var(--tabbar-h)]">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2">
         تخطَّ إلى المحتوى
       </a>
@@ -29,16 +31,20 @@ export function PublicLayout() {
         </div>
       </main>
       <SiteFooter />
-      {/* زر واتساب ثابت للجوال */}
-      <a
-        href={`https://wa.me/${settings.whatsappNumber}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="تواصل عبر واتساب"
-        className="fixed bottom-4 start-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-whatsapp text-white shadow-lift transition-transform hover:scale-105 md:hidden"
-      >
-        <Icon name="whatsapp" className="h-7 w-7" />
-      </a>
+      <MobileTabBar />
+      {/* زر واتساب ثابت للجوال — فوق الشريط السفلي */}
+      {showFab && (
+        <a
+          href={`https://wa.me/${settings.whatsappNumber}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="تواصل عبر واتساب"
+          className="fixed start-4 z-30 grid h-12 w-12 place-items-center rounded-full bg-whatsapp text-white shadow-lift transition-transform active:scale-95 lg:hidden"
+          style={{ bottom: 'calc(var(--tabbar-h) + 0.875rem)' }}
+        >
+          <Icon name="whatsapp" className="h-6 w-6" />
+        </a>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ export function QtyStepper({
     size === 'sm' ? 'h-11 w-11' : 'h-12 w-12',
   );
   return (
-    <div role="group" aria-labelledby={labelledBy} className="inline-flex items-center overflow-hidden rounded-xl border border-line bg-surface">
+    <div role="group" aria-labelledby={labelledBy} className="inline-flex items-center overflow-hidden rounded-lg border border-line-strong bg-surface">
       <button type="button" className={btn} onClick={() => onChange(Math.min(cap, value + 1))} disabled={value >= cap} aria-label="زيادة الكمية">
         <Icon name="plus" className="h-4 w-4" />
       </button>

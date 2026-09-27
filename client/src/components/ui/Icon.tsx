@@ -29,6 +29,20 @@ const paths = {
   image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9.5a1 1 0 1 0 0-.01',
   play: 'M8 5v14l11-7z',
   refresh: 'M4 4v6h6M20 20v-6h-6M5.5 15a7 7 0 0 0 12.4 2M18.5 9A7 7 0 0 0 6.1 7',
+  info: 'M12 11v5m0-8.5v.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+  home: 'M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z',
+  bag: 'M5 8h14l-1 12.2a1 1 0 0 1-1 .8H7a1 1 0 0 1-1-.8zM9 8V6.5a3 3 0 0 1 6 0V8',
+  grid: 'M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  sliders: 'M4 7h9m4 0h3M4 17h3m4 0h9M15 5v4M9 15v4',
+  shield: 'M12 3 5 6v5.5c0 4.3 3 8 7 9.5 4-1.5 7-5.2 7-9.5V6z M9 12l2 2 4-4',
+  truck: 'M3 6h11v10H3zM14 10h4l3 3v3h-7M7.5 18.5a1.5 1.5 0 1 0 0-.01M17.5 18.5a1.5 1.5 0 1 0 0-.01',
+  ruler: 'M4 16 16 4l4 4L8 20zM8 12l2 2M11 9l2 2M14 6l2 2',
+  store: 'M4 9.5 5.5 4h13L20 9.5M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M5 12v8h14v-8M10 20v-4.5h4V20',
+  briefcase: 'M4 8h16v11H4zM9 8V5.5h6V8M4 13h16',
+  arrowLeft: 'M19 12H5m6-6-6 6 6 6',
+  arrowRight: 'M5 12h14m-6-6 6 6-6 6',
+  star: 'M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z',
 } as const;
 
 export type IconName = keyof typeof paths | 'whatsapp';

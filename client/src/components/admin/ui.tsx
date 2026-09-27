@@ -30,7 +30,7 @@ export function AdminPage({
       )}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl leading-tight">{title}</h1>
+          <h1 className="text-[1.625rem] leading-tight">{title}</h1>
           {description && <p className="mt-1 text-sm text-muted">{description}</p>}
           {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
         </div>
@@ -61,7 +61,7 @@ export function Panel({
     <section id={id} className={cx('card overflow-hidden', className)}>
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
-          {title && <h2 className="text-base font-semibold">{title}</h2>}
+          {title && <h2 className="font-sans text-[15px] font-semibold">{title}</h2>}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
       )}
@@ -70,7 +70,7 @@ export function Panel({
   );
 }
 
-/** بطاقة رقم إحصائي */
+/** بطاقة رقم إحصائي (KPI): الرقم هو الأبرز، والنبرة نقطة لونية صغيرة فقط */
 export function StatTile({
   label,
   value,
@@ -88,31 +88,29 @@ export function StatTile({
 }) {
   const body = (
     <>
-      <p className="text-sm text-muted">{label}</p>
-      {loading ? (
-        <Skeleton className="mt-2 h-8 w-20" />
-      ) : (
-        <p
+      <p className="flex items-center gap-2 text-[13px] font-medium text-muted">
+        <span
           className={cx(
-            'mt-1 text-2xl font-bold tabular-nums',
-            tone === 'brand' && 'text-brand-700 dark:text-brand-200',
-            tone === 'sand' && 'text-sand-600 dark:text-sand-300',
-            tone === 'warn' && 'text-warn',
+            'h-2 w-2 rounded-full',
+            tone === 'neutral' && 'bg-line-strong',
+            tone === 'brand' && 'bg-primary',
+            tone === 'sand' && 'bg-ink',
+            tone === 'warn' && 'bg-warn',
           )}
-        >
-          {value}
-        </p>
+          aria-hidden
+        />
+        {label}
+      </p>
+      {loading ? (
+        <Skeleton className="mt-3 h-8 w-24" />
+      ) : (
+        <p className="mt-2 font-display text-[1.75rem] font-semibold leading-tight tabular-nums text-ink">{value}</p>
       )}
-      {sub && !loading && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
+      {sub && !loading && <p className="mt-1 text-xs text-muted">{sub}</p>}
+      {to && <Icon name="arrowLeft" className="absolute end-4 top-4 h-4 w-4 text-muted opacity-0 transition-opacity group-hover:opacity-100" />}
     </>
   );
-  const cls = cx(
-    'card block px-4 py-4 transition-colors',
-    tone === 'brand' && 'border-s-4 border-s-brand-600',
-    tone === 'sand' && 'border-s-4 border-s-sand-400',
-    tone === 'warn' && 'border-s-4 border-s-warn',
-    to && 'hover:border-brand-300',
-  );
+  const cls = cx('card group relative block px-5 py-4', to && 'card-hover');
   return to ? (
     <Link to={to} className={cls}>
       {body}
@@ -153,10 +151,11 @@ export function Ltr({ children, className }: { children: ReactNode; className?: 
 
 export function FilterBar({ children, onClear, active }: { children: ReactNode; onClear?: () => void; active?: boolean }) {
   return (
-    <div className="card mb-4 flex flex-wrap items-end gap-3 p-3 sm:p-4">
+    <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-subtle p-3 sm:p-4">
       {children}
       {onClear && active && (
-        <button type="button" onClick={onClear} className="h-10 rounded-lg px-3 text-sm text-muted hover:bg-subtle hover:text-ink">
+        <button type="button" onClick={onClear} className="anim-fade inline-flex h-10 items-center gap-1 rounded-lg px-3 text-sm text-muted hover:bg-surface hover:text-ink">
+          <Icon name="close" className="h-3.5 w-3.5" />
           مسح الفلاتر
         </button>
       )}

@@ -1,5 +1,16 @@
 import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cx } from '../../lib/format';
+import { Icon } from './Icon';
+
+/** رسالة خطأ الحقل — أيقونة + نص، وتُقرأ فور ظهورها */
+export function FieldErrorText({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <p id={id} className="mt-1.5 flex items-start gap-1.5 text-sm text-danger anim-fade" role="alert">
+      <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{children}</span>
+    </p>
+  );
+}
 
 type FieldShellProps = {
   label: string;
@@ -20,11 +31,9 @@ export function FieldShell({ label, error, hint, optional, id, children, classNa
       </label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm text-danger" role="alert">
-          {error}
-        </p>
+        <FieldErrorText id={`${id}-error`}>{error}</FieldErrorText>
       ) : hint ? (
-        <p id={`${id}-hint`} className="mt-1.5 text-sm text-muted">
+        <p id={`${id}-hint`} className="mt-1.5 text-[13px] leading-relaxed text-muted">
           {hint}
         </p>
       ) : null}
@@ -90,6 +99,7 @@ export const Select = forwardRef<HTMLSelectElement, Extra & SelectHTMLAttributes
               "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23889' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
             backgroundSize: '18px',
             backgroundPosition: 'left 12px center',
+            cursor: 'pointer',
           }}
           aria-invalid={Boolean(error) || undefined}
           {...rest}
@@ -147,25 +157,34 @@ export function ChoiceGroup<T extends string | boolean>({
               name={name}
               onClick={() => onChange(o.value)}
               className={cx(
-                'min-h-[3rem] rounded-xl border px-3 py-2.5 text-start text-[15px] transition-colors',
+                'group relative flex min-h-[3rem] items-start gap-3 rounded-lg border px-3.5 py-3 text-start text-[15px] transition-[border-color,background-color,box-shadow] duration-150',
                 active
-                  ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800 ring-1 ring-brand-600 dark:bg-brand-900/40 dark:text-brand-100'
-                  : 'border-line bg-surface hover:border-brand-300',
+                  ? 'border-ink bg-surface font-semibold text-ink shadow-[inset_0_0_0_1px_rgb(var(--c-ink))]'
+                  : 'border-line-strong bg-surface hover:border-ink/50',
                 error && !active && 'border-danger/60',
               )}
             >
-              <span className="block">{o.label}</span>
-              {o.description && <span className="mt-0.5 block text-xs font-normal text-muted">{o.description}</span>}
+              <span
+                className={cx(
+                  'mt-[3px] grid h-4 w-4 shrink-0 place-items-center rounded-full border transition-colors',
+                  active ? 'border-ink bg-ink' : 'border-line-strong group-hover:border-ink/50',
+                )}
+                aria-hidden
+              >
+                <span className={cx('h-1.5 w-1.5 rounded-full bg-primary transition-transform duration-150', active ? 'scale-100' : 'scale-0')} />
+              </span>
+              <span className="min-w-0">
+                <span className="block leading-snug">{o.label}</span>
+                {o.description && <span className="mt-0.5 block text-xs font-normal text-muted">{o.description}</span>}
+              </span>
             </button>
           );
         })}
       </div>
       {error ? (
-        <p id={`${id}-err`} className="mt-1.5 text-sm text-danger" role="alert">
-          {error}
-        </p>
+        <FieldErrorText id={`${id}-err`}>{error}</FieldErrorText>
       ) : hint ? (
-        <p className="mt-1.5 text-sm text-muted">{hint}</p>
+        <p className="mt-1.5 text-[13px] text-muted">{hint}</p>
       ) : null}
     </fieldset>
   );
@@ -185,16 +204,22 @@ export function Checkbox({
   return (
     <label
       className={cx(
-        'flex min-h-[3rem] cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors',
-        checked ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/40' : 'border-line bg-surface hover:border-brand-300',
+        'flex min-h-[3rem] cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-[border-color,box-shadow] duration-150 focus-within:ring-2 focus-within:ring-brand-500/40',
+        checked ? 'border-ink shadow-[inset_0_0_0_1px_rgb(var(--c-ink))]' : 'border-line-strong bg-surface hover:border-ink/50',
       )}
     >
-      <input
-        type="checkbox"
-        className="mt-1 h-4 w-4 shrink-0 accent-brand-700"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span
+        className={cx(
+          'mt-[3px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors duration-150',
+          checked ? 'border-ink bg-ink text-primary' : 'border-line-strong bg-surface',
+        )}
+        aria-hidden
+      >
+        <svg viewBox="0 0 16 16" className={cx('h-3 w-3 transition-transform duration-150', checked ? 'scale-100' : 'scale-0')} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3.5 8.5l3 3 6-7" />
+        </svg>
+      </span>
       <span>
         <span className="block text-[15px] font-medium">{label}</span>
         {description && <span className="block text-xs text-muted">{description}</span>}
