@@ -4,7 +4,7 @@ import { LogoContent } from './Logo';
 const SEEN_KEY = 'vj-splash-seen';
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 /** حجم الشعار في منتصف الشاشة مقارنة بحجمه في الهيدر */
-const BIG = 2.2;
+const BIG = 2;
 const ENTER_MS = 500;
 const HOLD_MS = 400;
 const MOVE_MS = 750;
@@ -111,7 +111,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
     <div className="fixed inset-0 z-[100]" aria-hidden>
       <div ref={bgRef} className="absolute inset-0 bg-bg" />
       <div className="absolute inset-0 grid place-items-center">
-        <div ref={logoRef} className="flex items-center gap-2.5 opacity-0 will-change-transform">
+        <div ref={logoRef} className="flex items-center opacity-0 will-change-transform">
           <LogoContent />
         </div>
       </div>

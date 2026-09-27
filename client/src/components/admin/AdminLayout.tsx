@@ -150,7 +150,7 @@ function Shell() {
       )}
 
       <div className="lg:ps-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-line bg-surface/95 px-3 backdrop-blur sm:px-5">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-line bg-surface px-3 sm:px-5">
           <button
             type="button"
             onClick={() => setOpen(true)}

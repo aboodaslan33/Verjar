@@ -2,10 +2,12 @@ import { ButtonLink, PageHeader } from '../../components/ui';
 import { useSite } from '../../context/SiteContext';
 import { formatJOD } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
+import { SPECIALTIES, WORKS } from '../../lib/works';
 
 export default function About() {
   useDocumentTitle('من نحن');
   const { settings } = useSite();
+  const villa = WORKS.find((w) => w.src.includes('villa')) ?? WORKS[0];
   const paragraphs = settings.aboutContent
     .split(/\n\s*\n/)
     .map((p) => p.trim())
@@ -34,8 +36,8 @@ export default function About() {
     <>
       <PageHeader eyebrow="من نحن" title={settings.aboutTitle} />
 
-      <section className="container py-10 md:py-14" data-reveal>
-        <div className="max-w-prose space-y-5 text-lg leading-loose">
+      <section className="container grid gap-10 py-12 md:py-16 lg:grid-cols-12 lg:items-start lg:gap-16" data-reveal>
+        <div className="max-w-prose space-y-5 text-lg leading-loose lg:col-span-7">
           {paragraphs.length > 0 ? (
             paragraphs.map((p, i) => (
               <p key={i} className={i === 0 ? 'text-ink' : 'text-muted'}>
@@ -47,17 +49,36 @@ export default function About() {
               فريق أردني يعمل في البناء والصيانة والدهان والأعمال المعدنية للبيوت والشركات.
             </p>
           )}
+          <ul className="flex flex-wrap gap-2 pt-2 text-base leading-normal" aria-label="تخصصاتنا">
+            {SPECIALTIES.map((t) => (
+              <li key={t} className="rounded-full border border-line px-4 py-1.5 text-sm text-ink">
+                {t}
+              </li>
+            ))}
+          </ul>
         </div>
+        <figure className="lg:col-span-5">
+          <img
+            src={villa.src}
+            width={villa.width}
+            height={villa.height}
+            alt={villa.title}
+            loading="lazy"
+            decoding="async"
+            className="aspect-[4/5] w-full rounded-2xl bg-subtle object-cover"
+          />
+          <figcaption className="mt-3 text-sm text-muted">{villa.text}</figcaption>
+        </figure>
       </section>
 
-      <section className="border-y border-line bg-surface" data-reveal>
+      <section className="border-y border-line bg-subtle" data-reveal>
         <div className="container py-12 md:py-16">
           <p className="eyebrow">كيف نعمل</p>
-          <h2 className="mt-1 text-2xl md:text-3xl">من الحجز حتى التسليم</h2>
+          <h2 className="mt-4 text-2xl md:text-3xl">من الحجز حتى التسليم</h2>
           <ol className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((s, i) => (
-              <li key={s.t} className="border-t-2 border-sand-300 pt-4 dark:border-sand-600">
-                <span className="ltr text-sm font-bold text-sand-600 dark:text-sand-300">{String(i + 1).padStart(2, '0')}</span>
+              <li key={s.t} className="border-t-2 border-line pt-5 first:border-primary">
+                <span className="ltr text-sm font-semibold text-muted">{String(i + 1).padStart(2, '0')}</span>
                 <h3 className="mt-2 text-lg">{s.t}</h3>
                 <p className="mt-1 text-muted">{s.d}</p>
               </li>

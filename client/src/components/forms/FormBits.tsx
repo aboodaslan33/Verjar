@@ -18,7 +18,7 @@ export function StepActions({
   backLabel?: string;
 }) {
   return (
-    <div className="sticky bottom-0 z-40 -mx-4 mt-8 border-t border-line bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-surface/85 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-2 sm:backdrop-blur-none">
+    <div className="sticky bottom-0 z-40 -mx-4 mt-8 border-t border-line bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-2">
       <div className="flex gap-2 sm:justify-between">
         {onBack ? (
           <Button variant="outline" size="lg" onClick={onBack} disabled={loading} className="shrink-0 px-4 sm:px-6">

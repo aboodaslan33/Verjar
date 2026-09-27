@@ -1,4 +1,4 @@
-# Render Blueprint — فرجار قروب (Farjar Group)
+# Render Blueprint — مجموعة فرجا (Farja Group)
 # الاستخدام: Render Dashboard → New → Blueprint → اختر هذا المستودع
 # بعد الإنشاء راجع قسم "النشر على Render" في README.md
 
@@ -49,7 +49,7 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: ADMIN_NAME
-        value: إدارة فرجار قروب
+        value: إدارة مجموعة فرجا
       # لا تُنشأ بيانات تجريبية في الإنتاج
       - key: SEED_DEMO
         value: "false"

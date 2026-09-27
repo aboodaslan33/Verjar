@@ -262,7 +262,7 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
       </Section>
 
       {/* شريط الحفظ */}
-      <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-surface px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted">{dirty ? `${Object.keys(changes).length} تعديل غير محفوظ` : 'لا توجد تعديلات'}</p>
           <div className="flex gap-2">

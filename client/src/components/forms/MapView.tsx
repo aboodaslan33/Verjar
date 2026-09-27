@@ -10,7 +10,7 @@ const AMMAN: [number, number] = [31.9539, 35.9106];
 // دبوس بسيط بألوان الهوية بدل صور Leaflet الافتراضية (لا تعمل مع الحزم)
 const pinIcon = L.divIcon({
   className: '',
-  html: '<span style="display:block;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#E8B40B;border:3px solid #1F2937;box-shadow:0 2px 6px rgba(0,0,0,.35)"></span>',
+  html: '<span style="display:block;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:rgb(var(--c-primary));border:3px solid rgb(var(--c-ink));box-shadow:0 2px 6px rgba(0,0,0,.35)"></span>',
   iconSize: [26, 26],
   iconAnchor: [13, 26],
 });

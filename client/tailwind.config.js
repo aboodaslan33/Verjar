@@ -11,30 +11,9 @@ export default {
         sans: ['"IBM Plex Sans Arabic"', 'system-ui', 'Segoe UI', 'Tahoma', 'sans-serif'],
       },
       colors: {
-        // الهوية: أصفر دافئ. الدرجات 700–900 داكنة لتصلح كنص وروابط على الأبيض (تباين ≥ 5:1)
-        brand: {
-          50: '#FEF9E7',
-          100: '#FDF1C4',
-          200: '#F8E08A',
-          300: '#F2CB47',
-          400: '#EDBD1F',
-          500: '#E8B40B',
-          600: '#C79905',
-          700: '#8A6400',
-          800: '#6B4E00',
-          900: '#4A3600',
-        },
-        // الثانوي: رمادي محايد (للنصوص الثانوية والحدود والخلفيات الخفيفة)
-        sand: {
-          50: '#F9FAFB',
-          100: '#F3F4F6',
-          200: '#E5E7EB',
-          300: '#D1D5DB',
-          400: '#9CA3AF',
-          500: '#6B7280',
-          600: '#4B5563',
-          700: '#374151',
-        },
+        // كل القيم في src/styles/index.css (مكان واحد للألوان)
+        brand: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900].map((n) => [n, v(`brand-${n}`)])),
+        sand: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700].map((n) => [n, v(`gray-${n}`)])),
         // أدوار دلالية — القيم في CSS variables (src/styles/index.css)
         primary: {
           DEFAULT: v('c-primary'),
@@ -52,18 +31,19 @@ export default {
         line: v('c-line'),
         ink: v('c-ink'),
         muted: v('c-muted'),
-        danger: '#b3261e',
-        success: '#2e7d4f',
-        warn: '#a86b00',
+        accent: v('c-accent-text'),
+        danger: v('c-danger'),
+        success: v('c-success'),
+        warn: v('c-warn'),
+        whatsapp: { DEFAULT: v('c-whatsapp'), hover: v('c-whatsapp-hover') },
       },
       borderRadius: { xl: '0.875rem', '2xl': '1.125rem' },
       boxShadow: {
-        card: '0 1px 2px rgb(17 24 39 / 0.05), 0 1px 1px rgb(17 24 39 / 0.03)',
-        lift: '0 8px 24px -8px rgb(17 24 39 / 0.16)',
+        card: '0 1px 2px rgb(var(--c-shadow) / 0.05)',
+        lift: '0 10px 28px -12px rgb(var(--c-shadow) / 0.22)',
       },
       maxWidth: { prose: '68ch' },
       keyframes: {
-        shimmer: { '100%': { transform: 'translateX(-100%)' } },
         'fade-up': { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'none' } },
       },
       animation: {

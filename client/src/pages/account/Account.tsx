@@ -195,7 +195,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
         </section>
 
         {/* التبويبات */}
-        <div className="sticky top-16 z-20 -mx-4 mt-8 border-b border-line bg-bg/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
+        <div className="sticky top-16 z-20 -mx-4 mt-8 border-b border-line bg-bg px-4 sm:mx-0 sm:px-0">
           <div role="tablist" aria-label="أقسام الحساب" className="-mb-px flex gap-1 overflow-x-auto [scrollbar-width:none]">
             {TABS.map((t) => {
               const active = t.key === tab;

@@ -10,10 +10,11 @@ import { Logo } from './Logo';
 
 export const NAV = [
   { to: '/', label: 'الرئيسية', end: true },
+  { to: '/work', label: 'أعمالنا' },
   { to: '/bookings', label: 'الحجوزات' },
   { to: '/corporate', label: 'عقود الشركات' },
   { to: '/store', label: 'المتجر' },
-  { to: '/about', label: 'نبذة عنا' },
+  { to: '/about', label: 'من نحن' },
   { to: '/contact', label: 'تواصل' },
 ];
 
@@ -43,17 +44,17 @@ export function SiteHeader() {
   }
 
   return (
-    <header className={cx('sticky top-0 z-40 border-b border-line bg-bg transition-shadow duration-300', scrolled && 'shadow-[0_6px_20px_-14px_rgb(17_24_39/0.35)]')}>
+    <header className={cx('sticky top-0 z-40 border-b bg-bg transition-[box-shadow,border-color] duration-300', scrolled ? 'border-line shadow-lift' : 'border-transparent')}>
       {/* شريط التواصل العلوي */}
-      <div className="hidden border-b border-line bg-subtle text-muted md:block">
+      <div className="hidden bg-inverse text-inverse-fg/75 md:block">
         <div className="container flex h-9 items-center justify-between text-[13px]">
           <span>{settings.workingHoursText}</span>
           <div className="flex items-center gap-5">
-            <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 hover:text-ink">
+            <a href={`tel:${settings.phone}`} className="flex items-center gap-1.5 hover:text-primary">
               <Icon name="phone" className="h-3.5 w-3.5" />
               <span className="ltr">{settings.phone}</span>
             </a>
-            <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 hover:text-ink">
+            <a href={`mailto:${settings.email}`} className="flex items-center gap-1.5 hover:text-primary">
               <Icon name="mail" className="h-3.5 w-3.5" />
               <span className="ltr">{settings.email}</span>
             </a>
@@ -61,11 +62,11 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <div className="container flex h-16 items-center justify-between gap-4">
+      <div className="container flex h-[4.5rem] items-center justify-between gap-4">
         <Logo splashAnchor />
 
-        <nav className="hidden lg:block" aria-label="القائمة الرئيسية">
-          <ul className="flex items-center gap-1">
+        <nav className="hidden xl:block" aria-label="القائمة الرئيسية">
+          <ul className="flex items-center gap-0.5">
             {NAV.map((n) => (
               <li key={n.to}>
                 <NavLink
@@ -73,8 +74,9 @@ export function SiteHeader() {
                   end={n.end}
                   className={({ isActive }) =>
                     cx(
-                      'rounded-lg px-3 py-2 text-[15px] font-medium transition-colors',
-                      isActive ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-100' : 'text-ink/80 hover:text-ink',
+                      'relative block px-3 py-2 text-[15px] font-medium transition-colors',
+                      'after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:origin-center after:rounded-full after:bg-primary after:transition-transform after:duration-300',
+                      isActive ? 'text-ink after:scale-x-100' : 'text-muted after:scale-x-0 hover:text-ink',
                     )
                   }
                 >
@@ -124,13 +126,13 @@ export function SiteHeader() {
           </Link>
           <Link
             to="/bookings"
-            className="ms-2 hidden h-10 items-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-fg hover:bg-primary-hover sm:inline-flex"
+            className="ms-2 hidden h-10 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-fg transition-colors hover:bg-primary-hover sm:inline-flex"
           >
             احجز موعد
           </Link>
           <button
             type="button"
-            className="grid h-10 w-10 place-items-center rounded-lg hover:bg-subtle lg:hidden"
+            className="grid h-10 w-10 place-items-center rounded-lg hover:bg-subtle xl:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label="القائمة"
@@ -142,7 +144,7 @@ export function SiteHeader() {
       </div>
 
       {open && (
-        <nav id="mobile-nav" className="animate-fade-up border-t border-line bg-bg lg:hidden" aria-label="القائمة">
+        <nav id="mobile-nav" className="animate-fade-up border-t border-line bg-bg xl:hidden" aria-label="القائمة">
           <ul className="container space-y-1 py-3">
             {NAV.map((n) => (
               <li key={n.to}>
@@ -150,7 +152,7 @@ export function SiteHeader() {
                   to={n.to}
                   end={n.end}
                   className={({ isActive }) =>
-                    cx('block rounded-xl px-4 py-3 text-base font-medium', isActive ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-100' : 'hover:bg-subtle')
+                    cx('flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium', isActive ? 'bg-subtle text-ink before:h-5 before:w-0.5 before:rounded-full before:bg-primary' : 'text-muted hover:bg-subtle hover:text-ink')
                   }
                 >
                   {n.label}

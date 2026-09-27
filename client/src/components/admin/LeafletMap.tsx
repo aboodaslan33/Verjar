@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { tokenColor } from '../../lib/tokens';
 
 /** خريطة OSM للعرض فقط — تُحمّل عند الطلب (حزمة منفصلة) */
 export default function LeafletMap({ lat, lng, label }: { lat: number; lng: number; label?: string }) {
@@ -16,9 +17,9 @@ export default function LeafletMap({ lat, lng, label }: { lat: number; lng: numb
     // دائرة بدل أيقونة الدبوس الافتراضية (تتجنب مشاكل مسارات الصور مع Vite)
     const marker = L.circleMarker([lat, lng], {
       radius: 9,
-      color: '#1F2937',
+      color: tokenColor('c-ink'),
       weight: 3,
-      fillColor: '#E8B40B',
+      fillColor: tokenColor('c-primary'),
       fillOpacity: 1,
     }).addTo(map);
     if (label) marker.bindTooltip(label);

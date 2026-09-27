@@ -35,7 +35,7 @@ export function PublicLayout() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="تواصل عبر واتساب"
-        className="fixed bottom-4 start-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-[#1f7a4d] text-white shadow-lift transition-transform hover:scale-105 md:hidden"
+        className="fixed bottom-4 start-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-whatsapp text-white shadow-lift transition-transform hover:scale-105 md:hidden"
       >
         <Icon name="whatsapp" className="h-7 w-7" />
       </a>

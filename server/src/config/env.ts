@@ -23,7 +23,7 @@ const schema = z.object({
   SMTP_PORT: z.coerce.number().int().default(465),
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
-  MAIL_FROM_NAME: z.string().default('فرجار قروب'),
+  MAIL_FROM_NAME: z.string().default('مجموعة فرجا'),
   CLOUDINARY_FOLDER: z.string().default('verjar'),
 });
 
