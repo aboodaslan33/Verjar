@@ -607,7 +607,7 @@ function BookingWizard({ type }: { type: BookingType }) {
                       <NumberField label="عدد الطوابق" field="floors" integer value={v.floors} onChange={(x) => set('floors', x)} onBlur={() => touch('floors')} error={err('floors')} />
                     </div>
                     <ChoiceField field="tiles">
-                      <ChoiceGroup label="هل يشمل العمل البلاط؟" value={v.tiles} onChange={(x) => choose('tiles', x)} options={YES_NO} error={err('tiles')} />
+                      <ChoiceGroup label="هل يشمل العمل التشطيب الداخلي والخارجي؟" value={v.tiles} onChange={(x) => choose('tiles', x)} options={YES_NO} error={err('tiles')} />
                     </ChoiceField>
                   </>
                 )}

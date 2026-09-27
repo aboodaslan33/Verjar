@@ -55,7 +55,7 @@ export const DETAIL_LABELS: Record<string, string> = {
   area: 'المساحة (م²)',
   colors: 'الألوان',
   decorations: 'ديكورات',
-  tiles: 'بلاط',
+  tiles: 'تشطيب داخلي وخارجي',
   buildingType: 'نوع البناء',
   landArea: 'مساحة الأرض (م²)',
   buildArea: 'مساحة البناء المطلوبة (م²)',
