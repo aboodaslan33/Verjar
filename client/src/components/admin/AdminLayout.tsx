@@ -24,10 +24,11 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     ],
   },
   {
-    group: 'المتجر',
+    group: 'السوق',
     items: [
-      { to: '/admin/products', label: 'المنتجات' },
-      { to: '/admin/categories', label: 'التصنيفات' },
+      { to: '/admin/products', label: 'المنتجات', badge: (s) => s.pendingProducts ?? 0 },
+      { to: '/admin/categories', label: 'الأقسام' },
+      { to: '/admin/vendors', label: 'الموردون' },
     ],
   },
   {

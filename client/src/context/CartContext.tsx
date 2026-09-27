@@ -13,6 +13,9 @@ export type CartItem = {
   discountPercent: number;
   stock: number;
   quantity: number;
+  /** المورد — السلة تقبل منتجات من أكثر من مورد، والطلب ينقسم عند الإرسال */
+  vendorName?: string;
+  vendorSlug?: string;
 };
 
 type CartCtx = {
@@ -93,6 +96,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           discountPercent: p.discountPercent,
           stock: cap,
           quantity: Math.min(qty, cap || 1),
+          vendorName: p.vendor?.name,
+          vendorSlug: p.vendor?.slug,
         },
       ];
     });

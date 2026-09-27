@@ -2,13 +2,16 @@ import { DataTable, type Column } from '../../components/admin/DataTable';
 import { useAdminQuery, useFilters, useMutation } from '../../components/admin/hooks';
 import type { AdminCategory, AdminProduct } from '../../components/admin/types';
 import { AdminPage, FilterBar, FilterSelect, SearchInput, Switch } from '../../components/admin/ui';
+import { ApprovalTag } from '../../components/store/ProductEditorForm';
+import type { AdminVendor } from '../../components/admin/types';
+import { editorCategories } from './ProductEditor';
 import { Button, ButtonLink, Icon, Price, Tag } from '../../components/ui';
 import { api } from '../../lib/api';
 import { cx } from '../../lib/format';
 import type { Paged } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 
-const KEYS = ['q', 'categoryId', 'visible', 'lowStock'] as const;
+const KEYS = ['q', 'categoryId', 'visible', 'lowStock', 'approval', 'vendorId'] as const;
 const LOW_STOCK = 3;
 
 export default function Products() {
@@ -16,6 +19,7 @@ export default function Products() {
   const f = useFilters(KEYS);
   const { values: v, page } = f;
   const cats = useAdminQuery(() => api.get<AdminCategory[]>('/admin/store/categories'), []);
+  const vendors = useAdminQuery(() => api.get<AdminVendor[]>('/admin/vendors'), []);
   const list = useAdminQuery(
     () => api.get<Paged<AdminProduct>>('/admin/store/products', { ...v, page, pageSize: 20 }),
     [JSON.stringify(v), page],
@@ -45,11 +49,19 @@ export default function Products() {
           <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-line bg-subtle">
             {p.media[0]?.kind === 'IMAGE' && <img src={p.media[0].url} alt="" loading="lazy" className="h-full w-full object-cover" />}
           </span>
-          <span className="line-clamp-2">{p.name}</span>
+          <span className="min-w-0">
+            <span className="line-clamp-2">{p.name}</span>
+            {p.approvalStatus !== 'APPROVED' && (
+              <span className="mt-1 block">
+                <ApprovalTag status={p.approvalStatus} />
+              </span>
+            )}
+          </span>
         </span>
       ),
     },
-    { key: 'cat', header: 'التصنيف', cell: (p) => p.category?.name },
+    { key: 'vendor', header: 'المورد', cell: (p) => (p.vendor?.isHouse ? <span className="text-muted">{p.vendor.name}</span> : p.vendor?.name) },
+    { key: 'cat', header: 'القسم', cell: (p) => p.category?.name },
     { key: 'price', header: 'السعر', cell: (p) => <Price price={p.price} finalPrice={p.finalPrice} discountPercent={p.discountPercent} size="sm" /> },
     {
       key: 'stock',
@@ -76,7 +88,7 @@ export default function Products() {
   return (
     <AdminPage
       title="المنتجات"
-      description="إدارة منتجات المتجر والأسعار والخصومات والمخزون"
+      description="منتجات السوق من كل الموردين: المراجعة، الأسعار، الخصومات، والمخزون"
       actions={
         <ButtonLink to="/admin/products/new" size="sm">
           <Icon name="plus" className="h-4 w-4" /> منتج جديد
@@ -85,11 +97,25 @@ export default function Products() {
     >
       <FilterBar onClear={f.clear} active={f.active}>
         <SearchInput value={v.q} onChange={(q) => f.set({ q })} placeholder="اسم المنتج…" />
-        <FilterSelect label="التصنيف" value={v.categoryId} onChange={(e) => f.set({ categoryId: e.target.value })}>
-          <option value="">كل التصنيفات</option>
-          {cats.data?.map((c) => (
+        <FilterSelect label="المراجعة" value={v.approval} onChange={(e) => f.set({ approval: e.target.value })}>
+          <option value="">كل الحالات</option>
+          <option value="PENDING">بانتظار المراجعة</option>
+          <option value="APPROVED">معتمد</option>
+          <option value="REJECTED">مرفوض</option>
+        </FilterSelect>
+        <FilterSelect label="المورد" value={v.vendorId} onChange={(e) => f.set({ vendorId: e.target.value })}>
+          <option value="">كل الموردين</option>
+          {vendors.data?.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </FilterSelect>
+        <FilterSelect label="القسم" value={v.categoryId} onChange={(e) => f.set({ categoryId: e.target.value })}>
+          <option value="">كل الأقسام</option>
+          {editorCategories(cats.data ?? []).map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.label}
             </option>
           ))}
         </FilterSelect>

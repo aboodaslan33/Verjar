@@ -18,10 +18,11 @@
 3. [النشر على Render خطوة بخطوة](#النشر-على-render-خطوة-بخطوة)
 4. [واتساب](#واتساب)
 5. [النشرة البريدية](#النشرة-البريدية)
-6. [قواعد العمل](#قواعد-العمل)
-7. [توثيق الـ API](#توثيق-الـ-api)
-8. [الاختبارات](#الاختبارات)
-9. [هيكل المشروع](#هيكل-المشروع)
+6. [السوق متعدد الموردين](#السوق-متعدد-الموردين)
+7. [قواعد العمل](#قواعد-العمل)
+8. [توثيق الـ API](#توثيق-الـ-api)
+9. [الاختبارات](#الاختبارات)
+10. [هيكل المشروع](#هيكل-المشروع)
 
 ---
 
@@ -216,6 +217,19 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 - كل رسالة فيها رابط إلغاء اشتراك موقّع، وزر إلغاء الاشتراك في Gmail (One-Click). العميل يتحكم بالاشتراك من صفحة حسابه أيضًا.
 - نفس الإعداد يفعّل **"نسيت كلمة المرور"**: رابط بالبريد صالح لساعة ولمرة واحدة. العميل بدون بريد يعيّن له الأدمن كلمة مرور مؤقتة من صفحة العميل.
 
+## السوق متعدد الموردين
+
+المتجر سوق يبيع فيه موردون متعددون، والشركة نفسها مورد افتراضي (`house_vendor`، عمولة 100%) تُنسب له منتجات المتجر القديمة وما يضيفه الأدمن.
+
+- **الأقسام:** ديناميكية من `/admin/categories` بمستويين (رئيسي وفرعي). لكل قسم حقول مواصفات (`text`، `number`، `select` مع خيارات، وإلزامي أو اختياري)، والقسم الفرعي يرث حقول القسم الرئيسي. إخفاء القسم الرئيسي يخفي منتجات أقسامه الفرعية.
+- **الموردون:** الأدمن يمنح عميلًا مسجّلًا صلاحية مورد من `/admin/vendors` أو من صفحة العميل، ويحدد العمولة (افتراضي 10%). سحب الصلاحية (`active=false`) يوقف لوحة المورد فورًا ويخفي منتجاته، والطلبات والمستحقات تبقى.
+- **لوحة المورد `/vendor`:** ملف المتجر (الاسم، الشعار، الوصف)، والمنتجات (صور Cloudinary حتى 8 لكل منتج، سعر، خصم، مخزون، قسم، مواصفات)، والطلبات وتحديث حالتها، والأرباح. صفحة المتجر العامة `/store/vendor/:slug`.
+- **المراجعة:** منتج المورد الجديد `PENDING` ولا يظهر قبل موافقة الأدمن. تعديل الاسم أو الوصف أو القسم أو المواصفات أو إضافة صور يعيده للمراجعة، وأي تعديل على منتج مرفوض يعيد إرساله. السعر والمخزون والإظهار لا تحتاج مراجعة.
+- **الطلب:** السلة تقبل منتجات من أكثر من مورد، والطلب ينقسم عند الإرسال إلى طلب فرعي (`VendorOrder`) لكل مورد. كل بند يحفظ وقت البيع: السعر، نسبة العمولة، العمولة، وصافي المورد. تغيير عمولة المورد لاحقًا لا يغيّر الطلبات السابقة.
+- **الحالات والمخزون:** المورد يحدّث حالة طلبه الفرعي (إعادة تفعيل الملغي للإدارة فقط). الإلغاء يُرجع المخزون، والتراجع عنه يخصمه من جديد. حالة الطلب الرئيسي تُشتق من طلباته الفرعية (كلها ملغاة = ملغي، وإلا أبطأ طلب فرعي نشط)، وتغييرها من الأدمن يُطبَّق على كل الطلبات الفرعية.
+- **التسوية:** المستحق للمورد = صافي طلباته الفرعية المكتملة غير المسوّاة. زر "تم الدفع" يسجّل `VendorPayout` ويربط به هذه الطلبات، وبعدها لا تتغير حالتها.
+- **العزل:** كل مسارات `/vendor` مقيدة بمتجر صاحب الجلسة، والعنصر الذي يخص موردًا آخر يُعامل كغير موجود (404). المورد لا يستطيع تغيير المورد أو حالة المراجعة أو التمييز.
+
 ## قواعد العمل
 
 - **المواعيد:** لا يُقبل حجزان بفارق أقل من `bookingGapHours` (افتراضي 3 ساعات) على مستوى الشركة. الأوقات المحجوزة تظهر معطّلة. التحقق النهائي يتم داخل معاملة مع قفل `pg_advisory_xact_lock`، فلا ينجح حجزان متزامنان لنفس الفترة. أيام وساعات العمل وطول الفترة تُضبط من الإعدادات. التوقيت دائمًا بتوقيت عمّان (`Asia/Amman`).
@@ -247,10 +261,11 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 | GET | `/site/settings` | الإعدادات العامة (التواصل، الرسوم، أيام العمل، المحتوى) |
 | GET | `/bookings/slots?date=YYYY-MM-DD` | أوقات اليوم: `{ open, reason, gapHours, slots:[{time, available, reason}] }` |
 | POST | `/bookings` | **(عميل مسجّل)** إنشاء حجز. `multipart/form-data`: `data` (JSON) + `photos[]` (حتى 5) + `designFiles[]`، أو JSON بدون ملفات |
-| GET | `/store/categories` | التصنيفات مع عدد المنتجات |
-| GET | `/store/products?category=&q=&featured=&sort=new\|price_asc\|price_desc\|discount` | المنتجات |
-| GET | `/store/products/:slug` | منتج + منتجات مشابهة |
-| POST | `/store/orders` | **(عميل مسجّل)** `{ name, phone, address, notes?, items:[{productId, quantity}] }` |
+| GET | `/store/categories` | شجرة الأقسام الظاهرة `[{ ..., productCount, children: [...] }]` |
+| GET | `/store/products?category=&vendor=&q=&featured=&sort=new\|price_asc\|price_desc\|discount` | المنتجات المعتمدة (القسم الرئيسي يشمل فروعه) مع `vendor` و`specs` |
+| GET | `/store/products/:slug` | منتج مع `specList` (المواصفات بأسمائها) + منتجات مشابهة |
+| GET | `/store/vendors/:slug` | ملف متجر مورد وعدد منتجاته |
+| POST | `/store/orders` | **(عميل مسجّل)** `{ name, phone, address, notes?, items:[{productId, quantity}] }` — يعيد أيضًا `vendorOrders` (طلب فرعي لكل مورد) |
 | GET | `/corporate/services` | خدمات الشركات (ANNUAL / URGENT) |
 | POST | `/corporate/requests` | **(عميل مسجّل)** طلب شركة. `multipart`: `data` (JSON) + `commercialRegister` + `license` |
 
@@ -298,6 +313,18 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 |---|---|---|
 | GET | `/account/overview` | الحجوزات، الطلبات، طلبات الشركات، العقود، الملفات (عروض الأسعار/التقييم)، الدفعات، والملخص المالي |
 
+### المورد (عميل بصلاحية مورد فعّالة) — تحت `/vendor`
+
+| المسار | العمليات |
+|---|---|
+| `/me` | GET: الملف والإجماليات والأعداد، PATCH `{ name?, description? }` |
+| `/me/logo` | POST `multipart file` / DELETE |
+| `/categories` | GET: الأقسام الظاهرة مع حقول المواصفات الفعلية |
+| `/products` | GET (`q, approval`) / POST `{ name, description, price, discountPercent?, stock, visible?, categoryId, specs }`، و `/:id` GET / PATCH / DELETE |
+| `/products/:id/media` | POST `multipart files[]` (صور فقط)، و `/:mediaId` DELETE، و `/order` PUT `{ ids }` |
+| `/orders` | GET (`status`)، و `/:id` GET / PATCH `{ status: CONFIRMED\|IN_PROGRESS\|COMPLETED\|CANCELLED }` |
+| `/earnings` | GET: الإجماليات، الطلبات المستحقة، والتسويات |
+
 ### الأدمن (جلسة بدور `ADMIN` أو `STAFF`) — تحت `/admin`
 
 | المسار | العمليات |
@@ -312,8 +339,13 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 | `/technicians` | GET / POST، و `/technicians/:id` PATCH |
 | `/orders` | GET بفلاتر `status, q, from, to`، و `/orders/:id` GET / PATCH (`status, notify`) / DELETE |
 | `/orders/:id/whatsapp` | POST: إعادة إرسال واتساب |
-| `/store/categories` | GET / POST، و `/:id` PATCH / DELETE |
-| `/store/products` | GET / POST، و `/:id` GET / PATCH / DELETE |
+| `/orders/:id/vendor-orders/:voId` | PATCH `{ status }`: حالة طلب فرعي واحد |
+| `/store/categories` | GET / POST `{ name, parentId?, specFields?, sortOrder?, visible? }`، و `/:id` PATCH / DELETE |
+| `/store/products` | GET (`approval, vendorId, categoryId, …`) / POST (`vendorId?`، افتراضيًا الشركة)، و `/:id` GET / PATCH / DELETE |
+| `/store/products/:id/approve`، `/reject` | POST: اعتماد منتج مورد، أو رفضه `{ reason }` |
+| `/vendors` | GET، POST `{ customerId, commissionPercent? }` (منح الصلاحية)، و `/:id` GET / PATCH `{ commissionPercent?, name?, active? }` |
+| `/vendors/report?from=&to=` | GET: لكل مورد المبيعات، العمولة، صافي المورد، المدفوع، والمستحق |
+| `/vendors/:id/payouts` | POST `{ method?, reference?, note?, expectedAmount? }`: "تم الدفع" — تسوية كل المستحق |
 | `/store/products/:id/media` | POST `multipart files[]`، و `/:mediaId` DELETE، و `/order` PUT `{ ids }` |
 | `/corporate/requests` | GET، و `/:id` GET / PATCH، و `/:id/whatsapp` POST |
 | `/corporate/requests/:id/contract` | POST `{ title, startDate, endDate, value, reminderDays?, notes? }`: تحويل إلى عقد نشط |
@@ -331,7 +363,7 @@ DATABASE_URL="<External Database URL>" SEED_DEMO=false npm run seed
 
 ## الاختبارات
 
-اختبارات Jest + Supertest لمسارات الحجز والطلب والشركات، وتشمل قاعدة الساعات الثلاث والحجز المتزامن وحساب الرسوم ورسالة واتساب وخصم المخزون وإرجاعه والملفات والمالية ودخول العميل.
+اختبارات Jest + Supertest لمسارات الحجز والطلب والشركات والسوق متعدد الموردين، وتشمل عزل الموردين ومراجعة المنتجات وتقسيم الطلب وتثبيت العمولة والتسوية، وقاعدة الساعات الثلاث والحجز المتزامن وحساب الرسوم ورسالة واتساب وخصم المخزون وإرجاعه والملفات والمالية ودخول العميل.
 
 ```bash
 createdb verjar_test

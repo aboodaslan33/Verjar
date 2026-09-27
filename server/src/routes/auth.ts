@@ -25,9 +25,12 @@ type CustomerRow = {
   emailOptIn: boolean;
 };
 
-function customerPublic(c: CustomerRow) {
+/** بيانات العميل للواجهة، مع متجره إن كان لديه صلاحية مورد فعّالة */
+async function customerPublic(c: CustomerRow) {
+  const vendor = await prisma.vendor.findFirst({ where: { customerId: c.id, active: true }, select: { id: true, name: true, slug: true } });
   return {
     role: 'CUSTOMER' as const,
+    vendor,
     id: c.id,
     name: c.name,
     phone: c.phone,
@@ -88,7 +91,7 @@ authRouter.get(
       clearAuthCookie(res);
       throw unauthorized('انتهت الجلسة، سجّل الدخول مجددًا');
     }
-    return ok(res, customerPublic(c));
+    return ok(res, await customerPublic(c));
   }),
 );
 
@@ -176,7 +179,7 @@ authRouter.post(
 
     setAuthCookie(res, principalOf(customer));
     await audit({ actorType: 'customer', action: existing ? 'register_claim' : 'register', entity: 'customer', entityId: customer.id });
-    ok(res, customerPublic(customer), 201);
+    ok(res, await customerPublic(customer), 201);
   }),
 );
 
@@ -236,7 +239,7 @@ authRouter.post(
     await loginSucceeded(key);
     const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
     setAuthCookie(res, principalOf(updated));
-    return ok(res, customerPublic(updated));
+    return ok(res, await customerPublic(updated));
   }),
 );
 
@@ -294,7 +297,7 @@ authRouter.post(
     });
     setAuthCookie(res, principalOf(updated));
     await audit({ actorType: 'customer', action: 'password_reset', entity: 'customer', entityId: c.id });
-    ok(res, customerPublic(updated));
+    ok(res, await customerPublic(updated));
   }),
 );
 
@@ -320,7 +323,7 @@ authRouter.patch(
     }
     const c = await prisma.customer.update({ where: { id: req.auth!.sub }, data: input });
     if (input.name) setAuthCookie(res, principalOf(c));
-    ok(res, customerPublic(c));
+    ok(res, await customerPublic(c));
   }),
 );
 
@@ -393,7 +396,7 @@ authRouter.get(
   asyncHandler(async (req, res) => {
     const c = await prisma.customer.findUnique({ where: { id: req.auth!.sub } });
     if (!c || c.deletedAt) throw unauthorized();
-    ok(res, customerPublic(c));
+    ok(res, await customerPublic(c));
   }),
 );
 

@@ -64,6 +64,7 @@ customersRouter.get(
       include: {
         bookings: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
         orders: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, include: { items: true } },
+        vendor: { select: { id: true, name: true, slug: true, active: true, commissionPercent: true } },
         corporateRequests: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, include: { services: { select: { name: true } } } },
         contracts: { where: { deletedAt: null }, orderBy: { startDate: 'desc' } },
         quoteFiles: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },

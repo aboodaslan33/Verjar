@@ -6,7 +6,7 @@ import { PaymentForm } from '../../components/admin/PaymentForm';
 import { PaymentsList } from '../../components/admin/RecordLists';
 import type { FinanceRow, FinanceSummary, Payment } from '../../components/admin/types';
 import { AdminPage, FilterBar, SearchInput, StatTile } from '../../components/admin/ui';
-import { Button, ButtonA, ErrorState, Icon, Modal, Skeleton } from '../../components/ui';
+import { Button, ButtonA, ButtonLink, ErrorState, Icon, Modal, Skeleton } from '../../components/ui';
 import { api } from '../../lib/api';
 import { cx, displayPhone, formatJOD } from '../../lib/format';
 import type { Paged } from '../../lib/types';
@@ -79,6 +79,9 @@ export default function Finance() {
       description="المطلوب والمدفوع والمتبقي على كل عميل (الطلبات + الحجوزات + العقود)"
       actions={
         <>
+          <ButtonLink to="/admin/vendors" size="sm">
+            تقرير الموردين والعمولات
+          </ButtonLink>
           <ButtonA href={api.url('/admin/finance/export?kind=customers')} download variant="outline" size="sm">
             <Icon name="download" className="h-4 w-4" /> تصدير العملاء CSV
           </ButtonA>

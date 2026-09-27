@@ -46,7 +46,11 @@ accountRouter.get(
           discountTotal: true,
           address: true,
           createdAt: true,
-          items: { select: { id: true, name: true, quantity: true, lineTotal: true } },
+          items: { select: { id: true, name: true, quantity: true, lineTotal: true, vendorOrderId: true } },
+          vendorOrders: {
+            orderBy: { number: 'asc' },
+            select: { id: true, number: true, status: true, total: true, vendor: { select: { name: true, slug: true, isHouse: true } } },
+          },
         },
       }),
       prisma.corporateRequest.findMany({

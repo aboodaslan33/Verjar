@@ -17,7 +17,7 @@ const SORTS = [
 const PAGE_SIZE = 12;
 
 export default function Store() {
-  useDocumentTitle('المتجر');
+  useDocumentTitle('السوق');
   const [params, setParams] = useSearchParams();
   const category = params.get('category') ?? '';
   const q = params.get('q') ?? '';
@@ -54,20 +54,22 @@ export default function Store() {
   );
 
   const totalCount = cats.data?.reduce((s, c) => s + (c.productCount ?? 0), 0);
-  const activeCat = cats.data?.find((c) => c.slug === category);
+  // القسم الرئيسي النشط (سواء اختير هو أو أحد أقسامه الفرعية)
+  const activeTop = cats.data?.find((c) => c.slug === category || c.children?.some((k) => k.slug === category));
+  const activeCat = activeTop?.slug === category ? activeTop : activeTop?.children?.find((k) => k.slug === category);
   const hasFilters = Boolean(category || q);
 
   return (
     <>
       <PageHeader
-        eyebrow="المتجر"
-        title="منتجات من ورشتنا"
-        description="أثاث داخلي وخارجي، قطع ديكور معدنية، ومنتجات للمصانع والمستودعات. اطلب من الموقع، ونتواصل معك على واتساب لتأكيد الطلب وموعد التوصيل."
+        eyebrow="السوق"
+        title="منتجات من ورشتنا ومن موردين معتمدين"
+        description="أقسام متنوعة من متاجر مختلفة في سلة واحدة. كل منتج تراجعه الإدارة قبل عرضه، وكل مورد يجهّز طلبه ويتابعه معك."
       />
 
       <div className="container py-8 md:py-10">
         {/* التصنيفات */}
-        <nav aria-label="تصنيفات المنتجات" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <nav aria-label="أقسام السوق" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           {cats.loading && !cats.data ? (
             <div className="flex gap-2" aria-hidden>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -80,7 +82,7 @@ export default function Store() {
               {cats.data?.map((c) => (
                 <CatTab
                   key={c.id}
-                  active={category === c.slug}
+                  active={activeTop?.id === c.id}
                   onClick={() => update({ category: c.slug })}
                   label={c.name}
                   count={c.productCount}
@@ -89,6 +91,28 @@ export default function Store() {
             </ul>
           )}
         </nav>
+        {activeTop && (activeTop.children?.length ?? 0) > 0 && (
+          <nav aria-label={`أقسام ${activeTop.name}`} className="-mx-4 mt-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <ul className="flex gap-1 border-b border-line">
+              {[{ id: activeTop.id, name: `كل ${activeTop.name}`, slug: activeTop.slug }, ...(activeTop.children ?? [])].map((k) => (
+                <li key={k.id} className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => update({ category: k.slug })}
+                    aria-pressed={category === k.slug}
+                    className={cx(
+                      'relative min-h-[44px] px-3 text-sm transition-colors',
+                      'after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary after:transition-transform',
+                      category === k.slug ? 'font-semibold text-ink after:scale-x-100' : 'text-muted after:scale-x-0 hover:text-ink',
+                    )}
+                  >
+                    {k.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
 
         {/* البحث والترتيب */}
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -169,8 +193,8 @@ export default function Store() {
               title={hasFilters ? 'لا توجد منتجات تطابق بحثك' : 'لا توجد منتجات حاليًا'}
               description={
                 hasFilters
-                  ? 'جرّب كلمة أخرى أو تصنيفًا مختلفًا.'
-                  : 'نضيف منتجات جديدة من الورشة باستمرار. تابعنا قريبًا.'
+                  ? 'جرّب كلمة أخرى أو قسمًا مختلفًا.'
+                  : 'نضيف منتجات جديدة باستمرار. تابعنا قريبًا.'
               }
               action={
                 hasFilters ? (

@@ -19,7 +19,7 @@ function markSeen() {
 
 /** تظهر مرة واحدة في الجلسة، لا تظهر في لوحة التحكم، ولا مع تقليل الحركة */
 export function shouldShowSplash(pathname: string) {
-  if (typeof window === 'undefined' || pathname.startsWith('/admin')) return false;
+  if (typeof window === 'undefined' || pathname.startsWith('/admin') || pathname.startsWith('/vendor')) return false;
   try {
     if (sessionStorage.getItem(SEEN_KEY)) return false;
   } catch {

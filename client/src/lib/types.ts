@@ -37,7 +37,20 @@ export type AdminSettings = Omit<SiteSettings, 'whatsappMode'> & {
   contractReminderDays: number;
 };
 
-export type Category = { id: string; name: string; slug: string; productCount?: number };
+export type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  productCount?: number;
+  children?: { id: string; name: string; slug: string; productCount: number }[];
+};
+
+/** حقل مواصفات يحدده الأدمن لكل قسم */
+export type SpecField = { key: string; label: string; type: 'text' | 'number' | 'select'; options: string[]; required: boolean };
+
+export type VendorBrief = { id: string; name: string; slug: string; logoUrl: string | null; isHouse: boolean };
+
+export type VendorStore = VendorBrief & { description: string; createdAt: string; productCount: number };
 
 export type Media = { id: string; kind: MediaKind; url: string };
 
@@ -51,8 +64,12 @@ export type Product = {
   finalPrice: number;
   stock: number;
   featured: boolean;
-  category: { id: string; name: string; slug: string };
+  specs?: Record<string, string | number>;
+  category: { id: string; name: string; slug: string; parent?: { id: string; name: string; slug: string } | null };
+  vendor: VendorBrief;
   media: Media[];
+  /** في صفحة المنتج فقط: المواصفات بأسمائها */
+  specList?: { key: string; label: string; value: string }[];
 };
 
 export type Slot = { time: string; available: boolean; reason?: 'past' | 'booked' };
@@ -99,6 +116,7 @@ export type OrderCreated = {
   discountTotal: number;
   total: number;
   items: OrderItem[];
+  vendorOrders: { id: string; number: number; total: number; status: RequestStatus; vendor: { name: string; slug: string } }[];
   message: string;
   whatsapp: WhatsAppResult;
 };
@@ -125,6 +143,8 @@ export type CustomerMe = {
   companyName: string | null;
   hasPassword: boolean;
   emailOptIn: boolean;
+  /** متجر العميل إن كان لديه صلاحية مورد */
+  vendor: { id: string; name: string; slug: string } | null;
 };
 export type AdminMe = { id: string; name: string; email: string; role: 'ADMIN' | 'STAFF' };
 /** المستخدم الحالي كما يعيده GET /auth/me */

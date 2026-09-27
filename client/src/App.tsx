@@ -26,6 +26,10 @@ const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const Account = lazy(() => import('./pages/account/Account'));
 
+const VendorStore = lazy(() => import('./pages/public/VendorStore'));
+// لوحة المورد — حزمة منفصلة
+const VendorApp = lazy(() => import('./pages/vendor/VendorApp'));
+
 // لوحة الأدمن — حزمة منفصلة لا تُحمّل للزوار
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
 
@@ -45,12 +49,21 @@ export default function App() {
             </Suspense>
           }
         />
+        <Route
+          path="/vendor/*"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <VendorApp />
+            </Suspense>
+          }
+        />
         <Route element={<PublicLayout />}>
           <Route index element={<Home />} />
           {/* التصفح مفتوح للجميع */}
           <Route path="bookings" element={<Bookings />} />
           <Route path="corporate" element={<Corporate />} />
           <Route path="store" element={<Store />} />
+          <Route path="store/vendor/:slug" element={<VendorStore />} />
           <Route path="store/:slug" element={<ProductPage />} />
           <Route path="work" element={<Work />} />
           <Route path="about" element={<About />} />

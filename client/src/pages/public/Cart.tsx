@@ -1,3 +1,4 @@
+import { BRAND } from '../../lib/brand';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
 import { QtyStepper } from '../../components/store/QtyStepper';
@@ -9,6 +10,15 @@ import { useDocumentTitle } from '../../lib/useAsync';
 export default function Cart() {
   useDocumentTitle('السلة');
   const { items, count, subtotal, discount, total, setQty, remove } = useCart();
+  // تجميع المنتجات حسب المتجر
+  const groups = items.reduce<{ key: string; name: string; slug?: string; items: typeof items }[]>((acc, i) => {
+    const key = i.vendorSlug ?? '_';
+    const g = acc.find((x) => x.key === key);
+    if (g) g.items.push(i);
+    else acc.push({ key, name: i.vendorName ?? BRAND.ar, slug: i.vendorSlug, items: [i] });
+    return acc;
+  }, []);
+  const multiVendor = groups.length > 1;
 
   if (items.length === 0) {
     return (
@@ -37,8 +47,28 @@ export default function Cart() {
       />
       <div className="container grid gap-8 py-8 md:py-10 lg:grid-cols-12">
         <section className="lg:col-span-8" aria-label="المنتجات في السلة">
-          <ul className="divide-y divide-line rounded-2xl border border-line bg-surface">
-            {items.map((i) => {
+          {multiVendor && (
+            <p className="mb-3 text-sm text-muted">
+              السلة فيها منتجات من {groups.length} متاجر. يصلك كل جزء من متجره، وتتابع الطلب كاملًا من حسابك.
+            </p>
+          )}
+          <div className="space-y-4">
+            {groups.map((group) => (
+              <div key={group.key} className="overflow-hidden rounded-2xl border border-line bg-surface">
+                {multiVendor && (
+                  <p className="border-b border-line bg-subtle/60 px-4 py-2.5 text-sm">
+                    من متجر{' '}
+                    {group.slug ? (
+                      <Link to={`/store/vendor/${group.slug}`} className="font-semibold hover:underline">
+                        {group.name}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold">{group.name}</span>
+                    )}
+                  </p>
+                )}
+              <ul className="divide-y divide-line">
+                {group.items.map((i) => {
               const discounted = i.discountPercent > 0 && i.finalPrice < i.price;
               return (
                 <li key={i.productId} className="flex gap-3 p-3 sm:gap-4 sm:p-4">
@@ -87,6 +117,9 @@ export default function Cart() {
               );
             })}
           </ul>
+              </div>
+            ))}
+          </div>
           <Link to="/store" className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
             <Icon name="chevronRight" className="h-4 w-4" /> متابعة التسوق
           </Link>

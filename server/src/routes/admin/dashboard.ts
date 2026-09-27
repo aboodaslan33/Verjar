@@ -29,6 +29,7 @@ dashboardRouter.get(
       recentBookings,
       recentOrders,
       recentCorporate,
+      pendingProducts,
     ] = await Promise.all([
       prisma.booking.count({
         where: { deletedAt: null, status: { not: 'CANCELLED' }, scheduledAt: { gte: dayStart, lt: dayEnd } },
@@ -70,6 +71,7 @@ dashboardRouter.get(
         take: 8,
         select: { id: true, number: true, type: true, companyName: true, status: true, createdAt: true },
       }),
+      prisma.product.count({ where: { deletedAt: null, approvalStatus: 'PENDING', vendor: { active: true } } }),
     ]);
 
     const activity = [
@@ -88,6 +90,7 @@ dashboardRouter.get(
       salesMonth: Number(salesMonth._sum.total ?? 0),
       ordersMonth,
       expiringContracts,
+      pendingProducts,
       upcoming,
       activity,
     });

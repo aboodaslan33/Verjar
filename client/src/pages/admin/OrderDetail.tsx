@@ -11,7 +11,7 @@ import { AdminPage, DefList, DetailSkeleton, Panel } from '../../components/admi
 import { WhatsAppFallback } from '../../components/admin/WhatsAppFallback';
 import { Alert, Button, ButtonA, Checkbox, ErrorState, Icon, StatusBadge } from '../../components/ui';
 import { api } from '../../lib/api';
-import { displayPhone, formatDate, formatJOD } from '../../lib/format';
+import { STATUS_LABEL, STATUS_ORDER, displayPhone, formatDate, formatJOD } from '../../lib/format';
 import type { RequestStatus } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 
@@ -35,6 +35,12 @@ export default function OrderDetail() {
     );
 
   const paid = o.payments.reduce((s, p) => s + p.amount, 0);
+  const multi = o.vendorOrders.length > 1;
+
+  const setVendorStatus = async (voId: string, status: RequestStatus) => {
+    const r = await m.run(`vo-${voId}`, () => api.patch(`/admin/orders/${o.id}/vendor-orders/${voId}`, { status }), 'تم تحديث حالة الطلب الفرعي');
+    if (r) q.reload();
+  };
 
   const resend = async (to: 'admin' | 'customer') => {
     const r = await m.run(`wa-${to}`, () => api.post<{ link: string; sent: boolean }>(`/admin/orders/${o.id}/whatsapp`, { to }));
@@ -74,34 +80,67 @@ export default function OrderDetail() {
       )}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <Panel title={`المنتجات (${o.items.length})`} bodyClassName="p-0 sm:p-0">
-            <ul className="divide-y divide-line">
-              {o.items.map((it) => {
-                const thumb = it.product?.media.find((x) => x.kind === 'IMAGE')?.url;
-                return (
-                  <li key={it.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-line bg-subtle">
-                      {thumb && <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <Link to={`/admin/products/${it.productId}`} className="line-clamp-1 font-medium hover:text-brand-700 dark:hover:text-brand-200">
-                        {it.name}
+          <Panel title={`المنتجات (${o.items.length})${multi ? ` — ${o.vendorOrders.length} موردين` : ''}`} bodyClassName="p-0 sm:p-0">
+            {o.vendorOrders.map((vo) => (
+              <section key={vo.id} className="border-b border-line last:border-b-0">
+                {(multi || !vo.vendor.isHouse) && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-subtle/60 px-4 py-2.5 sm:px-5">
+                    <span className="me-auto min-w-0">
+                      <Link to={`/admin/vendors/${vo.vendor.id}`} className="font-semibold hover:underline">
+                        {vo.vendor.name}
                       </Link>
-                      <p className="text-xs text-muted">
-                        <span className="tabular-nums">{it.quantity}</span> × {formatJOD(it.unitFinalPrice)}
-                        {it.discountPercent > 0 && (
-                          <>
-                            {' '}
-                            (<s>{formatJOD(it.unitPrice)}</s> خصم {it.discountPercent}%)
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <b className="shrink-0 tabular-nums">{formatJOD(it.lineTotal)}</b>
-                  </li>
-                );
-              })}
-            </ul>
+                      <span className="ms-2 text-xs text-muted">
+                        طلب فرعي #{vo.number} · عمولة {formatJOD(vo.commissionTotal)} · صافي المورد {formatJOD(vo.vendorNet)}
+                        {vo.payout && ' · تمت التسوية'}
+                      </span>
+                    </span>
+                    <select
+                      aria-label={`حالة طلب ${vo.vendor.name}`}
+                      className="input h-9 w-auto py-0 text-sm"
+                      value={vo.status}
+                      disabled={!!vo.payoutId || m.pending === `vo-${vo.id}`}
+                      onChange={(e) => setVendorStatus(vo.id, e.target.value as RequestStatus)}
+                    >
+                      {STATUS_ORDER.map((st) => (
+                        <option key={st} value={st}>
+                          {STATUS_LABEL[st]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <ul className="divide-y divide-line">
+                  {o.items
+                    .filter((it) => it.vendorOrderId === vo.id)
+                    .map((it) => {
+                      const thumb = it.product?.media.find((x) => x.kind === 'IMAGE')?.url;
+                      return (
+                        <li key={it.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-line bg-subtle">
+                            {thumb && <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <Link to={`/admin/products/${it.productId}`} className="line-clamp-1 font-medium hover:text-accent">
+                              {it.name}
+                            </Link>
+                            <p className="text-xs text-muted">
+                              <span className="tabular-nums">{it.quantity}</span> × {formatJOD(it.unitFinalPrice)}
+                              {it.discountPercent > 0 && (
+                                <>
+                                  {' '}
+                                  (<s>{formatJOD(it.unitPrice)}</s> خصم {it.discountPercent}%)
+                                </>
+                              )}
+                              {!vo.vendor.isHouse && <> · عمولة {it.commissionPercent}% = {formatJOD(it.commissionAmount)}</>}
+                            </p>
+                          </div>
+                          <b className="shrink-0 tabular-nums">{formatJOD(it.lineTotal)}</b>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </section>
+            ))}
             <dl className="space-y-1.5 border-t border-line bg-subtle/40 px-4 py-4 text-sm sm:px-5">
               <div className="flex justify-between">
                 <dt className="text-muted">المجموع قبل الخصم</dt>

@@ -74,7 +74,10 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
         )}
       </Link>
       <div className="flex flex-1 flex-col p-3 sm:p-4">
-        <p className="text-xs text-muted">{product.category.name}</p>
+        <p className="line-clamp-1 text-xs text-muted">
+          {product.category.name}
+          {product.vendor && !product.vendor.isHouse && <> · {product.vendor.name}</>}
+        </p>
         <H className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug sm:text-base">
           <Link to={`/store/${product.slug}`} className="hover:text-brand-700 dark:hover:text-brand-200">
             {product.name}

@@ -8,11 +8,15 @@ import { prisma } from '../lib/prisma';
 export type Role = 'ADMIN' | 'STAFF' | 'CUSTOMER';
 export type AuthPayload = { sub: string; role: Role; name: string };
 
+/** متجر المورد صاحب الجلسة (يُضبط في requireVendor) */
+export type VendorContext = { id: string; name: string; slug: string; commissionPercent: number };
+
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       auth?: AuthPayload;
+      vendor?: VendorContext;
     }
   }
 }
@@ -141,4 +145,24 @@ export function requireCustomer(req: Request, _res: Response, next: NextFunction
   if (!req.auth) return next(unauthorized());
   if (req.auth.role !== 'CUSTOMER') return next(forbidden('هذه الصفحة لحسابات العملاء'));
   next();
+}
+
+/**
+ * لوحة المورد: عميل لديه صلاحية مورد فعّالة. تُقرأ من قاعدة البيانات مع كل طلب،
+ * فسحب الصلاحية يسري فورًا. كل استعلامات اللوحة تُقيَّد بـ req.vendor.id.
+ */
+export async function requireVendor(req: Request, _res: Response, next: NextFunction) {
+  try {
+    if (!req.auth) return next(unauthorized());
+    if (req.auth.role !== 'CUSTOMER') return next(forbidden('لوحة الموردين لحسابات الموردين فقط'));
+    const v = await prisma.vendor.findFirst({
+      where: { customerId: req.auth.sub, active: true },
+      select: { id: true, name: true, slug: true, commissionPercent: true },
+    });
+    if (!v) return next(forbidden('حسابك ليس لديه صلاحية مورد'));
+    req.vendor = { id: v.id, name: v.name, slug: v.slug, commissionPercent: v.commissionPercent.toNumber() };
+    next();
+  } catch (e) {
+    next(e);
+  }
 }

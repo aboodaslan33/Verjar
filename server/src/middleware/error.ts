@@ -28,10 +28,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     });
   }
   if (err instanceof HttpError) {
+    // أخطاء حقول محددة (مثل المواصفات) تُعرض بجانب الحقل كما في أخطاء zod
+    const fields = (err.details as { fields?: Record<string, string> } | undefined)?.fields;
     return res.status(err.status).json({
       ok: false,
       data: null,
-      error: { code: err.code, message: err.message, details: err.details },
+      error: { code: err.code, message: err.message, details: err.details, ...(fields ? { fields } : {}) },
     });
   }
   if (err instanceof multer.MulterError) {

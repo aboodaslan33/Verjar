@@ -24,6 +24,8 @@ const Technicians = lazy(() => import('./Technicians'));
 const Settings = lazy(() => import('./Settings'));
 const Logs = lazy(() => import('./Logs'));
 const Newsletter = lazy(() => import('./Newsletter'));
+const Vendors = lazy(() => import('./Vendors'));
+const VendorDetail = lazy(() => import('./VendorDetail'));
 
 /** هيكل تحميل بشكل لوحة التحكم (أثناء التحقق من الجلسة) */
 function ShellSkeleton() {
@@ -110,6 +112,8 @@ export default function AdminApp() {
           <Route path="settings" element={s(<Settings />)} />
           <Route path="logs" element={s(<Logs />)} />
           <Route path="newsletter" element={s(<Newsletter />)} />
+          <Route path="vendors" element={s(<Vendors />)} />
+          <Route path="vendors/:id" element={s(<VendorDetail />)} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

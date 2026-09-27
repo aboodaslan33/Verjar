@@ -321,6 +321,22 @@ function Confirmation({ order }: { order: OrderCreated }) {
           ))}
         </ul>
         <Totals subtotal={Number(order.subtotal)} discount={Number(order.discountTotal)} total={Number(order.total)} />
+        {order.vendorOrders.length > 1 && (
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="text-sm font-semibold">طلبك مقسّم على {order.vendorOrders.length} متاجر</p>
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {order.vendorOrders.map((vo) => (
+                <li key={vo.id} className="flex justify-between gap-3">
+                  <span className="text-muted">
+                    {vo.vendor.name} <span className="ltr">#{vo.number}</span>
+                  </span>
+                  <span className="tabular-nums">{formatJOD(vo.total)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">كل متجر يجهّز ويوصل منتجاته، وتتابع حالة كل جزء من حسابك.</p>
+          </div>
+        )}
       </section>
 
       <details className="mt-6 rounded-2xl border border-line bg-surface p-5">

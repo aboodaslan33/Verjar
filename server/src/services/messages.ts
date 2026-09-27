@@ -20,15 +20,30 @@ function mapLink(lat?: number | null, lng?: number | null) {
 }
 
 /** رسالة الطلب من المتجر — بنفس الصيغة المعتمدة */
-export function orderMessage(order: Order & { items: OrderItem[] }): string {
+type OrderForMessage = Order & {
+  items: OrderItem[];
+  vendorOrders?: { id: string; number: number; vendor: { name: string } }[];
+};
+
+export function orderMessage(order: OrderForMessage): string {
   const lines: string[] = [];
   lines.push(`طلب جديد #${order.number} — ${BRAND}`);
   lines.push(`العميل: ${order.customerName}  الهاتف: ${displayPhone(order.phone)}`);
   lines.push(`العنوان: ${order.address}`);
   lines.push('المنتجات:');
-  for (const it of order.items) {
+  const itemLine = (it: OrderItem) => {
     const disc = it.discountPercent > 0 ? ` (بعد خصم ${it.discountPercent}%)` : '';
-    lines.push(`- ${it.name} × ${it.quantity} = ${formatJOD(it.lineTotal)}${disc}`);
+    return `- ${it.name} × ${it.quantity} = ${formatJOD(it.lineTotal)}${disc}`;
+  };
+  const groups = order.vendorOrders ?? [];
+  if (groups.length > 1) {
+    // أكثر من مورد: المنتجات مجمّعة تحت كل طلب فرعي
+    for (const vo of groups) {
+      lines.push(`[${vo.vendor.name} — طلب فرعي #${vo.number}]`);
+      for (const it of order.items.filter((i) => i.vendorOrderId === vo.id)) lines.push(itemLine(it));
+    }
+  } else {
+    for (const it of order.items) lines.push(itemLine(it));
   }
   lines.push(`المجموع قبل الخصم: ${formatJOD(order.subtotal)}`);
   if (toNum(order.discountTotal) > 0) lines.push(`الخصم: ${formatJOD(order.discountTotal)}`);

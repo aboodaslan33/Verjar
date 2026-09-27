@@ -43,7 +43,19 @@ export default function Orders() {
         </span>
       ),
     },
-    { key: 'items', header: 'المنتجات', cell: (o) => `${o._count?.items ?? 0} صنف` },
+    {
+      key: 'items',
+      header: 'المنتجات',
+      cell: (o) => (
+        <span>
+          {o._count?.items ?? 0} صنف
+          {(o.vendorOrders?.length ?? 0) > 1 && <span className="block text-xs text-muted">{o.vendorOrders!.length} موردين</span>}
+          {o.vendorOrders?.length === 1 && o.vendorOrders[0].vendor.id !== 'house_vendor' && (
+            <span className="block text-xs text-muted">{o.vendorOrders[0].vendor.name}</span>
+          )}
+        </span>
+      ),
+    },
     { key: 'addr', header: 'العنوان', cell: (o) => <span className="line-clamp-1 max-w-[14rem]">{o.address}</span>, hideOnMobile: true },
     { key: 'total', header: 'الإجمالي', cell: (o) => <b className="tabular-nums">{formatJOD(o.total)}</b>, align: 'end' },
     { key: 'status', header: 'الحالة', cell: (o) => <StatusBadge status={o.status} /> },

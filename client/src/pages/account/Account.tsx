@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -62,7 +62,8 @@ type OOrder = {
   discountTotal: Num;
   address: string | null;
   createdAt: string;
-  items: { id: string; name: string; quantity: number; lineTotal: Num }[];
+  items: { id: string; name: string; quantity: number; lineTotal: Num; vendorOrderId: string }[];
+  vendorOrders: { id: string; number: number; status: RequestStatus; total: Num; vendor: { name: string; slug: string; isHouse: boolean } }[];
 };
 type OCorporate = {
   id: string;
@@ -175,6 +176,11 @@ function AccountView({ customer }: { customer: CustomerMe }) {
               {customer.companyName && <span> · {customer.companyName}</span>}
             </p>
           </div>
+          {customer.vendor && (
+            <ButtonLink to="/vendor" variant="outline">
+              لوحة متجري: {customer.vendor.name}
+            </ButtonLink>
+          )}
         </div>
       </header>
 
@@ -383,16 +389,32 @@ function OrdersTab({ items }: { items: OOrder[] }) {
       {items.map((o) => (
         <ItemCard key={o.id}>
           <CardHead title="طلب متجر" number={o.number} refCode={o.ref} status={<StatusBadge status={o.status} />} />
-          <ul className="mt-4 divide-y divide-line rounded-xl border border-line text-[15px]">
-            {o.items.map((it) => (
-              <li key={it.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                <span className="min-w-0">
-                  {it.name} <span className="text-muted">× <span className="ltr">{it.quantity}</span></span>
-                </span>
-                <span className="shrink-0 font-medium">{formatJOD(it.lineTotal)}</span>
-              </li>
+          <div className="mt-4 overflow-hidden rounded-xl border border-line text-[15px]">
+            {(o.vendorOrders?.length ? o.vendorOrders : [null]).map((vo) => (
+              <div key={vo?.id ?? 'all'} className="border-b border-line last:border-b-0">
+                {vo && o.vendorOrders.length > 1 && (
+                  <p className="flex flex-wrap items-center justify-between gap-2 bg-subtle/60 px-3 py-2 text-sm">
+                    <Link to={`/store/vendor/${vo.vendor.slug}`} className="font-semibold hover:underline">
+                      {vo.vendor.name}
+                    </Link>
+                    <StatusBadge status={vo.status} />
+                  </p>
+                )}
+                <ul className="divide-y divide-line">
+                  {o.items
+                    .filter((it) => !vo || it.vendorOrderId === vo.id)
+                    .map((it) => (
+                      <li key={it.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <span className="min-w-0">
+                          {it.name} <span className="text-muted">× <span className="ltr">{it.quantity}</span></span>
+                        </span>
+                        <span className="shrink-0 font-medium">{formatJOD(it.lineTotal)}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
           <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
             <span className="text-muted">{formatDate(o.createdAt)}</span>
             <span>

@@ -270,6 +270,20 @@ async function main() {
 
   if (process.env.SEED_DEMO === 'false') return;
 
+  // المورد الافتراضي (الشركة) — منتجات الورشة تُنسب له
+  const house = await prisma.vendor.upsert({
+    where: { id: 'house_vendor' },
+    create: {
+      id: 'house_vendor',
+      name: 'مجموعة فرجا',
+      slug: 'farja-group',
+      description: 'منتجات من ورشة مجموعة فرجا.',
+      commissionPercent: new Prisma.Decimal(100),
+      isHouse: true,
+    },
+    update: {},
+  });
+
   const cats = Object.fromEntries((await prisma.category.findMany()).map((c) => [c.slug, c.id]));
   for (const p of PRODUCTS) {
     const exists = await prisma.product.findUnique({ where: { slug: p.slug } });
@@ -285,6 +299,8 @@ async function main() {
         stock: p.stock,
         featured: p.featured,
         categoryId: cats[p.category],
+        vendorId: house.id,
+        approvalStatus: 'APPROVED',
         media: { create: [{ kind: 'IMAGE', url: p.image, sortOrder: 0 }] },
       },
     });
@@ -336,7 +352,7 @@ async function main() {
     });
     const chair = await prisma.product.findUnique({ where: { slug: 'garden-chair-iron' } });
     if (chair) {
-      await prisma.order.create({
+      const order = await prisma.order.create({
         data: {
           ref: 'O-DEMO01',
           customerId: customer.id,
@@ -347,9 +363,21 @@ async function main() {
           discountTotal: new Prisma.Decimal(10),
           total: new Prisma.Decimal(90),
           whatsappText: 'طلب تجريبي',
+        },
+      });
+      await prisma.vendorOrder.create({
+        data: {
+          orderId: order.id,
+          vendorId: house.id,
+          subtotal: new Prisma.Decimal(100),
+          total: new Prisma.Decimal(90),
+          commissionTotal: new Prisma.Decimal(90),
+          vendorNet: new Prisma.Decimal(0),
           items: {
             create: [
               {
+                orderId: order.id,
+                vendorId: house.id,
                 productId: chair.id,
                 name: chair.name,
                 unitPrice: chair.price,
@@ -357,6 +385,9 @@ async function main() {
                 unitFinalPrice: chair.finalPrice,
                 quantity: 2,
                 lineTotal: new Prisma.Decimal(90),
+                commissionPercent: new Prisma.Decimal(100),
+                commissionAmount: new Prisma.Decimal(90),
+                vendorNet: new Prisma.Decimal(0),
               },
             ],
           },

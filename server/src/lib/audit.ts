@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 
 export async function audit(params: {
   actorId?: string | null;
-  actorType: 'admin' | 'customer' | 'system' | 'public';
+  actorType: 'admin' | 'customer' | 'vendor' | 'system' | 'public';
   action: string;
   entity: string;
   entityId?: string | null;

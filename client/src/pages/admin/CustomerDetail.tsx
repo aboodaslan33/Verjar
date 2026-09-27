@@ -8,7 +8,8 @@ import { PaymentForm } from '../../components/admin/PaymentForm';
 import { FilesList, PaymentsList } from '../../components/admin/RecordLists';
 import type { CustomerDetail as Customer } from '../../components/admin/types';
 import { AdminPage, DetailSkeleton, Panel } from '../../components/admin/ui';
-import { Button, ButtonA, ErrorState, Icon, Input, StatusBadge, Tag, Textarea } from '../../components/ui';
+import { GrantDialog } from './Vendors';
+import { Button, ButtonA, ButtonLink, ErrorState, Icon, Input, StatusBadge, Tag, Textarea } from '../../components/ui';
 import { api } from '../../lib/api';
 import { BOOKING_TYPE_LABEL, CORPORATE_TYPE_LABEL, cx, displayPhone, formatDate, formatJOD } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
@@ -211,6 +212,7 @@ export default function CustomerDetail() {
 
         <div className="space-y-6">
           <EditPanel key={c.id + (c.notes ?? '') + c.name} customer={c} onSaved={q.reload} />
+          <VendorPanel customer={c} onChanged={q.reload} />
         </div>
       </div>
     </AdminPage>
@@ -321,5 +323,33 @@ function EditPanel({ customer: c, onSaved }: { customer: Customer; onSaved: () =
         ستُستبدل كلمة مرور {c.name} بالكلمة المؤقتة، وتنتهي جلساته الحالية. أرسلها له بطريقة آمنة (اتصال أو واتساب).
       </ConfirmDialog>
     </>
+  );
+}
+
+/** صلاحية المورد لهذا العميل */
+function VendorPanel({ customer: c, onChanged }: { customer: Customer; onChanged: () => void }) {
+  const [granting, setGranting] = useState(false);
+  return (
+    <Panel title="صلاحية المورد">
+      {c.vendor ? (
+        <div className="space-y-2 text-sm">
+          <p>
+            متجر <Link to={`/admin/vendors/${c.vendor.id}`} className="font-semibold hover:underline">{c.vendor.name}</Link>
+            {c.vendor.active ? ` · عمولة ${c.vendor.commissionPercent}%` : ' · الصلاحية مسحوبة'}
+          </p>
+          <ButtonLink to={`/admin/vendors/${c.vendor.id}`} size="sm" variant="outline">
+            إدارة المورد
+          </ButtonLink>
+        </div>
+      ) : (
+        <>
+          <p className="mb-3 text-sm text-muted">امنح العميل صلاحية مورد ليضيف منتجاته ويبيعها في السوق.</p>
+          <Button size="sm" variant="outline" onClick={() => setGranting(true)}>
+            منح صلاحية مورد
+          </Button>
+          <GrantDialog open={granting} onClose={() => setGranting(false)} onGranted={onChanged} customer={c} />
+        </>
+      )}
+    </Panel>
   );
 }

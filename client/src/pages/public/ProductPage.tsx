@@ -29,7 +29,7 @@ export default function ProductPage() {
         {error.status === 404 ? (
           <EmptyState
             title="المنتج غير موجود"
-            description="ربما حُذف المنتج أو تغيّر رابطه. تصفح المنتجات المتوفرة في المتجر."
+            description="ربما حُذف المنتج أو تغيّر رابطه. تصفح المنتجات المتوفرة في السوق."
             action={<ButtonLink to="/store">العودة إلى المتجر</ButtonLink>}
           />
         ) : (
@@ -65,10 +65,20 @@ function ProductView({ product, related }: ProductResponse) {
           <ol className="flex flex-wrap items-center gap-1.5">
             <li>
               <Link to="/store" className="hover:text-ink">
-                المتجر
+                السوق
               </Link>
             </li>
             <li aria-hidden>/</li>
+            {product.category.parent && (
+              <>
+                <li>
+                  <Link to={`/store?category=${product.category.parent.slug}`} className="hover:text-ink">
+                    {product.category.parent.name}
+                  </Link>
+                </li>
+                <li aria-hidden>/</li>
+              </>
+            )}
             <li>
               <Link to={`/store?category=${product.category.slug}`} className="hover:text-ink">
                 {product.category.name}
@@ -88,7 +98,19 @@ function ProductView({ product, related }: ProductResponse) {
 
           <div className="lg:col-span-5">
             <p className="eyebrow">{product.category.name}</p>
-            <h1 className="mt-1 text-2xl md:text-3xl">{product.name}</h1>
+            <h1 className="mt-3 text-2xl md:text-3xl">{product.name}</h1>
+            {product.vendor && (
+              <Link to={`/store/vendor/${product.vendor.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm text-muted hover:text-ink">
+                <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full border border-line bg-subtle">
+                  {product.vendor.logoUrl ? (
+                    <img src={product.vendor.logoUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-semibold text-ink">{product.vendor.name.slice(0, 1)}</span>
+                  )}
+                </span>
+                يبيعه <span className="font-semibold text-ink underline-offset-4 hover:underline">{product.vendor.name}</span>
+              </Link>
+            )}
 
             <Price
               price={product.price}
@@ -143,6 +165,20 @@ function ProductView({ product, related }: ProductResponse) {
               السعر النهائي يُؤكَّد عند إرسال الطلب، ونتواصل معك لتحديد موعد التوصيل.
             </p>
 
+            {product.specList && product.specList.length > 0 && (
+              <section className="mt-8 border-t border-line pt-6">
+                <h2 className="text-lg">المواصفات</h2>
+                <dl className="mt-3 divide-y divide-line rounded-xl border border-line">
+                  {product.specList.map((sp) => (
+                    <div key={sp.key} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
+                      <dt className="text-muted">{sp.label}</dt>
+                      <dd className="font-medium">{sp.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+
             {product.description && (
               <section className="mt-8 border-t border-line pt-6">
                 <h2 className="text-lg">الوصف</h2>
@@ -156,7 +192,7 @@ function ProductView({ product, related }: ProductResponse) {
       {related.length > 0 && (
         <section className="border-t border-line bg-surface">
           <div className="container py-10 md:py-14">
-            <h2 className="text-xl md:text-2xl">منتجات من نفس التصنيف</h2>
+            <h2 className="text-xl md:text-2xl">منتجات من نفس القسم</h2>
             <div className={cx(PRODUCT_GRID, 'mt-6')} data-reveal-group>
               {related.map((p) => (
                 <ProductCard key={p.id} product={p} />

@@ -9,6 +9,7 @@ import { normalizePhone } from '../../lib/phone';
 import { prisma } from '../../lib/prisma';
 import { ammanToUtc } from '../../lib/time';
 import { statusMessage } from '../../services/messages';
+import { setVendorOrderStatus, syncOrderStatus } from '../../services/vendor.service';
 import { notifyAdmin, notifyCustomer } from '../../services/whatsapp.service';
 import { optionalDate, statusEnum } from './shared';
 
@@ -48,7 +49,10 @@ ordersRouter.get(
       prisma.order.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { items: true } } },
+        include: {
+          _count: { select: { items: true } },
+          vendorOrders: { select: { id: true, number: true, status: true, vendor: { select: { id: true, name: true } } } },
+        },
         ...pageArgs(q),
       }),
       prisma.order.count({ where }),
@@ -64,6 +68,13 @@ ordersRouter.get(
       where: { id: req.params.id, deletedAt: null },
       include: {
         items: { include: { product: { select: { slug: true, media: { take: 1, orderBy: { sortOrder: 'asc' } } } } } },
+        vendorOrders: {
+          orderBy: { number: 'asc' },
+          include: {
+            vendor: { select: { id: true, name: true, slug: true, isHouse: true } },
+            payout: { select: { id: true, paidAt: true } },
+          },
+        },
         customer: { select: { id: true, name: true, phone: true } },
         payments: { where: { deletedAt: null }, orderBy: { paidAt: 'desc' } },
       },
@@ -84,21 +95,16 @@ ordersRouter.patch(
     const input = z
       .object({ status: statusEnum.optional(), notify: z.boolean().default(true) })
       .parse(req.body);
-    const current = await prisma.order.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { items: true } });
+    const current = await prisma.order.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      include: { vendorOrders: { include: { items: true } } },
+    });
     if (!current) throw notFound('الطلب غير موجود');
 
+    // حالة الطلب تُطبَّق على كل طلباته الفرعية (المخزون يرجع عند الإلغاء ويُخصم عند التراجع عنه)
     const order = await prisma.$transaction(async (tx) => {
-      // عند الإلغاء يرجع المخزون، وعند التراجع عن الإلغاء يُخصم مرة أخرى
       if (input.status && input.status !== current.status) {
-        if (input.status === 'CANCELLED') {
-          for (const it of current.items) {
-            await tx.product.update({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
-          }
-        } else if (current.status === 'CANCELLED') {
-          for (const it of current.items) {
-            await tx.product.update({ where: { id: it.productId }, data: { stock: { decrement: it.quantity } } });
-          }
-        }
+        for (const vo of current.vendorOrders) await setVendorOrderStatus(tx, vo, input.status);
       }
       return tx.order.update({ where: { id: current.id }, data: { ...(input.status ? { status: input.status } : {}) } });
     });
@@ -116,6 +122,27 @@ ordersRouter.patch(
     }
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'update', entity: 'order', entityId: order.id, meta: { status: input.status ?? null } });
     ok(res, { order, whatsapp });
+  }),
+);
+
+/** تغيير حالة طلب فرعي واحد (مورد واحد) — حالة الطلب الرئيسي تُشتق من طلباته الفرعية */
+ordersRouter.patch(
+  '/:id/vendor-orders/:voId',
+  asyncHandler(async (req, res) => {
+    const { status } = z.object({ status: statusEnum }).parse(req.body);
+    const vo = await prisma.vendorOrder.findFirst({
+      where: { id: req.params.voId, orderId: req.params.id, order: { deletedAt: null } },
+      include: { items: true },
+    });
+    if (!vo) throw notFound('الطلب الفرعي غير موجود');
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await setVendorOrderStatus(tx, vo, status);
+      const synced = await syncOrderStatus(tx, vo.orderId);
+      return { vendorOrder: updated, order: synced.order };
+    });
+    emitAdmin({ type: 'status.changed', id: vo.orderId, title: `طلب فرعي #${vo.number}` });
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'update', entity: 'vendorOrder', entityId: vo.id, meta: { status } });
+    ok(res, result);
   }),
 );
 

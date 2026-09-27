@@ -32,6 +32,7 @@ const TYPE_PREFIX: Record<AdminEvent['type'], string> = {
   'order.created': 'طلب متجر جديد',
   'corporate.created': 'طلب شركة جديد',
   'status.changed': 'تحديث حالة',
+  'product.pending': 'مراجعة منتج',
 };
 
 export function LiveProvider({ children }: { children: ReactNode }) {

@@ -8,14 +8,18 @@ import { applyDiscount } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
 import { memoryUpload } from '../../middleware/upload';
+import { categoryForProduct, cleanSpecs, specFieldsSchema, specsInput } from '../../services/catalog.service';
 import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.service';
+import { HOUSE_VENDOR_ID, ensureHouseVendor } from '../../services/vendor.service';
 
 export const productsRouter = Router();
 
-// ───────────── التصنيفات ─────────────
+// ───────────── الأقسام (رئيسية وفرعية) ─────────────
 
 const categoryInput = z.object({
-  name: z.string().trim().min(2, 'اسم التصنيف مطلوب').max(60),
+  name: z.string().trim().min(2, 'اسم القسم مطلوب').max(60),
+  parentId: z.string().min(1).nullable().default(null),
+  specFields: specFieldsSchema.default([]),
   sortOrder: z.coerce.number().int().default(0),
   visible: z.boolean().default(true),
 });
@@ -26,9 +30,9 @@ productsRouter.get(
     const cats = await prisma.category.findMany({
       where: { deletedAt: null },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: { _count: { select: { products: { where: { deletedAt: null } } } } },
+      include: { _count: { select: { products: { where: { deletedAt: null } }, children: { where: { deletedAt: null } } } } },
     });
-    ok(res, cats.map(({ _count, ...c }) => ({ ...c, productCount: _count.products })));
+    ok(res, cats.map(({ _count, ...c }) => ({ ...c, productCount: _count.products, childCount: _count.children })));
   }),
 );
 
@@ -41,10 +45,23 @@ async function uniqueCategorySlug(name: string, excludeId?: string) {
   return slug;
 }
 
+/** مستويان فقط: القسم الرئيسي لا يكون فرعيًا، والقسم الذي له أقسام فرعية لا يصبح فرعيًا */
+async function checkParent(parentId: string | null | undefined, selfId?: string) {
+  if (!parentId) return;
+  if (parentId === selfId) throw badRequest('لا يمكن أن يكون القسم فرعيًا لنفسه', { fields: { parentId: 'اختر قسمًا آخر' } });
+  const parent = await prisma.category.findFirst({ where: { id: parentId, deletedAt: null } });
+  if (!parent) throw badRequest('القسم الرئيسي غير موجود', { fields: { parentId: 'اختر القسم الرئيسي' } });
+  if (parent.parentId) throw badRequest('القسم المختار فرعي. الأقسام بمستويين فقط', { fields: { parentId: 'اختر قسمًا رئيسيًا' } });
+  if (selfId && (await prisma.category.count({ where: { parentId: selfId, deletedAt: null } }))) {
+    throw badRequest('هذا القسم له أقسام فرعية ولا يمكن نقله تحت قسم آخر', { fields: { parentId: 'انقل أقسامه الفرعية أولًا' } });
+  }
+}
+
 productsRouter.post(
   '/categories',
   asyncHandler(async (req, res) => {
     const input = categoryInput.parse(req.body);
+    await checkParent(input.parentId);
     const cat = await prisma.category.create({ data: { ...input, slug: await uniqueCategorySlug(input.name) } });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'create', entity: 'category', entityId: cat.id });
     ok(res, cat, 201);
@@ -55,6 +72,7 @@ productsRouter.patch(
   '/categories/:id',
   asyncHandler(async (req, res) => {
     const input = categoryInput.partial().parse(req.body);
+    if (input.parentId !== undefined) await checkParent(input.parentId, req.params.id);
     const cat = await prisma.category.update({ where: { id: req.params.id }, data: input });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'update', entity: 'category', entityId: cat.id });
     ok(res, cat);
@@ -65,7 +83,9 @@ productsRouter.delete(
   '/categories/:id',
   asyncHandler(async (req, res) => {
     const count = await prisma.product.count({ where: { categoryId: req.params.id, deletedAt: null } });
-    if (count > 0) throw badRequest(`لا يمكن حذف تصنيف يحتوي ${count} منتج. انقل المنتجات أولًا.`);
+    if (count > 0) throw badRequest(`لا يمكن حذف قسم يحتوي ${count} منتج. انقل المنتجات أو أخفِ القسم.`);
+    const children = await prisma.category.count({ where: { parentId: req.params.id, deletedAt: null } });
+    if (children > 0) throw badRequest(`لا يمكن حذف قسم له ${children} أقسام فرعية. احذفها أو انقلها أولًا.`);
     await prisma.category.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'delete', entity: 'category', entityId: req.params.id });
     ok(res, { deleted: true });
@@ -82,7 +102,10 @@ const productInput = z.object({
   stock: z.coerce.number().int().min(0, 'المخزون لا يكون سالبًا').default(0),
   visible: z.boolean().default(true),
   featured: z.boolean().default(false),
-  categoryId: z.string().min(1, 'اختر التصنيف'),
+  categoryId: z.string().min(1, 'اختر القسم'),
+  specs: specsInput,
+  /** منتجات الأدمن للمورد الافتراضي ما لم يُحدَّد مورد */
+  vendorId: z.string().min(1).optional(),
 });
 
 async function uniqueProductSlug(name: string, excludeId?: string) {
@@ -103,11 +126,15 @@ productsRouter.get(
         categoryId: z.string().optional(),
         visible: z.enum(['true', 'false']).optional(),
         lowStock: z.enum(['true']).optional(),
+        approval: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
+        vendorId: z.string().optional(),
       })
       .parse(req.query);
     const where: Prisma.ProductWhereInput = {
       deletedAt: null,
-      ...(q.categoryId ? { categoryId: q.categoryId } : {}),
+      ...(q.categoryId ? { OR: [{ categoryId: q.categoryId }, { category: { parentId: q.categoryId } }] } : {}),
+      ...(q.approval ? { approvalStatus: q.approval } : {}),
+      ...(q.vendorId ? { vendorId: q.vendorId } : {}),
       ...(q.visible ? { visible: q.visible === 'true' } : {}),
       ...(q.lowStock ? { stock: { lte: 3 } } : {}),
       ...(q.q ? { name: { contains: q.q, mode: 'insensitive' } } : {}),
@@ -116,7 +143,11 @@ productsRouter.get(
       prisma.product.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { category: { select: { id: true, name: true } }, media: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+        include: {
+          category: { select: { id: true, name: true } },
+          vendor: { select: { id: true, name: true, slug: true, isHouse: true } },
+          media: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        },
         ...pageArgs(q),
       }),
       prisma.product.count({ where }),
@@ -130,7 +161,7 @@ productsRouter.get(
   asyncHandler(async (req, res) => {
     const p = await prisma.product.findFirst({
       where: { id: req.params.id, deletedAt: null },
-      include: { category: true, media: { orderBy: { sortOrder: 'asc' } } },
+      include: { category: true, vendor: { select: { id: true, name: true, slug: true, isHouse: true } }, media: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!p) throw notFound('المنتج غير موجود');
     ok(res, p);
@@ -140,10 +171,19 @@ productsRouter.get(
 productsRouter.post(
   '/products',
   asyncHandler(async (req, res) => {
-    const input = productInput.parse(req.body);
+    const { vendorId, specs, ...input } = productInput.parse(req.body);
+    const { fields } = await categoryForProduct(prisma, input.categoryId);
+    if (vendorId && vendorId !== HOUSE_VENDOR_ID && !(await prisma.vendor.findUnique({ where: { id: vendorId } }))) {
+      throw badRequest('المورد غير موجود');
+    }
+    if (!vendorId || vendorId === HOUSE_VENDOR_ID) await ensureHouseVendor();
     const p = await prisma.product.create({
       data: {
         ...input,
+        vendorId: vendorId ?? HOUSE_VENDOR_ID,
+        // ما يضيفه الأدمن معتمد مباشرة
+        approvalStatus: 'APPROVED',
+        specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
         price: new Prisma.Decimal(input.price),
         finalPrice: new Prisma.Decimal(applyDiscount(input.price, input.discountPercent)),
@@ -158,15 +198,21 @@ productsRouter.post(
 productsRouter.patch(
   '/products/:id',
   asyncHandler(async (req, res) => {
-    const input = productInput.partial().parse(req.body);
+    const { vendorId: _v, specs, ...input } = productInput.partial().parse(req.body);
     const current = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!current) throw notFound('المنتج غير موجود');
     const price = input.price ?? Number(current.price);
     const discount = input.discountPercent ?? current.discountPercent;
+    // المواصفات تُتحقق من جديد عند تغيير القسم أو المواصفات
+    const specsData =
+      specs !== undefined || input.categoryId
+        ? { specs: cleanSpecs((await categoryForProduct(prisma, input.categoryId ?? current.categoryId)).fields, specs ?? (current.specs as Record<string, string>)) }
+        : {};
     const p = await prisma.product.update({
       where: { id: current.id },
       data: {
         ...input,
+        ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
         price: new Prisma.Decimal(price),
         finalPrice: new Prisma.Decimal(applyDiscount(price, discount)),
@@ -184,6 +230,32 @@ productsRouter.delete(
     await prisma.product.update({ where: { id: req.params.id }, data: { deletedAt: new Date(), visible: false } });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'delete', entity: 'product', entityId: req.params.id });
     ok(res, { deleted: true });
+  }),
+);
+
+/** مراجعة منتجات الموردين: موافقة أو رفض مع السبب */
+productsRouter.post(
+  '/products/:id/approve',
+  asyncHandler(async (req, res) => {
+    const p = await prisma.product.update({
+      where: { id: req.params.id },
+      data: { approvalStatus: 'APPROVED', rejectionReason: null },
+    });
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'approve', entity: 'product', entityId: p.id });
+    ok(res, p);
+  }),
+);
+
+productsRouter.post(
+  '/products/:id/reject',
+  asyncHandler(async (req, res) => {
+    const { reason } = z.object({ reason: z.string().trim().min(3, 'اكتب سبب الرفض ليعرفه المورد').max(500) }).parse(req.body);
+    const p = await prisma.product.update({
+      where: { id: req.params.id },
+      data: { approvalStatus: 'REJECTED', rejectionReason: reason },
+    });
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'reject', entity: 'product', entityId: p.id, meta: { reason } });
+    ok(res, p);
   }),
 );
 

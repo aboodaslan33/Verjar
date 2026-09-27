@@ -13,7 +13,7 @@ export const NAV = [
   { to: '/work', label: 'أعمالنا' },
   { to: '/bookings', label: 'الحجوزات' },
   { to: '/corporate', label: 'عقود الشركات' },
-  { to: '/store', label: 'المتجر' },
+  { to: '/store', label: 'السوق' },
   { to: '/about', label: 'من نحن' },
   { to: '/contact', label: 'تواصل' },
 ];
@@ -100,6 +100,11 @@ export function SiteHeader() {
             <span className="hidden w-16 sm:block" aria-hidden />
           ) : user ? (
             <div className="hidden items-center sm:flex">
+              {user.role === 'CUSTOMER' && user.vendor && (
+                <Link to="/vendor" className="flex h-10 items-center rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-subtle">
+                  متجري
+                </Link>
+              )}
               <Link
                 to={homeFor(user)}
                 className="flex h-10 max-w-[10rem] items-center rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-subtle"
@@ -166,6 +171,11 @@ export function SiteHeader() {
                     <span className="block truncate">{user.name}</span>
                     <span className="block text-sm text-muted">{user.role === 'CUSTOMER' ? 'حسابي' : 'لوحة التحكم'}</span>
                   </Link>
+                  {user.role === 'CUSTOMER' && user.vendor && (
+                    <Link to="/vendor" className="inline-flex h-11 shrink-0 items-center rounded-xl border border-line px-4 text-sm font-medium">
+                      متجري
+                    </Link>
+                  )}
                   <button type="button" onClick={onLogout} className="h-11 shrink-0 rounded-xl border border-line px-4 text-sm font-medium">
                     تسجيل الخروج
                   </button>

@@ -1,5 +1,5 @@
 /** أنواع بيانات لوحة التحكم — مطابقة لاستجابات /api/v1/admin */
-import type { AdminSettings, BookingType, CorporateType, MediaKind, RequestStatus } from '../../lib/types';
+import type { AdminSettings, BookingType, CorporateType, MediaKind, RequestStatus, SpecField } from '../../lib/types';
 
 export type Urgency = 'NORMAL' | 'URGENT' | 'EMERGENCY';
 export type AreaZone = 'INSIDE_AMMAN' | 'OUTSIDE_AMMAN';
@@ -153,21 +153,40 @@ export type OrderRow = {
   createdAt: string;
   updatedAt: string;
   _count?: { items: number };
+  vendorOrders?: { id: string; number: number; status: RequestStatus; vendor: { id: string; name: string } }[];
 };
 
-export type OrderDetail = OrderRow & {
+export type AdminVendorOrder = {
+  id: string;
+  number: number;
+  status: RequestStatus;
+  subtotal: number;
+  total: number;
+  commissionTotal: number;
+  vendorNet: number;
+  payoutId: string | null;
+  vendor: { id: string; name: string; slug: string; isHouse: boolean };
+  payout: { id: string; paidAt: string } | null;
+};
+
+export type OrderDetail = Omit<OrderRow, 'vendorOrders'> & {
   whatsappText: string;
   items: {
     id: string;
     productId: string;
+    vendorOrderId: string;
     name: string;
     unitPrice: number;
     discountPercent: number;
     unitFinalPrice: number;
     quantity: number;
     lineTotal: number;
+    commissionPercent: number;
+    commissionAmount: number;
+    vendorNet: number;
     product: { slug: string; media: { url: string; kind: MediaKind }[] } | null;
   }[];
+  vendorOrders: AdminVendorOrder[];
   customer: { id: string; name: string; phone: string };
   payments: Payment[];
   whatsappLogs: WhatsAppLog[];
@@ -178,10 +197,67 @@ export type AdminCategory = {
   id: string;
   name: string;
   slug: string;
+  parentId: string | null;
+  specFields: SpecField[];
   sortOrder: number;
   visible: boolean;
   productCount: number;
+  childCount: number;
 };
+
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type VendorTotals = {
+  salesTotal: number;
+  commissionTotal: number;
+  vendorNetTotal: number;
+  ordersCount: number;
+  due: number;
+  dueOrders: number;
+  pending: number;
+  paid: number;
+};
+
+export type AdminVendor = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  logoUrl: string | null;
+  commissionPercent: number;
+  active: boolean;
+  isHouse: boolean;
+  createdAt: string;
+  customer: { id: string; name: string; phone: string; email: string | null } | null;
+  productCount?: number;
+  pendingCount?: number;
+  totals?: VendorTotals;
+};
+
+export type VendorPayout = {
+  id: string;
+  amount: number;
+  salesTotal: number;
+  commissionTotal: number;
+  ordersCount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  note?: string | null;
+  paidAt: string;
+  recordedBy?: { name: string } | null;
+};
+
+export type DueVendorOrder = {
+  id: string;
+  number: number;
+  total: number;
+  commissionTotal: number;
+  vendorNet: number;
+  createdAt: string;
+  order?: { id: string; number: number };
+};
+
+export type VendorReportRow = VendorTotals & { vendor: AdminVendor };
 
 export type ProductMedia = { id: string; kind: MediaKind; url: string; sortOrder: number };
 
@@ -198,6 +274,11 @@ export type AdminProduct = {
   featured: boolean;
   categoryId: string;
   category: { id: string; name: string };
+  vendorId: string;
+  vendor?: { id: string; name: string; slug: string; isHouse: boolean };
+  approvalStatus: ApprovalStatus;
+  rejectionReason: string | null;
+  specs: Record<string, string | number>;
   media: ProductMedia[];
   createdAt: string;
 };
@@ -282,6 +363,7 @@ export type CustomerDetail = {
   lastLoginAt: string | null;
   createdAt: string;
   hasPassword: boolean;
+  vendor: { id: string; name: string; slug: string; active: boolean; commissionPercent: number } | null;
   bookings: BookingRow[];
   orders: (OrderRow & { items: { id: string; name: string; quantity: number }[] })[];
   corporateRequests: CorporateRow[];
@@ -299,6 +381,8 @@ export type DashboardStats = {
   salesMonth: number;
   ordersMonth: number;
   expiringContracts: number;
+  /** منتجات موردين بانتظار المراجعة */
+  pendingProducts: number;
   upcoming: {
     id: string;
     number: number;
@@ -326,7 +410,7 @@ export type SettingsResponse = {
 };
 
 export type AdminEvent = {
-  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed';
+  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending';
   id: string;
   title: string;
   at: string;

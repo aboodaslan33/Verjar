@@ -10,6 +10,7 @@ import { ordersRouter } from './orders';
 import { productsRouter } from './products';
 import { newsletterRouter } from './newsletter';
 import { logsRouter, settingsRouter } from './settings';
+import { vendorsAdminRouter } from './vendors';
 
 export const adminRouter = Router();
 adminRouter.use(requireAdmin);
@@ -26,3 +27,4 @@ adminRouter.use('/customers', customersRouter);
 adminRouter.use('/settings', settingsRouter);
 adminRouter.use('/logs', logsRouter);
 adminRouter.use('/newsletter', newsletterRouter);
+adminRouter.use('/vendors', vendorsAdminRouter);
