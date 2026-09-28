@@ -472,3 +472,18 @@
 .print-only {
   display: none;
 }
+
+/* ترس الواجهة: دوران بطيء جدًا (يتوقف مع تقليل الحركة) */
+@keyframes hero-gear-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.hero-gear {
+  animation: hero-gear-spin 60s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-gear {
+    animation: none;
+  }
+}

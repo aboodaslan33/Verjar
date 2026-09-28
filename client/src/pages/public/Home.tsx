@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, SectionHeading } from '../../components/ui';
-import { PRODUCT_GRID, ProductCard, ProductGridSkeleton } from '../../components/store/ProductCard';
+import { PRODUCT_GRID, ProductCard, ProductGridSkeleton, productImage } from '../../components/store/ProductCard';
 
 import { WorkFigure } from '../../components/work/WorkFigure';
 import { useSite } from '../../context/SiteContext';
@@ -60,6 +60,68 @@ export default function Home() {
     <>
       <Hero />
 
+      {/* ——— للمصانع: الصيانة الصناعية أساس النشاط ——— */}
+      <section className="section border-b border-line" aria-labelledby="corp-title">
+        <div className="container grid gap-10 lg:grid-cols-12 lg:items-start">
+          <div className="lg:col-span-5" data-reveal>
+            <p className="eyebrow">للمصانع والشركات</p>
+            <h2 id="corp-title" className="mt-4 text-2xl md:text-[2rem]">
+              صيانة الماكينات والمرافق الصناعية
+            </h2>
+            <p className="mt-4 max-w-prose leading-relaxed text-muted">
+              نصون الماكينات وخطوط الإنتاج والمرافق بعقود سنوية أو عند العطل، ونورّد المنتجات والتجهيزات الصناعية التي يحتاجها مصنعك. زيارات مجدولة، تقرير مكتوب بعد كل زيارة، وأولوية حسب أثر العطل على الإنتاج.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/corporate/annual"
+                className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover"
+              >
+                اطلب عقد صيانة سنوي
+              </Link>
+              <Link to="/corporate/urgent" className="inline-flex h-12 items-center rounded-lg border border-line-strong px-5 font-semibold transition-colors hover:border-ink">
+                طلب صيانة عاجل
+              </Link>
+            </div>
+          </div>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:col-span-7" data-reveal-group>
+            {(
+              [
+                ['wrench', 'صيانة الماكينات وخطوط الإنتاج', 'تشخيص الأعطال وإصلاحها، وصيانة وقائية دورية تقلل التوقف.'],
+                ['factory', 'منتجات وتجهيزات صناعية', 'طاولات عمل، رفوف تخزين، ملصقات أرضية ومستلزمات للمصانع والمستودعات.'],
+                ['gear', 'كهرباء ومرافق', 'صيانة دورية للتمديدات والمرافق والأنظمة المساندة للإنتاج.'],
+                ['shield', 'مطابقة GMP وISO', 'تجهيز المرافق والأرضيات الإيبوكسي حسب متطلبات التدقيق.'],
+                ['alert', 'استجابة عاجلة', 'فريق يصل بسرعة عند توقف خط إنتاج أو عطل مفاجئ.'],
+                ['file', 'تقارير مكتوبة', 'تقرير بعد كل زيارة وسجل كامل لعقدك على صفحتك في الموقع.'],
+              ] as const
+            ).map(([icon, t, d]) => (
+              <li key={t} className="card p-5">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <Icon name={icon} className="h-5 w-5" />
+                </span>
+                <p className="mt-3 font-semibold">{t}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{d}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ——— من السوق ——— */}
+      {showFeatured && !featured.error && (
+        <section className="section" aria-labelledby="store-title">
+          <div className="container">
+            <SectionHeading id="store-title" eyebrow="السوق" title="منتجات مختارة من السوق" link={{ to: '/store', label: 'تصفح السوق' }} />
+            <div className="mt-10">
+              {featured.loading ? (
+                <ProductGridSkeleton count={4} className={PRODUCT_GRID} />
+              ) : (
+                <div className={PRODUCT_GRID} data-reveal-group>
+                  {featuredItems.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              )}
+
       {/* ——— كيف نعمل: شريط خطوات أفقي على خط قياس ——— */}
       <section className="border-b border-line bg-bg" aria-labelledby="process-title">
         <div className="container py-14 md:py-20">
@@ -104,7 +166,7 @@ export default function Home() {
         <div className="container grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <div className="lg:sticky lg:top-32" data-reveal>
-              <SectionHeading id="services-title" eyebrow="الخدمات" title="احجز الخدمة التي تحتاجها" />
+              <SectionHeading id="services-title" eyebrow="خدمات المباني" title="بناء وصيانة ودهان للبيوت والمنشآت" />
               <p className="mt-3 text-muted">تختار اليوم والساعة بنفسك، ويصلنا الحجز مباشرة.</p>
               <dl className="mt-8 divide-y divide-line border-y border-line text-[15px]">
                 <p className="py-3 text-sm font-semibold">رسوم الكشف الفني — ثابتة لكل المحافظات</p>
@@ -164,61 +226,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ——— الشركات: قسم فحمي ——— */}
-      <section className="bg-inverse text-inverse-fg" aria-labelledby="corp-title">
-        <div className="container grid gap-10 py-16 md:py-24 lg:grid-cols-12 lg:items-center">
-          <div className="lg:col-span-6" data-reveal>
-            <p className="eyebrow !text-inverse-fg/60">للمصانع والشركات</p>
-            <h2 id="corp-title" className="mt-4 text-2xl text-inverse-fg md:text-[2rem]">
-              عقود صيانة سنوية للمصانع والمنشآت
-            </h2>
-            <p className="mt-4 max-w-prose leading-relaxed text-inverse-fg/65">
-              زيارات مجدولة وتقارير مكتوبة بعد كل زيارة، وطلبات عاجلة عند الأعطال بأولوية حسب أثرها على الإنتاج.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/corporate/annual"
-                className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover"
-              >
-                اطلب عقد صيانة سنوي
-              </Link>
-              <Link to="/corporate/urgent" className="inline-flex h-12 items-center rounded-lg border border-inverse-fg/25 px-5 font-semibold transition-colors hover:border-inverse-fg/60">
-                طلب صيانة عاجل
-              </Link>
-            </div>
-          </div>
-          <ul className="grid gap-px overflow-hidden rounded-xl bg-inverse-fg/10 sm:grid-cols-2 lg:col-span-6" data-reveal-group>
-            {[
-              ['مطابقة GMP وISO', 'تجهيز المرافق حسب متطلبات التدقيق.'],
-              ['أرضيات إيبوكسي', 'تنفيذ وصيانة للأرضيات الصناعية.'],
-              ['كهرباء ومرافق', 'صيانة دورية للتمديدات والمرافق.'],
-              ['طلبات عاجلة', 'استجابة سريعة عند توقف خط إنتاج.'],
-            ].map(([t, d]) => (
-              <li key={t} className="bg-inverse-2 p-6">
-                <Icon name="check" className="h-5 w-5 text-primary" />
-                <p className="mt-3 font-semibold">{t}</p>
-                <p className="mt-1 text-sm text-inverse-fg/60">{d}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ——— من السوق ——— */}
-      {showFeatured && !featured.error && (
-        <section className="section" aria-labelledby="store-title">
-          <div className="container">
-            <SectionHeading id="store-title" eyebrow="السوق" title="منتجات مختارة" link={{ to: '/store', label: 'تصفح السوق' }} />
-            <div className="mt-10">
-              {featured.loading ? (
-                <ProductGridSkeleton count={4} className={PRODUCT_GRID} />
-              ) : (
-                <div className={PRODUCT_GRID} data-reveal-group>
-                  {featuredItems.map((p) => (
-                    <ProductCard key={p.id} product={p} />
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </section>
@@ -227,19 +234,58 @@ export default function Home() {
   );
 }
 
+type Need = { key: string; short: string; icon: 'gear' | 'wrench' | 'factory' | 'home'; text: string; cta: string; to: string };
+
+/** ماذا يحتاج الزائر؟ الجانب الصناعي أولًا لأنه أساس النشاط */
+const NEEDS: Need[] = [
+  {
+    key: 'products',
+    short: 'منتجات صناعية',
+    icon: 'factory',
+    text: 'تجهيزات ومستلزمات للمصانع والمستودعات والورش: طاولات عمل، رفوف تخزين، ملصقات أرضية إرشادية ومنتجات صناعية أخرى، مع التوصيل.',
+    cta: 'تصفح المنتجات الصناعية',
+    to: '/store?category=industrial',
+  },
+  {
+    key: 'machines',
+    short: 'صيانة ماكينات',
+    icon: 'wrench',
+    text: 'صيانة وإصلاح الماكينات وخطوط الإنتاج عند العطل، بفنيين يصلون بسرعة وأولوية حسب أثر العطل على الإنتاج، وتقرير مكتوب بعد كل زيارة.',
+    cta: 'اطلب صيانة عاجلة',
+    to: '/corporate/urgent',
+  },
+  {
+    key: 'contracts',
+    short: 'عقود صيانة للمصانع',
+    icon: 'gear',
+    text: 'زيارات دورية مجدولة للماكينات والمرافق والكهرباء، وتجهيز المنشأة لمتطلبات GMP وISO، مع أولوية الاستجابة عند الأعطال.',
+    cta: 'اطلب عقد صيانة سنوي',
+    to: '/corporate/annual',
+  },
+  {
+    key: 'buildings',
+    short: 'بناء وصيانة مباني',
+    icon: 'home',
+    text: 'كشف أعطال البناء، دهان وديكور، بناء وتشطيب، أعمال معدنية وصيانة عامة للبيوت والمنشآت.',
+    cta: 'احجز موعدًا',
+    to: '/bookings',
+  },
+];
+
 /**
- * الواجهة: فحمية كمربع الشعار. على اليمين سؤال "ماذا تحتاج؟" باختيار سريع يقود للحجز مباشرة،
- * وعلى اليسار تكوين صور متراكب مع مسطرة قياس كهرمانية.
+ * الواجهة: فحمية كمربع الشعار. على اليمين سؤال "ماذا تحتاج؟" يبدأ بالجانب الصناعي،
+ * وعلى اليسار لوحة صناعية: منتجات من السوق الصناعي وما نقدمه للمصانع.
  */
 function Hero() {
   const { settings } = useSite();
   const [picked, setPicked] = useState(0);
-  const service = SERVICES[picked];
-  const [main, side] = [WORKS[0], WORKS[2]];
+  const need = NEEDS[picked];
+  const industrial = useAsync(() => api.get<Paged<Product>>('/store/products', { category: 'industrial', pageSize: 3 }), []);
+  const items = industrial.data?.items ?? [];
 
   return (
     <section className="relative overflow-hidden bg-inverse text-inverse-fg">
-      {/* شبكة رسم هندسي خافتة خلف الصور (ورقة المهندس) */}
+      {/* شبكة رسم هندسي خافتة (ورقة المهندس) */}
       <svg className="pointer-events-none absolute inset-y-0 end-0 hidden h-full w-1/2 text-inverse-fg opacity-[0.06] lg:block" aria-hidden>
         <defs>
           <pattern id="hero-grid" width="56" height="56" patternUnits="userSpaceOnUse">
@@ -249,45 +295,43 @@ function Hero() {
         <rect width="100%" height="100%" fill="url(#hero-grid)" />
       </svg>
       <div className="container relative grid gap-12 py-12 md:py-16 lg:grid-cols-12 lg:gap-10 lg:py-20">
-        <div className="min-w-0 lg:col-span-6 xl:col-span-5">
-          <p className="eyebrow anim-rise !text-inverse-fg/60">{BRAND.ar} — تصميم ومقاولات وصيانة</p>
+        <div className="min-w-0 lg:col-span-6 xl:col-span-6">
+          <p className="eyebrow anim-rise !text-inverse-fg/60">{BRAND.ar} — حلول صناعية ومقاولات</p>
           <h1 className="anim-rise mt-5 text-[2rem] leading-[1.3] text-inverse-fg [animation-delay:60ms] sm:text-[2.5rem] xl:text-[3rem]">
             {settings.heroTitle}
           </h1>
           <p className="anim-rise mt-5 max-w-lg text-[17px] leading-relaxed text-inverse-fg/65 [animation-delay:120ms]">{settings.heroSubtitle}</p>
 
-          {/* اختيار سريع للخدمة */}
+          {/* اختيار سريع */}
           <div className="anim-rise mt-9 rounded-xl border border-inverse-fg/10 bg-inverse-2 p-4 [animation-delay:180ms] sm:p-5">
             <p id="need-label" className="text-sm font-semibold text-inverse-fg">
               ماذا تحتاج؟
             </p>
             <div role="radiogroup" aria-labelledby="need-label" className="scroll-x -mx-4 mt-3 flex gap-2 px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-              {SERVICES.map((s, i) => (
+              {NEEDS.map((n, i) => (
                 <button
-                  key={s.slug}
+                  key={n.key}
                   type="button"
                   role="radio"
                   aria-checked={picked === i}
                   onClick={() => setPicked(i)}
                   className={cx(
-                    'h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition-colors duration-200',
+                    'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition-colors duration-200',
                     picked === i ? 'border-primary bg-primary text-primary-fg' : 'border-inverse-fg/15 text-inverse-fg/80 hover:border-inverse-fg/40',
                   )}
                 >
-                  {s.short}
+                  <Icon name={n.icon} className="h-4 w-4" />
+                  {n.short}
                 </button>
               ))}
             </div>
-            <div key={service.slug} className="anim-fade mt-4 flex flex-col gap-4 border-t border-inverse-fg/10 pt-4 sm:flex-row sm:items-end sm:justify-between ltr:sm:flex-col ltr:sm:items-start">
-              <div className="min-w-0">
-                <p className="text-[15px] leading-relaxed text-inverse-fg/70">{service.text}</p>
-                {service.fee && <p className="mt-2 text-sm font-semibold text-primary">{service.fee(settings)}</p>}
-              </div>
+            <div key={need.key} className="anim-fade mt-4 flex flex-col gap-4 border-t border-inverse-fg/10 pt-4 sm:flex-row sm:items-end sm:justify-between ltr:sm:flex-col ltr:sm:items-start">
+              <p className="min-w-0 text-[15px] leading-relaxed text-inverse-fg/70">{need.text}</p>
               <Link
-                to={`/bookings/${service.slug}`}
+                to={need.to}
                 className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover active:translate-y-px"
               >
-                احجز موعدًا <Icon name="arrowLeft" className="h-4 w-4" />
+                {need.cta} <Icon name="arrowLeft" className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -298,7 +342,7 @@ function Hero() {
               <span className="ltr">{settings.phone}</span>
             </a>
             <a
-              href={waLink(settings.whatsappNumber, 'مرحبًا، أريد الاستفسار عن خدمة')}
+              href={waLink(settings.whatsappNumber, 'مرحبًا، أريد الاستفسار عن منتجاتكم وخدماتكم')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-[44px] items-center gap-2 transition-colors hover:text-inverse-fg"
@@ -309,34 +353,73 @@ function Hero() {
           </p>
         </div>
 
-        {/* تكوين الصور */}
-        <div className="relative min-w-0 lg:col-span-6 xl:col-span-7 xl:ps-8">
-          <div className="anim-rise relative ms-auto w-[88%] [animation-delay:120ms] lg:w-[90%]">
-            <img
-              src={main.src}
-              width={main.width}
-              height={main.height}
-              alt={main.title}
-              loading="eager"
-              decoding="async"
-              className="aspect-[4/3.4] w-full rounded-2xl object-cover"
-            />
-            <span className="absolute -top-3 end-6 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-fg">{main.category}</span>
+        {/* اللوحة الصناعية */}
+        <div className="anim-rise relative min-w-0 [animation-delay:120ms] lg:col-span-6 xl:ps-6">
+          <div className="relative overflow-hidden rounded-2xl border border-inverse-fg/10 bg-inverse-2 p-5 sm:p-7">
+            {/* ترس زخرفي */}
+            <svg viewBox="0 0 24 24" className="hero-gear pointer-events-none absolute -end-10 -top-10 h-44 w-44 text-primary/15" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden>
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <p className="relative text-xs font-semibold uppercase tracking-wide text-primary">للمصانع والمنشآت الصناعية</p>
+            <ul className="relative mt-4 grid gap-2 sm:grid-cols-3 sm:gap-3">
+              {(
+                [
+                  ['factory', 'منتجات صناعية', 'تجهيزات ومستلزمات مع التوصيل'],
+                  ['wrench', 'صيانة ماكينات', 'إصلاح الأعطال وخطوط الإنتاج'],
+                  ['gear', 'عقود سنوية', 'زيارات دورية وتقارير مكتوبة'],
+                ] as const
+              ).map(([icon, t, d]) => (
+                <li key={t} className="flex items-center gap-3 rounded-xl border border-inverse-fg/10 bg-inverse p-3 sm:block sm:p-4">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
+                    <Icon name={icon} className="h-5 w-5" />
+                  </span>
+                  <span className="block min-w-0 sm:mt-3">
+                    <span className="block font-semibold">{t}</span>
+                    <span className="mt-0.5 block text-sm leading-snug text-inverse-fg/60 sm:mt-1">{d}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="relative mt-6 border-t border-inverse-fg/10 pt-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">من السوق الصناعي</p>
+                <Link to="/store?category=industrial" className="inline-flex items-center gap-1 text-sm text-inverse-fg/60 transition-colors hover:text-inverse-fg">
+                  كل المنتجات <Icon name="arrowLeft" className="h-4 w-4" />
+                </Link>
+              </div>
+              {industrial.loading ? (
+                <div className="mt-3 space-y-2" aria-hidden>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-16 animate-pulse rounded-xl bg-inverse" />
+                  ))}
+                </div>
+              ) : items.length ? (
+                <ul className="mt-3 space-y-2">
+                  {items.map((p) => {
+                    const img = productImage(p);
+                    return (
+                      <li key={p.id}>
+                        <Link to={`/store/${p.slug}`} className="flex items-center gap-3 rounded-xl bg-inverse p-2.5 transition-colors hover:bg-inverse/60">
+                          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-white">
+                            {img ? <img src={img} alt="" loading="lazy" className="h-full w-full object-cover" /> : <Icon name="factory" className="h-5 w-5 text-muted" />}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{p.name}</span>
+                          <span className="shrink-0 font-display font-semibold text-primary">{formatJOD(p.finalPrice)}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <Link to="/store" className="mt-3 flex items-center justify-between rounded-xl bg-inverse p-4 text-sm text-inverse-fg/70 hover:text-inverse-fg">
+                  تصفح السوق <Icon name="arrowLeft" className="h-4 w-4" />
+                </Link>
+              )}
+            </div>
           </div>
-          <figure className="anim-rise absolute -bottom-4 start-0 w-[42%] [animation-delay:260ms] sm:w-[36%]">
-            <img
-              src={side.src}
-              width={side.width}
-              height={side.height}
-              alt={side.title}
-              loading="eager"
-              decoding="async"
-              className="aspect-[4/5] w-full rounded-xl border-4 border-inverse object-cover"
-            />
-            <figcaption className="mt-2 text-xs text-inverse-fg/60">قبل وبعد — {side.title}</figcaption>
-          </figure>
           {/* مسطرة القياس */}
-          <svg className="absolute -bottom-10 end-0 hidden w-[58%] text-inverse-fg/30 sm:block" viewBox="0 0 300 16" fill="none" aria-hidden>
+          <svg className="absolute -bottom-8 end-0 hidden w-[58%] text-inverse-fg/30 sm:block" viewBox="0 0 300 16" fill="none" aria-hidden>
             <line x1="0" y1="8" x2="300" y2="8" stroke="currentColor" />
             {Array.from({ length: 31 }).map((_, i) => (
               <line key={i} x1={i * 10} x2={i * 10} y1={i % 5 === 0 ? 1 : 5} y2="8" stroke="currentColor" />

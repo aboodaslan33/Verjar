@@ -38,7 +38,7 @@ export const MESSAGES = {
   'footer.ctaTitle': ['ابدأ بكشف على موقعك', 'Start with an on-site inspection'],
   'footer.ctaText': ['نزورك في الموعد الذي تختاره، ونعطيك سعرًا مكتوبًا قبل أي التزام.', 'We visit at the time you choose and give you a written price before any commitment.'],
   'footer.ctaButton': ['احجز كشفًا', 'Book an inspection'],
-  'footer.about': ['تصميم وديكور، مطابخ، بناء، صيانة، دهان، وأعمال معدنية للبيوت والشركات في عمّان وكل المحافظات.', 'Design and decor, kitchens, construction, maintenance, painting and metalwork for homes and companies across Jordan.'],
+  'footer.about': ['منتجات وتجهيزات صناعية، صيانة الماكينات وعقود صيانة المصانع، إلى جانب البناء والدهان والديكور والأعمال المعدنية في عمّان وكل المحافظات.', 'Industrial products and equipment, machine maintenance and factory maintenance contracts, plus construction, painting, decor and metalwork across Jordan.'],
   'footer.services': ['الخدمات', 'Services'],
   'footer.company': ['الشركة', 'Company'],
   'footer.contact': ['تواصل معنا', 'Contact us'],

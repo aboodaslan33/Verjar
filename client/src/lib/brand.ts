@@ -2,5 +2,5 @@
 export const BRAND = {
   ar: 'مجموعة فرجا',
   en: 'Farja Group',
-  tagline: 'تصميم وبناء وصيانة وديكور في الأردن',
+  tagline: 'منتجات صناعية وصيانة ماكينات ومقاولات في الأردن',
 } as const;
