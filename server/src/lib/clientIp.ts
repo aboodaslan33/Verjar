@@ -7,7 +7,7 @@ import type { Request } from 'express';
  * على Render تمر الطلبات عبر أكثر من وسيط (Cloudflare أمام الواجهة، إعادة التوجيه /api،
  * موازن الأحمال الداخلي)، وعددها يختلف بين الطلب عبر الواجهة والطلب المباشر للـ API.
  * لذلك لا نعتمد عددًا ثابتًا من الوسطاء: نمشي في X-Forwarded-For من اليمين (ما أضافه الوسطاء)
- * ونتخطى عناوين الوسطاء المعروفة (الشبكات الداخلية وCloudflare)، فأول عنوان غيرها هو الزائر.
+ * ونتخطى عناوين الوسطاء المعروفة (الشبكات الداخلية وCloudflare وRender)، فأول عنوان غيرها هو الزائر.
  * أي عنوان مزيّف يضيفه الزائر بنفسه يكون على اليسار فلا يُصل إليه.
  */
 const proxies = new BlockList();
@@ -39,6 +39,14 @@ for (const cidr of [
 for (const cidr of ['2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32']) {
   const [net, prefix] = cidr.split('/');
   proxies.addSubnet(net, Number(prefix), 'ipv6');
+}
+
+// Render: خادم إعادة توجيه /api من الواجهة للـ API يظهر بعنوان عام من نطاقات Render
+// (رُصد على الإنتاج: 74.220.48.x بين Cloudflare وموازن الأحمال). يمكن إضافة نطاقات أخرى عبر TRUSTED_PROXY_CIDRS.
+for (const cidr of ['74.220.48.0/24', '74.220.56.0/24', ...(process.env.TRUSTED_PROXY_CIDRS ?? '').split(',')]) {
+  const [net, prefix] = cidr.trim().split('/');
+  const v = isIP(net ?? '');
+  if (v && prefix) proxies.addSubnet(net, Number(prefix), v === 4 ? 'ipv4' : 'ipv6');
 }
 
 function clean(raw: string): string | null {
