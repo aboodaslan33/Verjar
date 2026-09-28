@@ -33,6 +33,7 @@ import {
 } from '../../lib/format';
 import type { BookingType, CorporateType, CustomerMe, Finance, RequestStatus } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
+import { TendersTab } from './AccountTenders';
 
 // ───────────── أنواع استجابة /account/overview ─────────────
 
@@ -122,11 +123,12 @@ type Overview = {
 const PROGRESS: RequestStatus[] = ['NEW', 'UNDER_REVIEW', 'PRICED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED'];
 const CONTRACT_STATUS: Record<OContract['status'], string> = { ACTIVE: 'ساري', EXPIRED: 'منتهي', CANCELLED: 'ملغي' };
 
-type TabKey = 'bookings' | 'orders' | 'corporate' | 'files' | 'payments';
+type TabKey = 'bookings' | 'orders' | 'corporate' | 'tenders' | 'files' | 'payments';
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'bookings', label: 'الحجوزات' },
   { key: 'orders', label: 'الطلبات' },
   { key: 'corporate', label: 'الشركات والعقود' },
+  { key: 'tenders', label: 'العطاءات' },
   { key: 'files', label: 'الملفات' },
   { key: 'payments', label: 'الدفعات' },
 ];
@@ -160,6 +162,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
     bookings: data?.bookings.length ?? 0,
     orders: data?.orders.length ?? 0,
     corporate: (data?.corporate.length ?? 0) + (data?.contracts.length ?? 0),
+    tenders: 0,
     files: data?.files.length ?? 0,
     payments: data?.payments.length ?? 0,
   };
@@ -240,6 +243,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
               {tab === 'bookings' && <BookingsTab items={data.bookings} />}
               {tab === 'orders' && <OrdersTab items={data.orders} />}
               {tab === 'corporate' && <CorporateTab items={data.corporate} contracts={data.contracts} />}
+              {tab === 'tenders' && <TendersTab />}
               {tab === 'files' && <FilesTab items={data.files} />}
               {tab === 'payments' && <PaymentsTab items={data.payments} />}
             </>

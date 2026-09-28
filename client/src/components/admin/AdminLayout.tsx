@@ -9,8 +9,9 @@ import { Icon } from '../ui';
 import { useAdminQuery } from './hooks';
 import { LiveProvider, useLive } from './live';
 import type { DashboardStats } from './types';
+import { LangSwitch, useI18n, type MessageKey } from '../../lib/i18n';
 
-type NavItem = { to: string; label: string; end?: boolean; badge?: (s: DashboardStats) => number };
+type NavItem = { to: string; label: string; k?: MessageKey; end?: boolean; badge?: (s: DashboardStats) => number };
 
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [{ to: '/admin', label: 'لوحة التحكم', end: true }] },
@@ -20,7 +21,9 @@ const NAV: { group?: string; items: NavItem[] }[] = [
       { to: '/admin/bookings', label: 'الحجوزات', badge: (s) => s.newBookings },
       { to: '/admin/orders', label: 'طلبات المتجر', badge: (s) => s.newOrders },
       { to: '/admin/corporate', label: 'طلبات الشركات', badge: (s) => s.pendingCorporate },
-      { to: '/admin/contracts', label: 'عقود الشركات', badge: (s) => s.expiringContracts },
+      { to: '/admin/contracts', label: 'عقود الشركات', k: 'admin.contracts', badge: (s) => s.expiringContracts },
+      { to: '/admin/tenders', label: 'العطاءات', k: 'admin.tenders' },
+      { to: '/admin/delivery', label: 'التوصيل والتحصيل', k: 'admin.delivery' },
     ],
   },
   {
@@ -35,6 +38,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     group: 'الحسابات',
     items: [
       { to: '/admin/finance', label: 'المالية' },
+      { to: '/admin/reports', label: 'التقارير', k: 'admin.reports' },
       { to: '/admin/customers', label: 'العملاء' },
       { to: '/admin/newsletter', label: 'النشرة البريدية' },
       { to: '/admin/technicians', label: 'الفنيون' },
@@ -50,6 +54,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
 ];
 
 function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNavigate?: () => void }) {
+  const { t } = useI18n();
   return (
     <nav aria-label="قائمة لوحة التحكم" className="flex-1 overflow-y-auto px-3 py-4">
       {NAV.map((g, gi) => (
@@ -73,7 +78,7 @@ function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNaviga
                       )
                     }
                   >
-                    <span>{n.label}</span>
+                    <span>{n.k ? t(n.k) : n.label}</span>
                     {count > 0 && (
                       <span className="min-w-[1.5rem] rounded-full bg-primary px-1.5 text-center text-xs font-bold tabular-nums text-primary-fg">{count}</span>
                     )}
@@ -178,6 +183,7 @@ function Shell() {
             >
               <Icon name="external" className="h-4 w-4" /> عرض الموقع
             </a>
+            <LangSwitch className="grid h-9 min-w-9 place-items-center rounded-lg px-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink" />
             <button
               type="button"
               onClick={toggle}

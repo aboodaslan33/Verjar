@@ -56,10 +56,11 @@ export function Icon({ name, className = 'h-5 w-5', title }: { name: IconName; c
       </svg>
     );
   }
+  const directional = name === 'chevronLeft' || name === 'chevronRight' || name === 'arrowLeft' || name === 'arrowRight';
   return (
     <svg
       viewBox="0 0 24 24"
-      className={className}
+      className={directional ? `${className} dir-icon` : className}
       fill="none"
       stroke="currentColor"
       strokeWidth={1.8}

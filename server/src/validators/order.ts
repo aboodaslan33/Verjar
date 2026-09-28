@@ -6,6 +6,8 @@ export const orderSchema = z.object({
   phone: phoneField,
   address: requiredText('العنوان', 300),
   notes: optionalText(1000),
+  /** اختياري: الطلبات بدونه تبقى كما كانت (الدفع يُرتّب بعد التأكيد) */
+  paymentMethod: z.enum(['COD', 'CLIQ', 'BANK_TRANSFER']).optional(),
   items: z
     .array(
       z.object({

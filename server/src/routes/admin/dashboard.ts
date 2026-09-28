@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminBus, type AdminEvent } from '../../lib/events';
 import { asyncHandler, ok } from '../../lib/http';
 import { prisma } from '../../lib/prisma';
+import { contractDisplayStatus, expiringWhere } from '../../services/contracts.service';
 import { ammanParts, ammanToUtc } from '../../lib/time';
 
 export const dashboardRouter = Router();
@@ -74,6 +75,8 @@ dashboardRouter.get(
       prisma.product.count({ where: { deletedAt: null, approvalStatus: 'PENDING', vendor: { active: true } } }),
     ]);
 
+    const ops = await operationsStats(dayStart, dayEnd, monthStart);
+
     const activity = [
       ...recentBookings.map((b) => ({ kind: 'booking' as const, id: b.id, number: b.number, title: b.name, sub: b.type, status: b.status, at: b.createdAt })),
       ...recentOrders.map((o) => ({ kind: 'order' as const, id: o.id, number: o.number, title: o.customerName, sub: o.total, status: o.status, at: o.createdAt })),
@@ -93,6 +96,7 @@ dashboardRouter.get(
       pendingProducts,
       upcoming,
       activity,
+      ops,
     });
   }),
 );
@@ -115,3 +119,48 @@ dashboardRouter.get('/events', (req, res) => {
     adminBus.off('event', onEvent);
   });
 });
+
+/** مؤشرات التوصيل والتحصيل والعقود والعطاءات (اليوم والشهر) */
+async function operationsStats(dayStart: Date, dayEnd: Date, monthStart: Date) {
+  const period = async (from: Date, to?: Date) => {
+    const created = { deletedAt: null, createdAt: { gte: from, ...(to ? { lt: to } : {}) } } as const;
+    const [orders, delivered, failed, cancelled, sales, codCollected, codPending, online, fees] = await Promise.all([
+      prisma.order.count({ where: created }),
+      prisma.order.count({ where: { deletedAt: null, deliveryStatus: 'DELIVERED', deliveredAt: { gte: from, ...(to ? { lt: to } : {}) } } }),
+      prisma.order.count({ where: { ...created, deliveryStatus: 'FAILED' } }),
+      prisma.order.count({ where: { ...created, status: 'CANCELLED' } }),
+      prisma.order.aggregate({ where: { ...created, status: { not: 'CANCELLED' } }, _sum: { total: true } }),
+      prisma.order.aggregate({ where: { deletedAt: null, codStatus: { in: ['COLLECTED', 'SETTLED'] }, codCollectedAt: { gte: from, ...(to ? { lt: to } : {}) } }, _sum: { codCollected: true } }),
+      prisma.order.aggregate({ where: { ...created, paymentMethod: 'COD', status: { not: 'CANCELLED' }, codStatus: 'PENDING' }, _sum: { codAmount: true } }),
+      prisma.payment.aggregate({ where: { deletedAt: null, method: { in: ['BANK_TRANSFER', 'CLIQ', 'CARD'] }, paidAt: { gte: from, ...(to ? { lt: to } : {}) } }, _sum: { amount: true } }),
+      prisma.order.aggregate({ where: { ...created, status: { not: 'CANCELLED' } }, _sum: { deliveryFee: true } }),
+    ]);
+    return {
+      orders,
+      delivered,
+      failed,
+      cancelled,
+      sales: Number(sales._sum.total ?? 0),
+      codCollected: Number(codCollected._sum.codCollected ?? 0),
+      codPending: Number(codPending._sum.codAmount ?? 0),
+      onlinePayments: Number(online._sum.amount ?? 0),
+      deliveryFees: Number(fees._sum.deliveryFee ?? 0),
+    };
+  };
+  const [today, month, commissions, activeContracts, expiring, cashPending] = await Promise.all([
+    period(dayStart, dayEnd),
+    period(monthStart),
+    prisma.tender.aggregate({ where: { deletedAt: null, status: 'AWARDED', awardedAt: { gte: monthStart } }, _sum: { commissionAmount: true } }),
+    prisma.contract.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
+    prisma.contract.findMany({ where: { deletedAt: null, ...expiringWhere() }, select: { status: true, endDate: true, reminderDays: true } }),
+    prisma.order.aggregate({ where: { deletedAt: null, codStatus: 'COLLECTED' }, _sum: { codCollected: true } }),
+  ]);
+  return {
+    today,
+    month: { ...month, tenderCommissions: Number(commissions._sum.commissionAmount ?? 0) },
+    activeContracts,
+    expiringContracts: expiring.filter((c) => contractDisplayStatus(c) === 'EXPIRING_SOON').length,
+    /** نقد محصّل لدى السائقين/الشركات لم يُسلَّم بعد */
+    cashWithCarriers: Number(cashPending._sum.codCollected ?? 0),
+  };
+}

@@ -20,6 +20,7 @@ const RANGES: Partial<Record<Key, [number, number, boolean?]>> = {
   bookingGapHours: [0, 24],
   maxDaysAhead: [1, 365, true],
   contractReminderDays: [1, 180, true],
+  tenderCommissionPercent: [0, 100],
 };
 
 const NUMERIC: Key[] = [
@@ -32,6 +33,7 @@ const NUMERIC: Key[] = [
   'bookingGapHours',
   'maxDaysAhead',
   'contractReminderDays',
+  'tenderCommissionPercent',
 ];
 
 export default function Settings() {
@@ -249,6 +251,7 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
           {num('bookingGapHours', 'الفارق بين المواعيد (ساعة)', { min: 0, max: 24, hint: 'الافتراضي 3 ساعات' })}
           {num('maxDaysAhead', 'أقصى مدة للحجز المسبق (يوم)', { min: 1, max: 365, step: '1' })}
           {num('contractReminderDays', 'التذكير قبل انتهاء العقد (يوم)', { min: 1, max: 180, step: '1' })}
+          {num('tenderCommissionPercent', 'عمولة المنصة على العطاءات (%) · Tender commission', { min: 0, max: 100, hint: 'تُحفظ مع كل ترسية ولا تتغير بتغيير النسبة لاحقًا' })}
         </div>
       </Section>
 

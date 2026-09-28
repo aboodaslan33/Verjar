@@ -13,13 +13,15 @@ import { formatJOD, toNum } from '../lib/money';
 import { displayPhone } from '../lib/phone';
 import { formatAmman } from '../lib/time';
 
-const BRAND = 'مجموعة فرجا';
+export const BRAND = 'مجموعة فرجا';
 
 function mapLink(lat?: number | null, lng?: number | null) {
   return lat != null && lng != null ? `https://maps.google.com/?q=${lat},${lng}` : null;
 }
 
 /** رسالة الطلب من المتجر — بنفس الصيغة المعتمدة */
+const ORDER_PAYMENT_AR: Record<string, string> = { COD: 'نقدًا عند الاستلام', CLIQ: 'CliQ', BANK_TRANSFER: 'تحويل بنكي' };
+
 type OrderForMessage = Order & {
   items: OrderItem[];
   vendorOrders?: { id: string; number: number; vendor: { name: string } }[];
@@ -48,6 +50,7 @@ export function orderMessage(order: OrderForMessage): string {
   lines.push(`المجموع قبل الخصم: ${formatJOD(order.subtotal)}`);
   if (toNum(order.discountTotal) > 0) lines.push(`الخصم: ${formatJOD(order.discountTotal)}`);
   lines.push(`الإجمالي: ${formatJOD(order.total)}`);
+  if (order.paymentMethod) lines.push(`الدفع: ${ORDER_PAYMENT_AR[order.paymentMethod] ?? order.paymentMethod}`);
   if (order.notes) lines.push(`ملاحظات: ${order.notes}`);
   lines.push(`المرجع: ${order.ref}`);
   return lines.join('\n');

@@ -15,6 +15,8 @@ import { categoryForProduct, cleanSpecs, effectiveSpecFields, specsInput, visibl
 import { statusMessage } from '../../services/messages';
 import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.service';
 import { emptyTotals, setVendorOrderStatus, syncOrderStatus, vendorTotals } from '../../services/vendor.service';
+import { type Attachment, assertOpen, offerInput, storeAttachments } from '../../services/tenders.service';
+import { conflict } from '../../lib/http';
 import { notifyCustomer } from '../../services/whatsapp.service';
 
 /**
@@ -425,5 +427,84 @@ vendorRouter.get(
       }),
     ]);
     ok(res, { totals: totals.get(id) ?? emptyTotals(), payouts, dueOrders: due });
+  }),
+);
+
+// ───────────── العطاءات ─────────────
+
+/** العطاءات المفتوحة للتقديم، مع عرض المورد عليها إن وُجد */
+vendorRouter.get(
+  '/tenders',
+  asyncHandler(async (req, res) => {
+    const id = vid(req);
+    const tenders = await prisma.tender.findMany({
+      where: { deletedAt: null, OR: [{ status: 'OPEN', deadline: { gte: new Date() } }, { offers: { some: { vendorId: id } } }] },
+      orderBy: { deadline: 'asc' },
+      select: {
+        id: true,
+        ref: true,
+        title: true,
+        description: true,
+        location: true,
+        durationMonths: true,
+        deadline: true,
+        budget: true,
+        requirements: true,
+        attachments: true,
+        status: true,
+        service: { select: { name: true } },
+        customer: { select: { companyName: true, name: true } },
+        offers: { where: { vendorId: id }, select: { id: true, price: true, proposal: true, status: true, submittedAt: true, attachments: true } },
+      },
+    });
+    ok(res, tenders.map(({ customer, ...t }) => ({ ...t, company: customer.companyName ?? customer.name })));
+  }),
+);
+
+vendorRouter.post(
+  '/tenders/:id/offers',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const input = offerInput.parse(req.body);
+    const t = await prisma.tender.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!t) throw notFound('العطاء غير موجود');
+    assertOpen(t);
+    if (await prisma.tenderOffer.findFirst({ where: { tenderId: t.id, vendorId: vid(req), status: 'SUBMITTED' } })) {
+      throw conflict('قدّمت عرضًا على هذا العطاء. اسحبه أولًا لتقديم عرض جديد.');
+    }
+    const o = await prisma.tenderOffer.create({
+      data: { tenderId: t.id, vendorId: vid(req), providerName: req.vendor!.name, price: new Prisma.Decimal(input.price), proposal: input.proposal },
+    });
+    await audit({ actorType: 'vendor', action: 'offer', entity: 'tender', entityId: t.id, meta: { offerId: o.id, vendorId: vid(req) } });
+    ok(res, o, 201);
+  }),
+);
+
+/** مرفقات العرض أو سحبه — لعروض المورد فقط */
+const ownOffer = async (vendorId: string, id: string) => {
+  const o = await prisma.tenderOffer.findFirst({ where: { id, vendorId }, include: { tender: true } });
+  if (!o) throw notFound('العرض غير موجود');
+  return o;
+};
+
+vendorRouter.post(
+  '/tender-offers/:id/attachments',
+  formLimiter,
+  uploadGuard(40),
+  memoryUpload(15, 5).array('files', 5),
+  asyncHandler(async (req, res) => {
+    const o = await ownOffer(vid(req), req.params.id);
+    if (o.status !== 'SUBMITTED') throw conflict('لا يمكن تعديل هذا العرض');
+    const added = await storeAttachments(req.files as Express.Multer.File[], 'tender-offers');
+    ok(res, await prisma.tenderOffer.update({ where: { id: o.id }, data: { attachments: [...((o.attachments as Attachment[]) ?? []), ...added] } }));
+  }),
+);
+
+vendorRouter.post(
+  '/tender-offers/:id/withdraw',
+  asyncHandler(async (req, res) => {
+    const o = await ownOffer(vid(req), req.params.id);
+    if (o.status !== 'SUBMITTED') throw conflict('لا يمكن سحب هذا العرض');
+    ok(res, await prisma.tenderOffer.update({ where: { id: o.id }, data: { status: 'WITHDRAWN' } }));
   }),
 );

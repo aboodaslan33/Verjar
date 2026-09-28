@@ -2,7 +2,8 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
 import { CheckoutHeader } from '../../components/store/CheckoutSteps';
-import { Alert, Button, ButtonA, ButtonLink, EmptyState, Icon, Input, SuccessMark, Textarea } from '../../components/ui';
+import { Alert, Button, ButtonA, ButtonLink, ChoiceGroup, EmptyState, Icon, Input, SuccessMark, Textarea } from '../../components/ui';
+import { useI18n } from '../../lib/i18n';
 import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useCart } from '../../context/CartContext';
 import { ApiError, api } from '../../lib/api';
@@ -49,6 +50,8 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [result, setResult] = useState<OrderCreated | null>(null);
+  const [payment, setPayment] = useState<'COD' | 'CLIQ' | 'BANK_TRANSFER'>('COD');
+  const { t } = useI18n();
   const refs = useRef<Partial<Record<Field, HTMLInputElement | HTMLTextAreaElement | null>>>({});
 
   if (result) return <Confirmation order={result} />;
@@ -101,6 +104,7 @@ export default function Checkout() {
         phone: form.phone.trim(),
         address: form.address.trim(),
         notes: form.notes.trim() || undefined,
+        paymentMethod: payment,
         items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       });
       setResult(data);
@@ -202,6 +206,14 @@ export default function Checkout() {
               onBlur={blur('notes')}
               error={errors.notes}
               maxLength={1000}
+            />
+            <ChoiceGroup
+              label={t('pay.title')}
+              name="paymentMethod"
+              value={payment}
+              onChange={setPayment}
+              columns={3}
+              options={(['COD', 'CLIQ', 'BANK_TRANSFER'] as const).map((m) => ({ value: m, label: t(`pay.${m}`), description: t(`pay.${m}Hint`) }))}
             />
           </div>
           <Button type="submit" size="lg" block loading={submitting}>

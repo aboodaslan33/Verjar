@@ -28,6 +28,7 @@ const ANNUAL_SERVICES = [
   ['electrical', 'صيانة كهرباء'],
   ['production-lines', 'صيانة خطوط إنتاج'],
   ['signage', 'لوحات إرشادية وأرضية'],
+  ['pest-control', 'مكافحة الآفات'],
   ['efficiency', 'رفع كفاءة المنشأة التشغيلية'],
 ];
 
@@ -39,6 +40,7 @@ const URGENT_SERVICES = [
   ['u-argon', 'لحام آرغون'],
   ['u-epoxy', 'صيانة إيبوكسي'],
   ['u-roof', 'عزل الأسطح'],
+  ['pest-control-urgent', 'مكافحة الآفات (طارئ)'],
 ];
 
 const PRODUCTS: {

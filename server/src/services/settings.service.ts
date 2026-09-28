@@ -42,6 +42,8 @@ export const settingsSchema = z.object({
   bookingGapHours: z.number().min(0).max(24),
   maxDaysAhead: z.number().int().min(1).max(365),
   contractReminderDays: z.number().int().min(1).max(180),
+  /** عمولة المنصة من العطاءات المُرسّاة (نسبة مئوية) */
+  tenderCommissionPercent: z.number().min(0).max(100),
   aboutTitle: z.string().max(200),
   aboutContent: z.string().max(10000),
   heroTitle: z.string().max(200),
@@ -73,6 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bookingGapHours: 3,
   maxDaysAhead: 60,
   contractReminderDays: 30,
+  tenderCommissionPercent: 10,
   aboutTitle: 'مجموعة فرجا للتصميم والمقاولات والصيانة',
   aboutContent:
     'نحن فريق أردني يعمل في البناء والصيانة والدهان والأعمال المعدنية. نزور الموقع، نكشف على المشكلة، ونعطيك سعرًا مكتوبًا قبل أن نبدأ.\n\nنعمل مع البيوت والشقق والفلل، ومع المصانع والشركات بعقود صيانة سنوية تشمل المرافق والكهرباء والأرضيات الإيبوكسي ومتطلبات GMP وISO.\n\nكل عمل نستلمه يكون له مسؤول واحد يتابعه معك من الكشف حتى التسليم، وتقدر تشوف حالة طلبك وعروض الأسعار من صفحتك على الموقع.',

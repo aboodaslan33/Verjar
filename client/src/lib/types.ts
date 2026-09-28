@@ -35,6 +35,7 @@ export type SiteSettings = {
 export type AdminSettings = Omit<SiteSettings, 'whatsappMode'> & {
   slotMinutes: number;
   contractReminderDays: number;
+  tenderCommissionPercent: number;
 };
 
 export type Category = {

@@ -4,6 +4,7 @@ export const URGENCY_LABEL = { NORMAL: 'عادي', URGENT: 'عاجل', EMERGENCY
 export const ZONE_LABEL = { INSIDE_AMMAN: 'داخل عمّان', OUTSIDE_AMMAN: 'خارج عمّان' } as const;
 
 export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
+  DRAFT: 'مسودة',
   ACTIVE: 'ساري',
   EXPIRED: 'منتهي',
   CANCELLED: 'ملغي',

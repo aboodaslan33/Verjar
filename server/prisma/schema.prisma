@@ -73,9 +73,74 @@ enum UrgencyLevel {
 }
 
 enum ContractStatus {
+  DRAFT
   ACTIVE
   EXPIRED
   CANCELLED
+}
+
+/// نوع العقد: صيانة عامة أو عقد سنوي لشركة
+enum ContractType {
+  MAINTENANCE
+  ANNUAL_CORPORATE
+}
+
+enum RenewalStatus {
+  NONE
+  PENDING
+  RENEWED
+  NOT_RENEWING
+}
+
+enum ContractVisitStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  MISSED
+}
+
+enum TenderStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  UNDER_REVIEW
+  AWARDED
+  CANCELLED
+}
+
+enum TenderOfferStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+/// حالة التوصيل (منفصلة عن حالة الطلب الموحّدة)
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// تحصيل الدفع عند الاستلام
+enum CodStatus {
+  PENDING
+  COLLECTED
+  SETTLED
+}
+
+enum SettlementStatus {
+  CONFIRMED
+  VOIDED
 }
 
 enum QuoteFileKind {
@@ -92,6 +157,7 @@ enum PaymentMethod {
   CLIQ
   CARD
   OTHER
+  COD
 }
 
 /// مراجعة منتجات الموردين قبل ظهورها في المتجر
@@ -126,11 +192,12 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  auditLogs AuditLog[]
-  campaigns EmailCampaign[]
-  payments  Payment[]       @relation("PaymentRecordedBy")
-  payouts   VendorPayout[]  @relation("PayoutRecordedBy")
-  quotes    QuoteFile[]     @relation("QuoteUploadedBy")
+  auditLogs   AuditLog[]
+  campaigns   EmailCampaign[]
+  payments    Payment[]            @relation("PaymentRecordedBy")
+  payouts     VendorPayout[]       @relation("PayoutRecordedBy")
+  settlements DeliverySettlement[] @relation("SettlementReceivedBy")
+  quotes      QuoteFile[]          @relation("QuoteUploadedBy")
 }
 
 /// العملاء — يتم إنشاؤهم تلقائيًا عند أول حجز أو طلب برقم الهاتف، أو بالتسجيل من صفحة /register
@@ -157,6 +224,7 @@ model Customer {
 
   bookings          Booking[]
   orders            Order[]
+  tenders           Tender[]
   vendor            Vendor?
   corporateRequests CorporateRequest[]
   contracts         Contract[]
@@ -169,14 +237,16 @@ model Customer {
 
 /// الفنيون الذين يُعيَّنون على الحجوزات
 model Technician {
-  id        String    @id @default(cuid())
+  id        String          @id @default(cuid())
   name      String
   phone     String
   specialty String?
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  active    Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
   bookings  Booking[]
+  contracts Contract[]
+  visits    ContractVisit[]
 }
 
 // ─────────────────────────── المتجر ───────────────────────────
@@ -226,6 +296,7 @@ model Vendor {
   vendorOrders VendorOrder[]
   orderItems   OrderItem[]
   payouts      VendorPayout[]
+  tenderOffers TenderOffer[]
 
   @@index([active])
 }
@@ -282,35 +353,56 @@ model ProductMedia {
 }
 
 model Order {
-  id            String        @id @default(cuid())
+  id                String         @id @default(cuid())
   /// رقم الطلب المعروض (#1042)
-  number        Int           @unique @default(autoincrement())
+  number            Int            @unique @default(autoincrement())
   /// رمز مرجعي عشوائي يستخدمه العميل للدخول لحسابه
-  ref           String        @unique
-  customerId    String
-  customerName  String
-  phone         String
-  address       String
-  notes         String?
-  status        RequestStatus @default(NEW)
-  subtotal      Decimal       @db.Decimal(10, 3)
-  discountTotal Decimal       @db.Decimal(10, 3)
-  total         Decimal       @db.Decimal(10, 3)
-  whatsappText  String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?
+  ref               String         @unique
+  customerId        String
+  customerName      String
+  phone             String
+  address           String
+  notes             String?
+  status            RequestStatus  @default(NEW)
+  subtotal          Decimal        @db.Decimal(10, 3)
+  discountTotal     Decimal        @db.Decimal(10, 3)
+  total             Decimal        @db.Decimal(10, 3)
+  whatsappText      String
+  /// طريقة الدفع التي اختارها العميل (فارغة للطلبات القديمة)
+  paymentMethod     PaymentMethod?
+  // ── التوصيل ──
+  deliveryStatus    DeliveryStatus @default(PENDING)
+  driverId          String?
+  deliveryCompanyId String?
+  deliveryFee       Decimal        @default(0) @db.Decimal(10, 3)
+  deliveredAt       DateTime?
+  deliveryNote      String?
+  // ── الدفع عند الاستلام ──
+  codAmount         Decimal?       @db.Decimal(10, 3)
+  codStatus         CodStatus?
+  codCollected      Decimal?       @db.Decimal(10, 3)
+  codCollectedAt    DateTime?
+  settlementId      String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  deletedAt         DateTime?
 
-  customer     Customer      @relation(fields: [customerId], references: [id])
-  items        OrderItem[]
-  vendorOrders VendorOrder[]
-  payments     Payment[]
-  quoteFiles   QuoteFile[]
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  driver          Driver?             @relation(fields: [driverId], references: [id])
+  deliveryCompany DeliveryCompany?    @relation(fields: [deliveryCompanyId], references: [id])
+  settlement      DeliverySettlement? @relation(fields: [settlementId], references: [id])
+  items           OrderItem[]
+  vendorOrders    VendorOrder[]
+  payments        Payment[]
+  quoteFiles      QuoteFile[]
 
   @@index([phone])
   @@index([status])
   @@index([createdAt])
   @@index([customerId])
+  @@index([deliveryStatus])
+  @@index([driverId])
+  @@index([codStatus])
 }
 
 /// طلب فرعي لكل مورد داخل طلب العميل — المورد يتابع حالته
@@ -465,7 +557,9 @@ model CorporateService {
   sortOrder Int                  @default(0)
   active    Boolean              @default(true)
 
-  requests CorporateRequest[]
+  requests  CorporateRequest[]
+  contracts Contract[]         @relation("ContractServices")
+  tenders   Tender[]
 }
 
 model CorporateRequest {
@@ -492,6 +586,8 @@ model CorporateRequest {
   notes                  String?
   adminNotes             String?
   quotedAmount           Decimal?             @db.Decimal(10, 3)
+  /// العقد الذي يُنفَّذ هذا الطلب ضمنه (طلبات الصيانة ضمن عقد)
+  contractId             String?
   whatsappText           String
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
@@ -500,6 +596,7 @@ model CorporateRequest {
   customer   Customer           @relation(fields: [customerId], references: [id])
   services   CorporateService[]
   contracts  Contract[]
+  contract   Contract?          @relation("ContractRequests", fields: [contractId], references: [id])
   quoteFiles QuoteFile[]
 
   @@index([status])
@@ -522,18 +619,182 @@ model Contract {
   reminderDays       Int            @default(30)
   reminderSentAt     DateTime?
   notes              String?
+  /// مرجع متسلسل مثل MC-2026-00001 (العقود القديمة تبقى برقمها)
+  ref                String?        @unique
+  type               ContractType   @default(MAINTENANCE)
+  paymentMethod      PaymentMethod?
+  /// عدد الزيارات المشمولة
+  visitsIncluded     Int?
+  /// زمن الاستجابة المتفق عليه (بالساعات)
+  responseHours      Int?
+  technicianId       String?
+  terms              String?
+  renewalStatus      RenewalStatus  @default(NONE)
+  tenderId           String?        @unique
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   deletedAt          DateTime?
 
-  corporateRequest CorporateRequest? @relation(fields: [corporateRequestId], references: [id])
-  customer         Customer          @relation(fields: [customerId], references: [id])
+  corporateRequest CorporateRequest?  @relation(fields: [corporateRequestId], references: [id])
+  customer         Customer           @relation(fields: [customerId], references: [id])
+  technician       Technician?        @relation(fields: [technicianId], references: [id])
+  tender           Tender?            @relation(fields: [tenderId], references: [id])
+  services         CorporateService[] @relation("ContractServices")
+  visits           ContractVisit[]
+  requests         CorporateRequest[] @relation("ContractRequests")
   payments         Payment[]
   quoteFiles       QuoteFile[]
 
   @@index([endDate])
   @@index([status])
   @@index([customerId])
+  @@index([type])
+}
+
+/// زيارة خدمة ضمن عقد
+model ContractVisit {
+  id           String              @id @default(cuid())
+  contractId   String
+  scheduledAt  DateTime
+  technicianId String?
+  status       ContractVisitStatus @default(SCHEDULED)
+  notes        String?
+  completedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  contract   Contract    @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  technician Technician? @relation(fields: [technicianId], references: [id])
+
+  @@index([contractId])
+  @@index([scheduledAt])
+}
+
+// ─────────────────────────── العطاءات ───────────────────────────
+
+/// عطاء تنشره شركة (عميل) لخدمة صيانة
+model Tender {
+  id                String       @id @default(cuid())
+  /// TEN-2026-00001
+  ref               String       @unique
+  customerId        String
+  title             String
+  description       String
+  serviceId         String?
+  location          String
+  durationMonths    Int?
+  deadline          DateTime
+  budget            Decimal?     @db.Decimal(12, 3)
+  requirements      String?
+  attachments       Json         @default("[]")
+  status            TenderStatus @default(DRAFT)
+  // ── الترسية والعمولة (تُحفظ وقت الترسية) ──
+  awardedOfferId    String?      @unique
+  awardedAmount     Decimal?     @db.Decimal(12, 3)
+  commissionPercent Decimal?     @db.Decimal(5, 2)
+  commissionAmount  Decimal?     @db.Decimal(12, 3)
+  providerAmount    Decimal?     @db.Decimal(12, 3)
+  awardedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
+
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  service      CorporateService? @relation(fields: [serviceId], references: [id])
+  offers       TenderOffer[]     @relation("TenderOffers")
+  awardedOffer TenderOffer?      @relation("AwardedOffer", fields: [awardedOfferId], references: [id])
+  contract     Contract?
+
+  @@index([status])
+  @@index([deadline])
+  @@index([customerId])
+}
+
+/// عرض على عطاء: من المنصة نفسها (vendorId فارغ) أو من مورد/شركة
+model TenderOffer {
+  id           String            @id @default(cuid())
+  tenderId     String
+  vendorId     String?
+  providerName String
+  price        Decimal           @db.Decimal(12, 3)
+  proposal     String
+  attachments  Json              @default("[]")
+  status       TenderOfferStatus @default(SUBMITTED)
+  submittedAt  DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  tender    Tender  @relation("TenderOffers", fields: [tenderId], references: [id], onDelete: Cascade)
+  vendor    Vendor? @relation(fields: [vendorId], references: [id])
+  awardedOf Tender? @relation("AwardedOffer")
+
+  @@index([tenderId])
+  @@index([vendorId])
+}
+
+// ─────────────────────────── التوصيل ───────────────────────────
+
+model DeliveryCompany {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  /// رسوم التوصيل الافتراضية لكل طلب
+  defaultFee  Decimal  @default(0) @db.Decimal(10, 3)
+  active      Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders      Order[]
+  settlements DeliverySettlement[]
+}
+
+/// سائق التوصيل الداخلي
+model Driver {
+  id        String       @id @default(cuid())
+  name      String
+  phone     String
+  status    DriverStatus @default(ACTIVE)
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  orders      Order[]
+  settlements DeliverySettlement[]
+}
+
+/// تسليم النقد المحصّل (من سائق أو شركة توصيل) للشركة — لا يُحذف، يُلغى فقط
+model DeliverySettlement {
+  id                String           @id @default(cuid())
+  /// SET-2026-00001
+  ref               String           @unique
+  driverId          String?
+  deliveryCompanyId String?
+  amount            Decimal          @db.Decimal(12, 3)
+  ordersCount       Int
+  status            SettlementStatus @default(CONFIRMED)
+  notes             String?
+  receivedById      String?
+  receivedAt        DateTime         @default(now())
+  voidedAt          DateTime?
+  voidReason        String?
+  createdAt         DateTime         @default(now())
+
+  driver          Driver?          @relation(fields: [driverId], references: [id])
+  deliveryCompany DeliveryCompany? @relation(fields: [deliveryCompanyId], references: [id])
+  receivedBy      User?            @relation("SettlementReceivedBy", fields: [receivedById], references: [id])
+  orders          Order[]
+
+  @@index([driverId])
+  @@index([deliveryCompanyId])
+  @@index([receivedAt])
+}
+
+/// عدّاد المراجع المتسلسلة لكل بادئة وسنة (MC-2026، TEN-2026، SET-2026)
+model RefCounter {
+  key   String @id
+  value Int    @default(0)
 }
 
 // ─────────────────────────── الملفات والمالية ───────────────────────────

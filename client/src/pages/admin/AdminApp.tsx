@@ -26,6 +26,11 @@ const Logs = lazy(() => import('./Logs'));
 const Newsletter = lazy(() => import('./Newsletter'));
 const Vendors = lazy(() => import('./Vendors'));
 const VendorDetail = lazy(() => import('./VendorDetail'));
+const ContractDetail = lazy(() => import('./ContractDetail'));
+const Tenders = lazy(() => import('./Tenders'));
+const TenderDetail = lazy(() => import('./TenderDetail'));
+const Delivery = lazy(() => import('./Delivery'));
+const Reports = lazy(() => import('./Reports'));
 
 /** هيكل تحميل بشكل لوحة التحكم (أثناء التحقق من الجلسة) */
 function ShellSkeleton() {
@@ -105,6 +110,11 @@ export default function AdminApp() {
           <Route path="corporate" element={s(<Corporate />)} />
           <Route path="corporate/:id" element={s(<CorporateDetail />)} />
           <Route path="contracts" element={s(<Contracts />)} />
+          <Route path="contracts/:id" element={s(<ContractDetail />)} />
+          <Route path="tenders" element={s(<Tenders />)} />
+          <Route path="tenders/:id" element={s(<TenderDetail />)} />
+          <Route path="delivery" element={s(<Delivery />)} />
+          <Route path="reports" element={s(<Reports />)} />
           <Route path="finance" element={s(<Finance />)} />
           <Route path="customers" element={s(<Customers />)} />
           <Route path="customers/:id" element={s(<CustomerDetail />)} />

@@ -3,7 +3,7 @@ import type { AdminSettings, BookingType, CorporateType, MediaKind, RequestStatu
 
 export type Urgency = 'NORMAL' | 'URGENT' | 'EMERGENCY';
 export type AreaZone = 'INSIDE_AMMAN' | 'OUTSIDE_AMMAN';
-export type ContractStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 export type FileKind = 'EVALUATION' | 'QUOTE' | 'CONTRACT' | 'INVOICE' | 'OTHER';
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CLIQ' | 'CARD' | 'OTHER';
 export type WaResult = { link: string; sent: boolean } | null;
@@ -191,6 +191,16 @@ export type OrderDetail = Omit<OrderRow, 'vendorOrders'> & {
   payments: Payment[];
   whatsappLogs: WhatsAppLog[];
   quoteFiles?: QuoteFile[];
+  paymentMethod: string | null;
+  deliveryStatus: 'PENDING' | 'ASSIGNED' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
+  deliveryFee: number;
+  deliveryNote: string | null;
+  codAmount: number | null;
+  codStatus: 'PENDING' | 'COLLECTED' | 'SETTLED' | null;
+  codCollected: number | null;
+  driver: { id: string; name: string } | null;
+  deliveryCompany: { id: string; name: string } | null;
+  settlement: { id: string; ref: string } | null;
 };
 
 export type AdminCategory = {
@@ -302,6 +312,16 @@ export type Contract = {
   createdAt: string;
   customer?: { id: string; name: string; phone: string; companyName: string | null };
   corporateRequest?: { id: string; number: number; companyName: string } | null;
+  // ── عقود الصيانة ──
+  ref?: string | null;
+  type?: 'MAINTENANCE' | 'ANNUAL_CORPORATE';
+  displayStatus?: ContractStatus | 'EXPIRING_SOON';
+  paid?: number;
+  remaining?: number;
+  visitsIncluded?: number | null;
+  visitsUsed?: number;
+  visitsRemaining?: number | null;
+  services?: { id: string; key: string; name: string }[];
 };
 
 export type CorporateRow = {
@@ -373,6 +393,8 @@ export type CustomerDetail = {
   finance: FinanceSummary;
 };
 
+type OpsPeriod = { orders: number; delivered: number; failed: number; cancelled: number; sales: number; codCollected: number; codPending: number; onlinePayments: number; deliveryFees: number };
+
 export type DashboardStats = {
   bookingsToday: number;
   newBookings: number;
@@ -383,6 +405,14 @@ export type DashboardStats = {
   expiringContracts: number;
   /** منتجات موردين بانتظار المراجعة */
   pendingProducts: number;
+  /** التوصيل والتحصيل والعقود (اليوم/الشهر) */
+  ops?: {
+    today: OpsPeriod;
+    month: OpsPeriod & { tenderCommissions: number };
+    activeContracts: number;
+    expiringContracts: number;
+    cashWithCarriers: number;
+  };
   upcoming: {
     id: string;
     number: number;

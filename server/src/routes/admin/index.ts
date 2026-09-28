@@ -11,6 +11,9 @@ import { productsRouter } from './products';
 import { newsletterRouter } from './newsletter';
 import { logsRouter, settingsRouter } from './settings';
 import { vendorsAdminRouter } from './vendors';
+import { deliveryRouter } from './delivery';
+import { tendersAdminRouter } from './tenders';
+import { reportsRouter } from './reports';
 
 export const adminRouter = Router();
 adminRouter.use(requireAdmin);
@@ -28,3 +31,6 @@ adminRouter.use('/settings', settingsRouter);
 adminRouter.use('/logs', logsRouter);
 adminRouter.use('/newsletter', newsletterRouter);
 adminRouter.use('/vendors', vendorsAdminRouter);
+adminRouter.use('/delivery', deliveryRouter);
+adminRouter.use('/tenders', tendersAdminRouter);
+adminRouter.use('/reports', reportsRouter);

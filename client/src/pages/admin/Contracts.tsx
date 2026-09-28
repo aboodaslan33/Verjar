@@ -1,20 +1,22 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ContractStatusTag, NewContractForm } from '../../components/admin/ContractExtras';
+import { useI18n } from '../../lib/i18n';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { ContractForm } from '../../components/admin/ContractForm';
 import { DataTable, type Column } from '../../components/admin/DataTable';
 import { FileUploadForm } from '../../components/admin/FileUploadForm';
 import { useAdminQuery, useFilters, useMutation } from '../../components/admin/hooks';
-import { CONTRACT_STATUS_LABEL, daysUntil } from '../../components/admin/labels';
+import { daysUntil } from '../../components/admin/labels';
 import type { Contract } from '../../components/admin/types';
-import { AdminPage, FilterBar, FilterSelect } from '../../components/admin/ui';
-import { Button, ButtonLink, Icon, Modal, Tag } from '../../components/ui';
+import { AdminPage, FilterBar, FilterSelect, SearchInput } from '../../components/admin/ui';
+import { Button, ButtonLink, Icon, Modal } from '../../components/ui';
 import { api } from '../../lib/api';
 import { cx, formatDate, formatJOD } from '../../lib/format';
 import type { Paged } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 
-const KEYS = ['status', 'expiring'] as const;
+const KEYS = ['status', 'expiring', 'type', 'q'] as const;
 
 export default function Contracts() {
   useDocumentTitle('عقود الشركات');
@@ -28,6 +30,9 @@ export default function Contracts() {
   const [edit, setEdit] = useState<Contract | null>(null);
   const [upload, setUpload] = useState<Contract | null>(null);
   const [remove, setRemove] = useState<Contract | null>(null);
+  const [creating, setCreating] = useState(false);
+  const { t } = useI18n();
+  const navigate = useNavigate();
   const m = useMutation();
 
   async function doRemove() {
@@ -45,7 +50,8 @@ export default function Contracts() {
         <span className="flex flex-col">
           <span className="font-medium">{c.corporateRequest?.companyName ?? c.customer?.companyName ?? c.customer?.name}</span>
           <span className="text-xs text-muted">
-            {c.title} · #{c.number}
+            {c.title} · <span className="ltr">{c.ref ?? `#${c.number}`}</span>
+            {c.type && <> · {t(`contract.type.${c.type}`)}</>}
           </span>
         </span>
       ),
@@ -74,7 +80,8 @@ export default function Contracts() {
       },
     },
     { key: 'value', header: 'القيمة', cell: (c) => <span className="tabular-nums">{formatJOD(c.value)}</span> },
-    { key: 'status', header: 'الحالة', cell: (c) => <Tag tone={c.status === 'ACTIVE' ? 'brand' : c.status === 'CANCELLED' ? 'danger' : 'neutral'}>{CONTRACT_STATUS_LABEL[c.status]}</Tag> },
+    { key: 'paid', header: t('contract.paid'), cell: (c) => <span className="tabular-nums text-muted">{formatJOD(c.paid ?? 0)}</span>, hideOnMobile: true },
+    { key: 'status', header: 'الحالة', cell: (c) => <ContractStatusTag status={c.displayStatus ?? c.status} /> },
     {
       key: 'file',
       header: 'الملف',
@@ -117,19 +124,30 @@ export default function Contracts() {
       title="عقود الشركات"
       description="العقود السارية والمنتهية وتذكيرات التجديد"
       actions={
-        <ButtonLink to="/admin/corporate" variant="outline" size="sm">
-          طلبات الشركات
-        </ButtonLink>
+        <>
+          <ButtonLink to="/admin/corporate" variant="outline" size="sm">
+            طلبات الشركات
+          </ButtonLink>
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Icon name="plus" className="h-4 w-4" /> {t('contract.new')}
+          </Button>
+        </>
       }
     >
       <FilterBar onClear={f.clear} active={f.active}>
+        <SearchInput value={v.q} onChange={(q) => f.set({ q })} placeholder="MC-2026-… / الشركة" />
         <FilterSelect label="الحالة" value={v.status} onChange={(e) => f.set({ status: e.target.value })}>
           <option value="">الكل</option>
-          {(Object.keys(CONTRACT_STATUS_LABEL) as (keyof typeof CONTRACT_STATUS_LABEL)[]).map((s) => (
+          {(['DRAFT', 'ACTIVE', 'EXPIRING_SOON', 'EXPIRED', 'CANCELLED'] as const).map((s) => (
             <option key={s} value={s}>
-              {CONTRACT_STATUS_LABEL[s]}
+              {t(`contract.status.${s}`)}
             </option>
           ))}
+        </FilterSelect>
+        <FilterSelect label={t('contract.type')} value={v.type} onChange={(e) => f.set({ type: e.target.value })}>
+          <option value="">الكل</option>
+          <option value="MAINTENANCE">{t('contract.type.MAINTENANCE')}</option>
+          <option value="ANNUAL_CORPORATE">{t('contract.type.ANNUAL_CORPORATE')}</option>
         </FilterSelect>
         <label className="flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-line px-3 text-sm">
           <input type="checkbox" className="accent-brand-700" checked={v.expiring === 'true'} onChange={(e) => f.set({ expiring: e.target.checked ? 'true' : '' })} />
@@ -140,6 +158,7 @@ export default function Contracts() {
         rows={list.data?.items}
         columns={columns}
         rowKey={(c) => c.id}
+        rowHref={(c) => `/admin/contracts/${c.id}`}
         loading={list.loading}
         refreshing={list.refreshing}
         error={list.error}
@@ -153,7 +172,7 @@ export default function Contracts() {
         }
         empty={{
           title: f.active ? 'لا توجد عقود مطابقة' : 'لا توجد عقود بعد',
-          description: 'تُنشأ العقود من صفحة طلب الشركة عبر «تحويل إلى عقد».',
+          description: 'تُنشأ العقود من صفحة طلب الشركة عبر «تحويل إلى عقد»، أو مباشرة من زر «عقد جديد».',
         }}
       />
 
@@ -183,6 +202,9 @@ export default function Contracts() {
             />
           </>
         )}
+      </Modal>
+      <Modal open={creating} onClose={() => setCreating(false)} title={t('contract.new')} size="lg">
+        {creating && <NewContractForm onCancel={() => setCreating(false)} onCreated={(id) => navigate(`/admin/contracts/${id}`)} />}
       </Modal>
       <ConfirmDialog
         open={Boolean(remove)}

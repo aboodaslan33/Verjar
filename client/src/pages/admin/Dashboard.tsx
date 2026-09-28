@@ -9,6 +9,7 @@ import { useAdmin } from '../../context/AdminAuth';
 import { api } from '../../lib/api';
 import { BOOKING_TYPE_LABEL, CORPORATE_TYPE_LABEL, formatDate, formatJOD, formatTime } from '../../lib/format';
 import type { BookingType, CorporateType } from '../../lib/types';
+import { useI18n } from '../../lib/i18n';
 import { useDocumentTitle } from '../../lib/useAsync';
 
 const KIND_LABEL = { booking: 'حجز', order: 'طلب متجر', corporate: 'طلب شركة' } as const;
@@ -20,6 +21,37 @@ function relTime(iso: string) {
   if (diff < 60) return `قبل ${Math.floor(diff)} د`;
   if (diff < 60 * 24) return `قبل ${Math.floor(diff / 60)} س`;
   return formatDate(iso);
+}
+
+/** مؤشرات التوصيل والتحصيل والعقود لليوم وللشهر */
+function OpsWidgets({ ops, loading }: { ops?: DashboardStats['ops']; loading: boolean }) {
+  const { t } = useI18n();
+  const money = (v?: number) => <span className="text-xl">{formatJOD(v ?? 0)}</span>;
+  return (
+    <Panel title={t('kpi.opsTitle')}>
+      <p className="mb-2 text-xs font-semibold text-muted">{t('kpi.today')}</p>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <StatTile label={t('kpi.orders')} value={ops?.today.orders ?? 0} loading={loading} to="/admin/orders" />
+        <StatTile label={t('kpi.delivered')} value={ops?.today.delivered ?? 0} loading={loading} tone="brand" to="/admin/delivery?deliveryStatus=DELIVERED" />
+        <StatTile label={t('kpi.failed')} value={ops?.today.failed ?? 0} loading={loading} tone={ops?.today.failed ? 'warn' : 'neutral'} to="/admin/delivery?deliveryStatus=FAILED" />
+        <StatTile label={t('kpi.sales')} value={money(ops?.today.sales)} loading={loading} />
+        <StatTile label={t('kpi.codCollected')} value={money(ops?.today.codCollected)} loading={loading} />
+        <StatTile label={t('kpi.codPending')} value={money(ops?.today.codPending)} loading={loading} to="/admin/delivery?codStatus=PENDING" />
+      </div>
+      <p className="mb-2 mt-5 text-xs font-semibold text-muted">{t('kpi.month')}</p>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <StatTile label={t('kpi.orders')} value={ops?.month.orders ?? 0} loading={loading} sub={`${t('kpi.delivered')}: ${ops?.month.delivered ?? 0} · ${t('kpi.failed')}: ${ops?.month.failed ?? 0} · ${t('kpi.cancelled')}: ${ops?.month.cancelled ?? 0}`} />
+        <StatTile label={t('kpi.sales')} value={money(ops?.month.sales)} loading={loading} to="/admin/reports" />
+        <StatTile label={t('kpi.codCollected')} value={money(ops?.month.codCollected)} loading={loading} to="/admin/reports?kind=cod" />
+        <StatTile label={t('kpi.online')} value={money(ops?.month.onlinePayments)} loading={loading} />
+        <StatTile label={t('kpi.fees')} value={money(ops?.month.deliveryFees)} loading={loading} />
+        <StatTile label={t('kpi.commissions')} value={money(ops?.month.tenderCommissions)} loading={loading} to="/admin/reports?kind=commissions" />
+        <StatTile label={t('kpi.activeContracts')} value={ops?.activeContracts ?? 0} loading={loading} tone="brand" to="/admin/contracts?status=ACTIVE" />
+        <StatTile label={t('kpi.expiringContracts')} value={ops?.expiringContracts ?? 0} loading={loading} tone={ops?.expiringContracts ? 'warn' : 'neutral'} to="/admin/contracts?status=EXPIRING_SOON" />
+        <StatTile label={t('kpi.cashWithCarriers')} value={money(ops?.cashWithCarriers)} loading={loading} tone={ops?.cashWithCarriers ? 'sand' : 'neutral'} to="/admin/delivery?tab=drivers" />
+      </div>
+    </Panel>
+  );
 }
 
 export default function Dashboard() {
@@ -81,6 +113,8 @@ export default function Dashboard() {
               to="/admin/contracts?expiring=true"
             />
           </div>
+
+          <OpsWidgets ops={data?.ops} loading={loading} />
 
           <div className="grid gap-6 lg:grid-cols-5">
             <Panel

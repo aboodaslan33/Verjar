@@ -4,12 +4,14 @@ import { Icon } from '../../components/ui';
 import { useAuth } from '../../context/Auth';
 import { useTheme } from '../../context/ThemeContext';
 import { cx } from '../../lib/format';
+import { LangSwitch } from '../../lib/i18n';
 
 const NAV = [
   { to: '/vendor', label: 'الرئيسية', end: true },
   { to: '/vendor/orders', label: 'الطلبات' },
   { to: '/vendor/products', label: 'المنتجات' },
   { to: '/vendor/earnings', label: 'الأرباح' },
+  { to: '/vendor/tenders', label: 'العطاءات' },
   { to: '/vendor/profile', label: 'ملف المتجر' },
 ];
 
@@ -37,6 +39,7 @@ export function VendorLayout() {
                 <Icon name="external" className="h-4 w-4" /> صفحة متجري
               </a>
             )}
+            <LangSwitch className="grid h-9 min-w-9 place-items-center rounded-lg px-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink" />
             <button
               type="button"
               onClick={toggle}

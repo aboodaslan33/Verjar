@@ -9,6 +9,7 @@ import { StatusSelect } from '../../components/admin/StatusSelect';
 import type { OrderDetail as Order, WaResult } from '../../components/admin/types';
 import { AdminPage, DefList, DetailSkeleton, Panel } from '../../components/admin/ui';
 import { WhatsAppFallback } from '../../components/admin/WhatsAppFallback';
+import { OrderDeliveryPanel } from './Delivery';
 import { Alert, Button, ButtonA, Checkbox, ErrorState, Icon, StatusBadge } from '../../components/ui';
 import { api } from '../../lib/api';
 import { STATUS_LABEL, STATUS_ORDER, displayPhone, formatDate, formatJOD } from '../../lib/format';
@@ -226,6 +227,7 @@ export default function OrderDetail() {
               q.reload();
             }}
           />
+          <OrderDeliveryPanel order={o} onSaved={q.reload} />
           <Panel title="واتساب">
             <p className="mb-3 text-sm text-muted">إعادة إرسال رسالة الطلب الأصلية.</p>
             <div className="flex flex-wrap gap-2">

@@ -229,6 +229,9 @@ storeRouter.post(
           discountTotal: new Prisma.Decimal(round3(subtotal - total)),
           total: new Prisma.Decimal(total),
           whatsappText: '',
+          ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
+          // الدفع عند الاستلام: المبلغ المطلوب تحصيله يُثبَّت وقت الطلب
+          ...(input.paymentMethod === 'COD' ? { codAmount: new Prisma.Decimal(total), codStatus: 'PENDING' as const } : {}),
         },
       });
 

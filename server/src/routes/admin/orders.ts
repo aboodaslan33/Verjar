@@ -77,6 +77,9 @@ ordersRouter.get(
         },
         customer: { select: { id: true, name: true, phone: true } },
         payments: { where: { deletedAt: null }, orderBy: { paidAt: 'desc' } },
+        driver: { select: { id: true, name: true, phone: true } },
+        deliveryCompany: { select: { id: true, name: true } },
+        settlement: { select: { id: true, ref: true, status: true } },
       },
     });
     if (!order) throw notFound('الطلب غير موجود');

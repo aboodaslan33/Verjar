@@ -12,6 +12,7 @@ const ProductEdit = lazy(() => import('./VendorProductEdit'));
 const Orders = lazy(() => import('./VendorOrders'));
 const OrderDetail = lazy(() => import('./VendorOrderDetail'));
 const Earnings = lazy(() => import('./VendorEarnings'));
+const Tenders = lazy(() => import('./VendorTenders'));
 
 const s = (el: JSX.Element) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
 
@@ -47,6 +48,7 @@ export default function VendorApp() {
         <Route path="orders" element={s(<Orders />)} />
         <Route path="orders/:id" element={s(<OrderDetail />)} />
         <Route path="earnings" element={s(<Earnings />)} />
+        <Route path="tenders" element={s(<Tenders />)} />
         <Route path="*" element={<Navigate to="/vendor" replace />} />
       </Route>
     </Routes>

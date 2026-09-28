@@ -7,11 +7,13 @@ import { AuthProvider } from './context/Auth';
 import { SiteProvider } from './context/SiteContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
+import { I18nProvider } from './lib/i18n';
 import './styles/index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
+      <I18nProvider>
       <ThemeProvider>
         <ToastProvider>
           <SiteProvider>
@@ -23,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
           </SiteProvider>
         </ToastProvider>
       </ThemeProvider>
+      </I18nProvider>
     </BrowserRouter>
   </StrictMode>,
 );

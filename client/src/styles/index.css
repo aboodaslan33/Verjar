@@ -244,6 +244,11 @@
   z-index: 0;
 }
 
+/* الأيقونات الاتجاهية (الأسهم) مرسومة للعربية؛ تنعكس تلقائيًا في الواجهة الإنجليزية */
+[dir='ltr'] .dir-icon {
+  transform: scaleX(-1);
+}
+
 /* شاشة البداية: شعار الهيدر مخفي حتى يصل إليه الشعار المتحرك */
 .splash-active [data-splash-anchor] {
   visibility: hidden;

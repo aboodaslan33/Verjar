@@ -2,7 +2,15 @@ import { Router } from 'express';
 import { asyncHandler, ok } from '../../lib/http';
 import { prisma } from '../../lib/prisma';
 import { requireCustomer } from '../../middleware/auth';
+import { Prisma } from '@prisma/client';
+import { z } from 'zod';
+import { audit } from '../../lib/audit';
+import { conflict, notFound } from '../../lib/http';
+import { nextRef } from '../../lib/refs';
+import { memoryUpload, uploadGuard } from '../../middleware/upload';
+import { formLimiter } from '../../middleware/rateLimit';
 import { customerFinance } from '../../services/customer.service';
+import { type Attachment, checkService, storeAttachments, tenderData, tenderInput } from '../../services/tenders.service';
 
 export const accountRouter = Router();
 accountRouter.use(requireCustomer);
@@ -107,5 +115,69 @@ accountRouter.get(
       customerFinance(customerId),
     ]);
     ok(res, { bookings, orders, corporate, contracts, files, payments, finance });
+  }),
+);
+
+// ───────────── عطاءات الشركة ─────────────
+
+const ownTender = async (customerId: string, id: string) => {
+  const t = await prisma.tender.findFirst({ where: { id, customerId, deletedAt: null } });
+  if (!t) throw notFound('العطاء غير موجود');
+  return t;
+};
+
+/** عطاءات العميل مع العروض المقدّمة عليها */
+accountRouter.get(
+  '/tenders',
+  asyncHandler(async (req, res) => {
+    const items = await prisma.tender.findMany({
+      where: { customerId: req.auth!.sub, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        service: { select: { id: true, name: true } },
+        offers: { where: { status: { not: 'WITHDRAWN' } }, orderBy: { price: 'asc' }, select: { id: true, providerName: true, price: true, proposal: true, status: true, submittedAt: true, attachments: true } },
+      },
+    });
+    ok(res, items);
+  }),
+);
+
+accountRouter.post(
+  '/tenders',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const input = tenderInput.extend({ status: z.enum(['DRAFT', 'OPEN']).default('OPEN') }).parse(req.body);
+    await checkService(input.serviceId);
+    const t = await prisma.$transaction(async (tx) =>
+      tx.tender.create({ data: { ...(tenderData(input) as Prisma.TenderUncheckedCreateInput), status: input.status, customerId: req.auth!.sub, ref: await nextRef(tx, 'TEN') } }),
+    );
+    await audit({ actorType: 'customer', action: 'create', entity: 'tender', entityId: t.id, meta: { ref: t.ref } });
+    ok(res, t, 201);
+  }),
+);
+
+/** تعديل العطاء قبل الترسية؛ العميل يفتحه أو يغلقه أو يلغيه */
+accountRouter.patch(
+  '/tenders/:id',
+  asyncHandler(async (req, res) => {
+    const input = tenderInput.partial().extend({ status: z.enum(['DRAFT', 'OPEN', 'CLOSED', 'CANCELLED']).optional() }).parse(req.body);
+    const current = await ownTender(req.auth!.sub, req.params.id);
+    if (['AWARDED', 'CANCELLED'].includes(current.status)) throw conflict('لا يمكن تعديل عطاء مُرسّى أو ملغي');
+    await checkService(input.serviceId);
+    const t = await prisma.tender.update({ where: { id: current.id }, data: tenderData(input) });
+    await audit({ actorType: 'customer', action: 'update', entity: 'tender', entityId: t.id, meta: JSON.parse(JSON.stringify({ status: input.status })) });
+    ok(res, t);
+  }),
+);
+
+accountRouter.post(
+  '/tenders/:id/attachments',
+  formLimiter,
+  uploadGuard(40),
+  memoryUpload(15, 5).array('files', 5),
+  asyncHandler(async (req, res) => {
+    const t = await ownTender(req.auth!.sub, req.params.id);
+    const added = await storeAttachments(req.files as Express.Multer.File[], 'tenders');
+    ok(res, await prisma.tender.update({ where: { id: t.id }, data: { attachments: [...((t.attachments as Attachment[]) ?? []), ...added] } }));
   }),
 );
