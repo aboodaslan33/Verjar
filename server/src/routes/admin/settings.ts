@@ -6,8 +6,18 @@ import { prisma } from '../../lib/prisma';
 import { getSettings, settingsSchema, updateSettings } from '../../services/settings.service';
 import { whatsappMode } from '../../services/whatsapp.service';
 import { env } from '../../config/env';
+import { clientIp, forwardChain, isProxyAddress } from '../../lib/clientIp';
 
 export const settingsRouter = Router();
+
+/**
+ * فحص كشف عنوان الزائر (للأدمن): يُظهر العنوان الذي تُحسب عليه حدود المحاولات
+ * وسلسلة الوسطاء، للتأكد على الاستضافة أن كل زائر يُعرف بعنوانه وليس بعنوان الوسيط.
+ */
+settingsRouter.get('/network', (req, res) => {
+  const chain = forwardChain(req).map((ip) => ({ ip, proxy: isProxyAddress(ip) }));
+  ok(res, { clientIp: clientIp(req), chain });
+});
 
 settingsRouter.get(
   '/',
