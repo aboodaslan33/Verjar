@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
 import type { SettingsResponse } from '../../components/admin/types';
 import { AdminPage, DetailSkeleton, FieldError, Panel } from '../../components/admin/ui';
-import { Alert, Button, Checkbox, ErrorState, Input, Tag, Textarea } from '../../components/ui';
+import { Alert, Button, Checkbox, ErrorState, Input, Select, Tag, Textarea } from '../../components/ui';
 import { api } from '../../lib/api';
 import { WEEKDAYS, cx } from '../../lib/format';
 import type { AdminSettings } from '../../lib/types';
@@ -56,6 +56,9 @@ export default function Settings() {
     <AdminPage title="الإعدادات" description="بيانات التواصل والرسوم والمواعيد ومحتوى الموقع">
       <SystemStatus system={q.data.system} />
       <SettingsForm initial={q.data.settings} onSaved={(s) => q.setData((d) => (d ? { ...d, settings: s } : d))} />
+      <div className="mt-6">
+        <EmailOtpPanel enabled={q.data.system.email} />
+      </div>
       <div className="mt-6">
         <PasswordForm />
       </div>
@@ -340,6 +343,67 @@ function PasswordForm() {
           </Button>
         </div>
       </form>
+    </Panel>
+  );
+}
+
+const OTP_PURPOSES = [
+  ['LOGIN_2FA', 'تسجيل الدخول (تحقق ثنائي)'],
+  ['VERIFY_EMAIL', 'تأكيد البريد الإلكتروني'],
+  ['PASSWORD_RESET', 'إعادة تعيين كلمة المرور'],
+  ['SENSITIVE_ACTION', 'تأكيد عملية حساسة'],
+] as const;
+
+/** معاينة رسالة رمز التحقق بالبريد وإرسال نسخة تجريبية */
+function EmailOtpPanel({ enabled }: { enabled: boolean }) {
+  const m = useMutation();
+  const [purpose, setPurpose] = useState<string>('LOGIN_2FA');
+  const [to, setTo] = useState('');
+  const preview = useAdminQuery(() => api.get<{ subject: string; html: string }>('/admin/settings/email/preview', { purpose }), [purpose]);
+  return (
+    <Panel title="رسائل رمز التحقق (OTP) بالبريد">
+      <p className="-mt-1 mb-4 text-sm text-muted">
+        رسالة بهوية فرجار باسم العميل ورمز من 6 أرقام صالح 10 دقائق ولمرة واحدة. هذه معاينة ببيانات تجريبية.
+      </p>
+      {!enabled && (
+        <Alert tone="info" className="mb-4">
+          البريد غير مفعّل على الخادم بعد. أضف SMTP_HOST وSMTP_USER وSMTP_PASS في إعدادات Render ليبدأ الإرسال الفعلي.
+        </Alert>
+      )}
+      <div className="grid gap-5 lg:grid-cols-5">
+        <div className="space-y-4 lg:col-span-2">
+          <Select label="نوع الرسالة" value={purpose} onChange={(e) => setPurpose(e.target.value)}>
+            {OTP_PURPOSES.map(([k, l]) => (
+              <option key={k} value={k}>
+                {l}
+              </option>
+            ))}
+          </Select>
+          {preview.data && (
+            <p className="text-sm">
+              <span className="text-muted">العنوان: </span>
+              {preview.data.subject}
+            </p>
+          )}
+          <Input label="إرسال تجربة إلى" optional type="email" dir="ltr" className="text-start" placeholder="بريدك (افتراضيًا بريد حسابك)" value={to} onChange={(e) => setTo(e.target.value)} error={m.fieldErrors.to} />
+          <Button
+            variant="outline"
+            disabled={!enabled}
+            loading={m.pending === 'test'}
+            onClick={() => m.run('test', () => api.post<{ sentTo: string }>('/admin/settings/email/test', { purpose, ...(to.trim() ? { to: to.trim() } : {}) }), 'تم إرسال رسالة تجريبية')}
+          >
+            إرسال رسالة تجريبية
+          </Button>
+          {m.error && !Object.keys(m.fieldErrors).length && <Alert tone="error">{m.error}</Alert>}
+        </div>
+        <div className="overflow-hidden rounded-xl border border-line bg-[#F4F4F5] lg:col-span-3">
+          {preview.data ? (
+            <iframe title="معاينة الرسالة" srcDoc={preview.data.html} sandbox="" className="h-[640px] w-full bg-[#F4F4F5]" />
+          ) : (
+            <div className="grid h-[640px] place-items-center text-sm text-muted">{preview.error?.message ?? 'جاري التحميل…'}</div>
+          )}
+        </div>
+      </div>
     </Panel>
   );
 }

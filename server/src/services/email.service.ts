@@ -3,6 +3,7 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../config/env';
 import { formatJOD } from '../lib/money';
 import { prisma } from '../lib/prisma';
+import { renderPasswordResetEmail } from './emailTemplates';
 
 /**
  * النشرة البريدية: رسالة موحّدة لكل العملاء المسجّلين الذين لديهم بريد ووافقوا على الاستلام.
@@ -133,30 +134,28 @@ export function renderCampaign(c: CampaignContent, recipient: { name: string; id
 
 // ───────────── رسائل الحساب ─────────────
 
-/** رابط إعادة تعيين كلمة المرور (رسالة خدمية — لا تتطلب الاشتراك في النشرة) */
-export async function sendPasswordReset(to: string, name: string, url: string) {
-  const brand = env.MAIL_FROM_NAME;
-  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"></head>
-<body style="margin:0;background:#F9FAFB;font-family:Tahoma,'Segoe UI',Arial,sans-serif;color:#1F2937">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;text-align:right" dir="rtl">
-      <tr><td style="padding:24px">
-        <h1 style="margin:0 0 14px;font-size:20px">إعادة تعيين كلمة المرور</h1>
-        <p style="margin:0 0 14px;line-height:1.8">مرحبًا ${esc(name)}، وصلنا طلب لتغيير كلمة مرور حسابك في ${esc(brand)}. الرابط صالح لمدة ساعة واحدة ولمرة واحدة.</p>
-        <a href="${esc(url)}" style="display:inline-block;background:#E8B40B;color:#1F2937;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:12px">تعيين كلمة مرور جديدة</a>
-        <p style="margin:18px 0 0;font-size:13px;color:#6B7280;line-height:1.7">إذا لم تطلب ذلك تجاهل هذه الرسالة، وكلمة مرورك الحالية تبقى كما هي.</p>
-      </td></tr>
-    </table>
-  </td></tr></table>
-</body></html>`;
-  const text = `مرحبًا ${name}،\nلتعيين كلمة مرور جديدة لحسابك في ${brand} افتح الرابط (صالح لساعة واحدة):\n${url}\n\nإذا لم تطلب ذلك تجاهل هذه الرسالة.`;
+/** صندوق صادر في الاختبارات فقط: آخر الرسائل المرسلة (للتحقق من المحتوى دون إرسال فعلي) */
+export const testOutbox: { to: string; subject: string; html: string; text: string }[] = [];
+
+/** إرسال رسالة خدمية واحدة (رمز تحقق، إعادة تعيين…) — لا تتطلب الاشتراك في النشرة */
+export async function sendTransactional(to: string, m: { subject: string; html: string; text: string }) {
+  if (env.isTest) {
+    testOutbox.push({ to, ...m });
+    if (testOutbox.length > 50) testOutbox.shift();
+  }
   await getTransporter().sendMail({
-    from: { name: brand, address: env.SMTP_USER || 'no-reply@example.com' },
+    from: { name: env.MAIL_FROM_NAME, address: env.SMTP_USER || 'no-reply@example.com' },
     to,
-    subject: `إعادة تعيين كلمة المرور — ${brand}`,
-    html,
-    text,
+    subject: m.subject,
+    html: m.html,
+    text: m.text,
+    headers: { 'X-Entity-Ref-ID': `${Date.now()}` },
   });
+}
+
+/** رابط إعادة تعيين كلمة المرور */
+export async function sendPasswordReset(to: string, name: string, url: string) {
+  await sendTransactional(to, await renderPasswordResetEmail(name, url));
 }
 
 // ───────────── الإرسال ─────────────

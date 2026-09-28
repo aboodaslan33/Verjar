@@ -25,6 +25,7 @@ type CustomerRow = {
   companyName: string | null;
   passwordHash: string | null;
   emailOptIn: boolean;
+  emailVerifiedAt?: Date | null;
 };
 
 /** بيانات العميل للواجهة، مع متجره إن كان لديه صلاحية مورد فعّالة */
@@ -40,6 +41,7 @@ async function customerPublic(c: CustomerRow) {
     companyName: c.companyName,
     hasPassword: Boolean(c.passwordHash),
     emailOptIn: c.emailOptIn,
+    emailVerified: Boolean(c.email && c.emailVerifiedAt),
   };
 }
 
@@ -360,7 +362,10 @@ authRouter.patch(
       const other = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
       if ((other && other.id !== req.auth!.sub) || (await isStaffEmail(input.email))) throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email' });
     }
-    const c = await prisma.customer.update({ where: { id: req.auth!.sub }, data: input });
+    const before = input.email !== undefined ? await prisma.customer.findUnique({ where: { id: req.auth!.sub }, select: { email: true } }) : null;
+    // تغيير البريد يلغي تأكيده السابق
+    const emailChanged = before !== null && before.email !== input.email;
+    const c = await prisma.customer.update({ where: { id: req.auth!.sub }, data: { ...input, ...(emailChanged ? { emailVerifiedAt: null } : {}) } });
     if (input.name) setAuthCookie(res, principalOf(c));
     ok(res, await customerPublic(c));
   }),

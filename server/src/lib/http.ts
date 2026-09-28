@@ -17,6 +17,7 @@ export const unauthorized = (msg = 'يجب تسجيل الدخول') => new Http
 export const forbidden = (msg = 'لا تملك صلاحية الوصول') => new HttpError(403, msg, 'FORBIDDEN');
 export const notFound = (msg = 'العنصر غير موجود') => new HttpError(404, msg, 'NOT_FOUND');
 export const conflict = (msg: string, details?: unknown) => new HttpError(409, msg, 'CONFLICT', details);
+export const tooMany = (msg: string) => new HttpError(429, msg, 'TOO_MANY_REQUESTS');
 
 /** استجابة موحّدة { ok, data, error } */
 export function ok<T>(res: Response, data: T, status = 200) {

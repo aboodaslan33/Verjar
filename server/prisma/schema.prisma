@@ -276,6 +276,8 @@ model Customer {
   registeredAt DateTime?
   /// موافقة على استلام النشرة البريدية (منتجات وخدمات جديدة) — يمكن إلغاؤها من الحساب أو رابط البريد
   emailOptIn   Boolean   @default(true)
+  /// تأكيد ملكية البريد برمز OTP
+  emailVerifiedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -1121,4 +1123,31 @@ model Notification {
 
   @@index([recipientType, recipientId, readAt])
   @@index([createdAt])
+}
+
+/// الغرض من رمز التحقق المرسل بالبريد
+enum OtpPurpose {
+  LOGIN_2FA
+  VERIFY_EMAIL
+  PASSWORD_RESET
+  SENSITIVE_ACTION
+}
+
+/// رموز التحقق بالبريد (OTP): يُخزن هاش الرمز فقط، صالح لمدة قصيرة ولمرة واحدة
+model EmailOtp {
+  id          String     @id @default(cuid())
+  purpose     OtpPurpose
+  /// customer | user
+  subjectType String
+  subjectId   String
+  email       String
+  codeHash    String
+  expiresAt   DateTime
+  attempts    Int        @default(0)
+  consumedAt  DateTime?
+  ip          String?
+  createdAt   DateTime   @default(now())
+
+  @@index([subjectType, subjectId, purpose, createdAt])
+  @@index([expiresAt])
 }

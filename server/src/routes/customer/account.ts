@@ -9,6 +9,8 @@ import { conflict, notFound } from '../../lib/http';
 import { nextRef } from '../../lib/refs';
 import { memoryUpload, uploadGuard } from '../../middleware/upload';
 import { formLimiter } from '../../middleware/rateLimit';
+import { clientIp } from '../../lib/clientIp';
+import { issueEmailOtp, verifyEmailOtp } from '../../services/emailOtp.service';
 import { customerFinance } from '../../services/customer.service';
 import { type Attachment, checkService, storeAttachments, tenderData, tenderInput } from '../../services/tenders.service';
 
@@ -216,5 +218,41 @@ accountRouter.get(
       timeline: o.statusEvents.filter((e) => e.fromStatus !== e.toStatus).map((e) => ({ status: e.toStatus, at: e.createdAt })),
       statusEvents: undefined,
     });
+  }),
+);
+
+// ───────────── رمز التحقق بالبريد (OTP) ─────────────
+
+const otpPurpose = z.enum(['VERIFY_EMAIL', 'SENSITIVE_ACTION']);
+
+/** يرسل رمز تحقق إلى بريد العميل (تأكيد البريد أو تأكيد عملية حساسة) */
+accountRouter.post(
+  '/email-otp/send',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const { purpose } = z.object({ purpose: otpPurpose.default('VERIFY_EMAIL') }).parse(req.body ?? {});
+    const c = await prisma.customer.findUnique({ where: { id: req.auth!.sub }, select: { id: true, name: true, email: true, emailVerifiedAt: true } });
+    if (!c) throw notFound('الحساب غير موجود');
+    if (!c.email) throw conflict('أضف بريدًا إلكترونيًا لحسابك أولًا');
+    if (purpose === 'VERIFY_EMAIL' && c.emailVerifiedAt) throw conflict('بريدك مؤكَّد مسبقًا');
+    const r = await issueEmailOtp({ purpose, subject: { type: 'customer', id: c.id }, to: { email: c.email, name: c.name }, ip: clientIp(req) });
+    ok(res, r);
+  }),
+);
+
+/** يتحقق من الرمز. عند تأكيد البريد يُسجَّل وقت التأكيد على الحساب */
+accountRouter.post(
+  '/email-otp/verify',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const { purpose, code } = z.object({ purpose: otpPurpose.default('VERIFY_EMAIL'), code: z.string().trim().max(12) }).parse(req.body ?? {});
+    const id = req.auth!.sub;
+    const r = await verifyEmailOtp({ purpose, subject: { type: 'customer', id }, code });
+    if (purpose === 'VERIFY_EMAIL') {
+      // يُؤكَّد البريد الذي أُرسل إليه الرمز فقط (لو تغيّر بريد الحساب بعد الإرسال لا يُعتبر مؤكَّدًا)
+      await prisma.customer.updateMany({ where: { id, email: r.email }, data: { emailVerifiedAt: new Date() } });
+      await audit({ actorType: 'customer', action: 'email_verified', entity: 'customer', entityId: id });
+    }
+    ok(res, { verified: true, purpose });
   }),
 );
