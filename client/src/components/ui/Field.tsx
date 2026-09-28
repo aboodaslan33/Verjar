@@ -195,35 +195,60 @@ export function Checkbox({
   checked,
   onChange,
   description,
+  error,
+  id,
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
   description?: string;
+  /** رسالة خطأ (خانة إلزامية لم تُحدد) */
+  error?: string;
+  id?: string;
 }) {
+  const errId = id ? `${id}-error` : undefined;
   return (
-    <label
-      className={cx(
-        'flex min-h-[3rem] cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-[border-color,box-shadow] duration-150 focus-within:ring-2 focus-within:ring-brand-500/40',
-        checked ? 'border-ink shadow-[inset_0_0_0_1px_rgb(var(--c-ink))]' : 'border-line-strong bg-surface hover:border-ink/50',
-      )}
-    >
-      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span
+    <div>
+      <label
         className={cx(
-          'mt-[3px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors duration-150',
-          checked ? 'border-ink bg-ink text-primary' : 'border-line-strong bg-surface',
+          'flex min-h-[3rem] cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-[border-color,box-shadow] duration-150 focus-within:ring-2 focus-within:ring-brand-500/40',
+          checked
+            ? 'border-ink shadow-[inset_0_0_0_1px_rgb(var(--c-ink))]'
+            : error
+              ? 'border-danger bg-surface shadow-[inset_0_0_0_1px_rgb(var(--c-danger))]'
+              : 'border-line-strong bg-surface hover:border-ink/50',
         )}
-        aria-hidden
       >
-        <svg viewBox="0 0 16 16" className={cx('h-3 w-3 transition-transform duration-150', checked ? 'scale-100' : 'scale-0')} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3.5 8.5l3 3 6-7" />
-        </svg>
-      </span>
-      <span>
-        <span className="block text-[15px] font-medium">{label}</span>
-        {description && <span className="block text-xs text-muted">{description}</span>}
-      </span>
-    </label>
+        <input
+          id={id}
+          type="checkbox"
+          className="peer sr-only"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errId : undefined}
+        />
+        <span
+          className={cx(
+            'mt-[3px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors duration-150',
+            checked ? 'border-ink bg-ink text-primary' : error ? 'border-danger bg-surface' : 'border-line-strong bg-surface',
+          )}
+          aria-hidden
+        >
+          <svg viewBox="0 0 16 16" className={cx('h-3 w-3 transition-transform duration-150', checked ? 'scale-100' : 'scale-0')} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3.5 8.5l3 3 6-7" />
+          </svg>
+        </span>
+        <span>
+          <span className="block text-[15px] font-medium">{label}</span>
+          {description && <span className="block text-xs text-muted">{description}</span>}
+        </span>
+      </label>
+      {error && !checked && (
+        <p id={errId} className="mt-1.5 text-sm text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

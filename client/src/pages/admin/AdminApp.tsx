@@ -5,36 +5,69 @@ import { AdminPage } from '../../components/admin/ui';
 import { ButtonLink, EmptyState, Skeleton } from '../../components/ui';
 import { AdminAuthProvider, useAdmin } from '../../context/AdminAuth';
 import { hasPerm, isDriverUser, useAuth } from '../../context/Auth';
+import { usePrefetchRoutes } from '../../lib/prefetch';
 
-const Login = lazy(() => import('./Login'));
-const Dashboard = lazy(() => import('./Dashboard'));
-const Bookings = lazy(() => import('./Bookings'));
-const BookingDetail = lazy(() => import('./BookingDetail'));
-const Orders = lazy(() => import('./Orders'));
-const OrderDetail = lazy(() => import('./OrderDetail'));
-const Products = lazy(() => import('./Products'));
-const ProductEditor = lazy(() => import('./ProductEditor'));
-const Categories = lazy(() => import('./Categories'));
-const Corporate = lazy(() => import('./Corporate'));
-const CorporateDetail = lazy(() => import('./CorporateDetail'));
-const Contracts = lazy(() => import('./Contracts'));
-const Finance = lazy(() => import('./Finance'));
-const Customers = lazy(() => import('./Customers'));
-const CustomerDetail = lazy(() => import('./CustomerDetail'));
-const Technicians = lazy(() => import('./Technicians'));
-const Settings = lazy(() => import('./Settings'));
-const Logs = lazy(() => import('./Logs'));
-const Newsletter = lazy(() => import('./Newsletter'));
-const Vendors = lazy(() => import('./Vendors'));
-const VendorDetail = lazy(() => import('./VendorDetail'));
-const ContractDetail = lazy(() => import('./ContractDetail'));
-const Tenders = lazy(() => import('./Tenders'));
-const TenderDetail = lazy(() => import('./TenderDetail'));
-const Delivery = lazy(() => import('./Delivery'));
-const Reports = lazy(() => import('./Reports'));
-const Users = lazy(() => import('./Users'));
-const DeliveryOrderDetail = lazy(() => import('./DeliveryOrderDetail'));
-const DeliveryOrderNew = lazy(() => import('./DeliveryOrderNew'));
+const P = {
+  Login: () => import('./Login'),
+  Dashboard: () => import('./Dashboard'),
+  Bookings: () => import('./Bookings'),
+  BookingDetail: () => import('./BookingDetail'),
+  Orders: () => import('./Orders'),
+  OrderDetail: () => import('./OrderDetail'),
+  Products: () => import('./Products'),
+  ProductEditor: () => import('./ProductEditor'),
+  Categories: () => import('./Categories'),
+  Corporate: () => import('./Corporate'),
+  CorporateDetail: () => import('./CorporateDetail'),
+  Contracts: () => import('./Contracts'),
+  Finance: () => import('./Finance'),
+  Customers: () => import('./Customers'),
+  CustomerDetail: () => import('./CustomerDetail'),
+  Technicians: () => import('./Technicians'),
+  Settings: () => import('./Settings'),
+  Logs: () => import('./Logs'),
+  Newsletter: () => import('./Newsletter'),
+  Vendors: () => import('./Vendors'),
+  VendorDetail: () => import('./VendorDetail'),
+  ContractDetail: () => import('./ContractDetail'),
+  Tenders: () => import('./Tenders'),
+  TenderDetail: () => import('./TenderDetail'),
+  Delivery: () => import('./Delivery'),
+  Reports: () => import('./Reports'),
+  Users: () => import('./Users'),
+  DeliveryOrderDetail: () => import('./DeliveryOrderDetail'),
+  DeliveryOrderNew: () => import('./DeliveryOrderNew'),
+};
+
+const Login = lazy(P.Login);
+const Dashboard = lazy(P.Dashboard);
+const Bookings = lazy(P.Bookings);
+const BookingDetail = lazy(P.BookingDetail);
+const Orders = lazy(P.Orders);
+const OrderDetail = lazy(P.OrderDetail);
+const Products = lazy(P.Products);
+const ProductEditor = lazy(P.ProductEditor);
+const Categories = lazy(P.Categories);
+const Corporate = lazy(P.Corporate);
+const CorporateDetail = lazy(P.CorporateDetail);
+const Contracts = lazy(P.Contracts);
+const Finance = lazy(P.Finance);
+const Customers = lazy(P.Customers);
+const CustomerDetail = lazy(P.CustomerDetail);
+const Technicians = lazy(P.Technicians);
+const Settings = lazy(P.Settings);
+const Logs = lazy(P.Logs);
+const Newsletter = lazy(P.Newsletter);
+const Vendors = lazy(P.Vendors);
+const VendorDetail = lazy(P.VendorDetail);
+const ContractDetail = lazy(P.ContractDetail);
+const Tenders = lazy(P.Tenders);
+const TenderDetail = lazy(P.TenderDetail);
+const Delivery = lazy(P.Delivery);
+const Reports = lazy(P.Reports);
+const Users = lazy(P.Users);
+const DeliveryOrderDetail = lazy(P.DeliveryOrderDetail);
+const DeliveryOrderNew = lazy(P.DeliveryOrderNew);
 
 /** هيكل تحميل بشكل لوحة التحكم (أثناء التحقق من الجلسة) */
 function ShellSkeleton() {
@@ -71,6 +104,11 @@ function PageFallback() {
   );
 }
 
+function WarmAdmin() {
+  usePrefetchRoutes(ADMIN_PREFETCH);
+  return null;
+}
+
 function Protected() {
   const { admin, loading } = useAdmin();
   const { user } = useAuth();
@@ -79,7 +117,12 @@ function Protected() {
   // موظف التوصيل له لوحته الخاصة
   if (isDriverUser(user)) return <Navigate to="/driver" replace />;
   if (!admin) return <Navigate to="/admin/login" replace state={{ from: location.pathname + location.search }} />;
-  return <AdminLayout />;
+  return (
+    <>
+      <WarmAdmin />
+      <AdminLayout />
+    </>
+  );
 }
 
 function NotFound() {
@@ -98,6 +141,38 @@ function Home() {
   if (!hasPerm(admin, 'dashboard.view')) return <Navigate to="/admin/delivery" replace />;
   return s(<Dashboard />);
 }
+
+/** تحميل مسبق لصفحات اللوحة (عند المرور على الروابط، وصفحات القوائم بعد الدخول) */
+const ADMIN_PREFETCH: [RegExp, () => Promise<unknown>, boolean][] = [
+  [/^\/admin\/bookings\/?$/, P.Bookings, true],
+  [/^\/admin\/bookings\/[^/]+\/?$/, P.BookingDetail, false],
+  [/^\/admin\/orders\/?$/, P.Orders, true],
+  [/^\/admin\/orders\/[^/]+\/?$/, P.OrderDetail, false],
+  [/^\/admin\/products\/?$/, P.Products, true],
+  [/^\/admin\/products\/new\/?$/, P.ProductEditor, false],
+  [/^\/admin\/products\/[^/]+\/?$/, P.ProductEditor, false],
+  [/^\/admin\/categories\/?$/, P.Categories, true],
+  [/^\/admin\/corporate\/?$/, P.Corporate, true],
+  [/^\/admin\/corporate\/[^/]+\/?$/, P.CorporateDetail, false],
+  [/^\/admin\/contracts\/?$/, P.Contracts, true],
+  [/^\/admin\/contracts\/[^/]+\/?$/, P.ContractDetail, false],
+  [/^\/admin\/tenders\/?$/, P.Tenders, true],
+  [/^\/admin\/tenders\/[^/]+\/?$/, P.TenderDetail, false],
+  [/^\/admin\/delivery\/?$/, P.Delivery, true],
+  [/^\/admin\/delivery\/new\/?$/, P.DeliveryOrderNew, false],
+  [/^\/admin\/delivery\/orders\/[^/]+\/?$/, P.DeliveryOrderDetail, false],
+  [/^\/admin\/users\/?$/, P.Users, true],
+  [/^\/admin\/reports\/?$/, P.Reports, true],
+  [/^\/admin\/finance\/?$/, P.Finance, true],
+  [/^\/admin\/customers\/?$/, P.Customers, true],
+  [/^\/admin\/customers\/[^/]+\/?$/, P.CustomerDetail, false],
+  [/^\/admin\/technicians\/?$/, P.Technicians, true],
+  [/^\/admin\/settings\/?$/, P.Settings, true],
+  [/^\/admin\/logs\/?$/, P.Logs, true],
+  [/^\/admin\/newsletter\/?$/, P.Newsletter, false],
+  [/^\/admin\/vendors\/?$/, P.Vendors, true],
+  [/^\/admin\/vendors\/[^/]+\/?$/, P.VendorDetail, false],
+];
 
 export default function AdminApp() {
   return (

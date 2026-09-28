@@ -7,7 +7,7 @@ const account = { name: 'سارة خليل', phone: '0791112233', email: 'Sara@E
 
 function booking(phone: string, time: string, date = nextWorkingDate()) {
   return {
-    type: 'INSPECTION',
+    type: 'INSPECTION', acceptPolicy: true,
     name: 'ضيف',
     phone,
     locationText: 'عمّان — الصويفية',

@@ -13,8 +13,8 @@ export default function VendorStore() {
   const { slug = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const page = Math.max(1, Number(params.get('page')) || 1);
-  const store = useAsync(() => api.get<Store>(`/store/vendors/${slug}`), [slug]);
-  const products = useAsync(() => api.get<Paged<Product>>('/store/products', { vendor: slug, page, pageSize: PAGE_SIZE }), [slug, page]);
+  const store = useAsync(() => api.get<Store>(`/store/vendors/${slug}`), [slug], `vendor/${slug}`);
+  const products = useAsync(() => api.get<Paged<Product>>('/store/products', { vendor: slug, page, pageSize: PAGE_SIZE }), [slug, page], `vendor/${slug}/products/${page}`);
   useDocumentTitle(store.data?.name ?? 'متجر');
 
   if (store.error) {

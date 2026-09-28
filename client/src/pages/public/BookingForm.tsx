@@ -16,7 +16,8 @@ import {
   toNum,
   useDraftSaver,
 } from '../../components/forms/formUtils';
-import { Alert, Breadcrumbs, ButtonLink, ChoiceGroup, Icon, Input, Stepper, Textarea } from '../../components/ui';
+import { PolicyList } from '../../components/PolicyList';
+import { Alert, Breadcrumbs, ButtonLink, Checkbox, ChoiceGroup, Icon, Input, Stepper, Textarea } from '../../components/ui';
 import { AccountNote, useAccountPrefill } from '../../components/forms/AccountPrefill';
 import { useSite } from '../../context/SiteContext';
 import { ApiError, api, toFormData } from '../../lib/api';
@@ -266,6 +267,10 @@ function BookingWizard({ type }: { type: BookingType }) {
   const [submitting, setSubmitting] = useState(false);
   const [slotsReload, setSlotsReload] = useState(0);
   const [done, setDone] = useState<BookingCreated | null>(null);
+  // الموافقة على سياسة الحجز: إلزامية في الخطوة الأخيرة (لا تُحفظ في المسودة)
+  const [acceptPolicy, setAcceptPolicy] = useState(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
   useDraftSaver(draftKey, v, !done);
@@ -321,10 +326,16 @@ function BookingWizard({ type }: { type: BookingType }) {
         return;
       }
     }
+    if (!acceptPolicy) {
+      setPolicyError('اقرأ سياسة الحجز وضع إشارة على الموافقة لإتمام الحجز');
+      window.setTimeout(() => document.getElementById('accept-policy')?.focus(), 0);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     const payload = {
       type,
+      acceptPolicy: true,
       name: v.name.trim(),
       phone: v.phone.trim(),
       locationText: v.locationText.trim(),
@@ -860,6 +871,39 @@ function BookingWizard({ type }: { type: BookingType }) {
                     <p className="text-2xl font-bold">{formatJOD(fee)}</p>
                   </div>
                 )}
+                <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-labelledby="policy-title">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 id="policy-title" className="text-base font-semibold">
+                      سياسة الحجز
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setPolicyOpen((o) => !o)}
+                      aria-expanded={policyOpen}
+                      className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 dark:text-brand-200"
+                    >
+                      {policyOpen ? 'إخفاء' : 'قراءة البنود'}
+                      <Icon name="chevronDown" className={`h-4 w-4 transition-transform ${policyOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+                  {policyOpen ? (
+                    <PolicyList text={settings.bookingPolicy} compact className="mt-4 max-h-80 overflow-y-auto pe-1" />
+                  ) : (
+                    <p className="mt-1.5 text-sm text-muted">المواعيد، رسوم الكشف، عرض السعر قبل البدء، والتعديل والإلغاء.</p>
+                  )}
+                  <div className="mt-4">
+                    <Checkbox
+                      id="accept-policy"
+                      label="قرأت سياسة الحجز وأوافق عليها"
+                      checked={acceptPolicy}
+                      onChange={(c) => {
+                        setAcceptPolicy(c);
+                        if (c) setPolicyError(null);
+                      }}
+                      error={policyError ?? serverErrors.acceptPolicy}
+                    />
+                  </div>
+                </section>
                 {submitError && (
                   <Alert tone="error" title="لم يُرسل الحجز">
                     {submitError}

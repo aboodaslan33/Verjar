@@ -12,7 +12,7 @@ const base = {
 
 function inspection(date: string, time: string, extra: Record<string, unknown> = {}) {
   return {
-    type: 'INSPECTION',
+    type: 'INSPECTION', acceptPolicy: true,
     ...base,
     date,
     time,
@@ -72,6 +72,15 @@ describe('POST /api/v1/bookings', () => {
     expect(customer?.name).toBe('أحمد السعدي');
     const log = await prisma.whatsAppLog.findFirst({ where: { entityId: d.id } });
     expect(log?.channel).toBe('LINK');
+    // تُسجَّل موافقة العميل على سياسة الحجز
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: d.id } })).policyAcceptedAt).not.toBeNull();
+  });
+
+  it('يرفض الحجز بدون الموافقة على سياسة الحجز', async () => {
+    const { acceptPolicy: _drop, ...body } = inspection(nextWorkingDate(), '10:00');
+    const res = await user.post('/api/v1/bookings').send(body);
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body.error)).toContain('سياسة الحجز');
   });
 
   it('الكشف الفني ثابت لكل المحافظات: عادي 25، عاجل 50، طارئ 70 (المنطقة لا تؤثر)', async () => {
@@ -89,7 +98,7 @@ describe('POST /api/v1/bookings', () => {
   it('الكشف على الدهان: 15 داخل عمّان و25 خارجها، والمنطقة مطلوبة', async () => {
     const date = nextWorkingDate();
     const painting = (time: string, zone?: string) => ({
-      type: 'PAINTING',
+      type: 'PAINTING', acceptPolicy: true,
       ...base,
       date,
       time,
@@ -159,7 +168,7 @@ describe('POST /api/v1/bookings', () => {
   it('يعيد أخطاء الحقول بالعربي', async () => {
     const res = await user
       .post('/api/v1/bookings')
-      .send({ type: 'PAINTING', ...base, phone: '123', date: nextWorkingDate(), time: '10:00', details: { rooms: 0 } });
+      .send({ type: 'PAINTING', acceptPolicy: true, ...base, phone: '123', date: nextWorkingDate(), time: '10:00', details: { rooms: 0 } });
     expect(res.status).toBe(400);
     expect(res.body.error.fields.phone).toContain('رقم الهاتف غير صحيح');
     expect(res.body.error.fields['details.rooms']).toBeDefined();
@@ -169,7 +178,7 @@ describe('POST /api/v1/bookings', () => {
   it('يقبل صورًا عبر multipart ويرفض الملفات غير المدعومة', async () => {
     const date = nextWorkingDate();
     const data = JSON.stringify({
-      type: 'PAINTING',
+      type: 'PAINTING', acceptPolicy: true,
       ...base,
       date,
       time: '09:00',
@@ -196,7 +205,7 @@ describe('POST /api/v1/bookings', () => {
     const date = nextWorkingDate();
     let req = user
       .post('/api/v1/bookings')
-      .field('data', JSON.stringify({ type: 'GENERAL', ...base, date, time: '09:00', details: { description: 'تركيب رفوف' } }));
+      .field('data', JSON.stringify({ type: 'GENERAL', acceptPolicy: true, ...base, date, time: '09:00', details: { description: 'تركيب رفوف' } }));
     for (let i = 0; i < 6; i++) req = req.attach('photos', PNG_1PX, { filename: `p${i}.png`, contentType: 'image/png' });
     const res = await req;
     expect(res.status).toBe(400);
@@ -206,7 +215,7 @@ describe('POST /api/v1/bookings', () => {
   it('أعمال البناء تتطلب الإحداثيات وملف التصميم عند اختيار "يوجد تصميم"', async () => {
     const date = nextWorkingDate();
     const body = {
-      type: 'CONSTRUCTION',
+      type: 'CONSTRUCTION', acceptPolicy: true,
       ...base,
       date,
       time: '09:00',

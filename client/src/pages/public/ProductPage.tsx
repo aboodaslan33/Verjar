@@ -18,6 +18,7 @@ export default function ProductPage() {
   const { data, error, loading, reload } = useAsync(
     () => api.get<ProductResponse>(`/store/products/${encodeURIComponent(slug)}`),
     [slug],
+    `product/${slug}`,
   );
   useDocumentTitle(data?.product.name ?? (error?.status === 404 ? 'المنتج غير موجود' : 'المتجر'));
 

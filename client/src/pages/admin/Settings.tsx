@@ -283,12 +283,14 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
         </div>
       </Section>
 
-      <Section title="المحتوى" description="نصوص الصفحة الرئيسية وصفحة نبذة عنا">
+      <Section title="المحتوى والسياسات" description="نصوص الصفحة الرئيسية وصفحة نبذة عنا وسياسات الحجز والطلب">
         <div className="space-y-4">
           <Input label="عنوان الواجهة" value={str('heroTitle')} onChange={set('heroTitle')} error={fe.heroTitle} />
           <Textarea label="النص التعريفي للواجهة" rows={2} value={str('heroSubtitle')} onChange={set('heroSubtitle')} error={fe.heroSubtitle} />
           <Input label="عنوان نبذة عنا" value={str('aboutTitle')} onChange={set('aboutTitle')} error={fe.aboutTitle} />
           <Textarea label="محتوى نبذة عنا" rows={8} value={str('aboutContent')} onChange={set('aboutContent')} error={fe.aboutContent} hint="افصل الفقرات بسطر فارغ" />
+          <Textarea label="سياسة الحجز" rows={8} value={str('bookingPolicy')} onChange={set('bookingPolicy')} error={fe.bookingPolicy} hint="كل سطر بند مستقل. اكتب «العنوان: النص» ليظهر العنوان بخط عريض. تظهر في آخر خطوة من الحجز (بخانة موافقة إلزامية) وفي صفحة السياسات." />
+          <Textarea label="سياسة الطلب والتوصيل" rows={7} value={str('storePolicy')} onChange={set('storePolicy')} error={fe.storePolicy} hint="تظهر في صفحة السياسات ورابطها في صفحة إتمام الطلب." />
         </div>
       </Section>
 

@@ -43,6 +43,7 @@ export const MESSAGES = {
   'footer.company': ['الشركة', 'Company'],
   'footer.contact': ['تواصل معنا', 'Contact us'],
   'footer.track': ['تتبّع طلبك', 'Track your order'],
+  'footer.policies': ['سياسة الحجز والطلب', 'Booking & order policy'],
   'footer.rights': ['جميع الحقوق محفوظة.', 'All rights reserved.'],
   'footer.city': ['عمّان — الأردن', 'Amman — Jordan'],
   'svc.inspection': ['كشف أعطال البناء', 'Building fault inspection'],

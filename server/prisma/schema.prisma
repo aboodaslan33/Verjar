@@ -615,6 +615,8 @@ model Booking {
   technicianId  String?
   adminNotes    String?
   whatsappText  String
+  /// وقت موافقة العميل على سياسة الحجز
+  policyAcceptedAt DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?

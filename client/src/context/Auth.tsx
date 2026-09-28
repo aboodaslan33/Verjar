@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 import type { AdminMe, SessionUser } from '../lib/types';
+import { clearAsyncCache } from '../lib/useAsync';
 
 type Ctx = {
   /** المستخدم الحالي (عميل أو أدمن) أو null للزائر */
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.post('/auth/logout').catch(() => undefined);
+    clearAsyncCache();
     // مسودات النماذج تحوي بيانات شخصية (الاسم والهاتف والعنوان) — تُمسح عند الخروج
     try {
       for (const k of Object.keys(sessionStorage)) if (/^vj-(booking|corporate)-draft/.test(k)) sessionStorage.removeItem(k);

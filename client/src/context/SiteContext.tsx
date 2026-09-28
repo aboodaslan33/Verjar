@@ -19,6 +19,8 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   workEnd: '18:00',
   bookingGapHours: 3,
   maxDaysAhead: 60,
+  bookingPolicy: '',
+  storePolicy: '',
   aboutTitle: 'مجموعة فرجا للتصميم والمقاولات والصيانة',
   aboutContent: '',
   heroTitle: 'منتجات صناعية وصيانة ماكينات ومقاولات',

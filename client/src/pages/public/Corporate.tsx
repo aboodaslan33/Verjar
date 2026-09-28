@@ -39,7 +39,7 @@ const OPTIONS: {
 
 export default function Corporate() {
   useDocumentTitle('خدمات الشركات والمصانع');
-  const { data, error, loading, reload } = useAsync(() => api.get<CorporateService[]>('/corporate/services'), []);
+  const { data, error, loading, reload } = useAsync(() => api.get<CorporateService[]>('/corporate/services'), [], 'corporate/services');
 
   return (
     <>

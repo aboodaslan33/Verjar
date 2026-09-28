@@ -47,10 +47,11 @@ export default function Store() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  const cats = useAsync(() => api.get<Category[]>('/store/categories'), []);
+  const cats = useAsync(() => api.get<Category[]>('/store/categories'), [], 'store/categories');
   const products = useAsync(
     () => api.get<Paged<Product>>('/store/products', { category, q, sort, page, pageSize: PAGE_SIZE }),
     [category, q, sort, page],
+    `store/products?${category}|${q}|${sort}|${page}`,
   );
 
   const totalCount = cats.data?.reduce((s, c) => s + (c.productCount ?? 0), 0);

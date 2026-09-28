@@ -162,7 +162,7 @@ export default function Account() {
 function AccountView({ customer }: { customer: CustomerMe }) {
   const [params, setParams] = useSearchParams();
   const tab = (TABS.find((t) => t.key === params.get('tab'))?.key ?? 'bookings') as TabKey;
-  const { data, error, loading, reload } = useAsync(() => api.get<Overview>('/account/overview'), [customer.id]);
+  const { data, error, loading, reload } = useAsync(() => api.get<Overview>('/account/overview'), [customer.id], `account/${customer.id}`);
 
   const counts: Record<TabKey, number> = {
     bookings: data?.bookings.length ?? 0,

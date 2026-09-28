@@ -138,7 +138,7 @@ function CorporateWizard({ type, slug }: { type: CorporateType; slug: string }) 
   const [done, setDone] = useState<CorporateCreated | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
-  const svc = useAsync(() => api.get<CorporateService[]>('/corporate/services'), []);
+  const svc = useAsync(() => api.get<CorporateService[]>('/corporate/services'), [], 'corporate/services');
   const services = useMemo(() => (svc.data ?? []).filter((s) => s.kind === type), [svc.data, type]);
 
   useDraftSaver(draftKey, v, !done);

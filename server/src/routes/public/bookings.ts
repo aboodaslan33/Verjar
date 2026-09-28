@@ -127,6 +127,7 @@ bookingsRouter.post(
           data: {
             ref: makeRef('B'),
             type: input.type,
+            policyAcceptedAt: new Date(),
             customerId: customer.id,
             name: input.name,
             phone: input.phone,

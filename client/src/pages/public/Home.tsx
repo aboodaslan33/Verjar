@@ -52,7 +52,7 @@ const SERVICES: Service[] = [
 export default function Home() {
   useDocumentTitle('');
   const { settings } = useSite();
-  const featured = useAsync(() => api.get<Paged<Product>>('/store/products', { featured: true, pageSize: 4 }), []);
+  const featured = useAsync(() => api.get<Paged<Product>>('/store/products', { featured: true, pageSize: 4 }), [], 'home/featured');
   const featuredItems = featured.data?.items ?? [];
   const showFeatured = featured.loading || featuredItems.length > 0;
 
@@ -280,7 +280,7 @@ function Hero() {
   const { settings } = useSite();
   const [picked, setPicked] = useState(0);
   const need = NEEDS[picked];
-  const industrial = useAsync(() => api.get<Paged<Product>>('/store/products', { category: 'industrial', pageSize: 3 }), []);
+  const industrial = useAsync(() => api.get<Paged<Product>>('/store/products', { category: 'industrial', pageSize: 3 }), [], 'home/industrial');
   const items = industrial.data?.items ?? [];
 
   return (

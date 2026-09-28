@@ -23,6 +23,8 @@ export type SiteSettings = {
   workEnd: string;
   bookingGapHours: number;
   maxDaysAhead: number;
+  bookingPolicy: string;
+  storePolicy: string;
   aboutTitle: string;
   aboutContent: string;
   heroTitle: string;

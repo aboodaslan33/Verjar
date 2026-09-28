@@ -221,6 +221,12 @@ export default function Checkout() {
           </Button>
           <p className="text-center text-sm text-muted">
             بعد الإرسال يظهر لك رقم الطلب ورسالة جاهزة لإرسالها على واتساب.
+            <br />
+            بتأكيد الطلب أنت توافق على{' '}
+            <Link to="/policies#store" target="_blank" className="font-medium text-ink underline underline-offset-4">
+              سياسة الطلب والتوصيل
+            </Link>
+            .
           </p>
         </form>
 

@@ -24,6 +24,8 @@ const common = {
   date: dateField,
   time: timeField,
   notes: optionalText(2000),
+  /** موافقة صريحة على سياسة الحجز (خانة إلزامية في الخطوة الأخيرة) */
+  acceptPolicy: z.literal(true, { errorMap: () => ({ message: 'اقرأ سياسة الحجز ووافق عليها لإتمام الحجز' }) }),
 };
 
 export const inspectionSchema = z.object({
