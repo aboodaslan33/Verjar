@@ -6,16 +6,9 @@ import { MESSAGES, type MessageKey } from './messages';
  * النصوص في ملف واحد (messages.ts) بمفتاح لكل نص، واللغة تُحفظ في المتصفح
  * وتُطبَّق على <html lang dir> قبل الرسم (سكربت index.html) وعند التبديل.
  */
-export type Lang = 'ar' | 'en';
-const KEY = 'vj-lang';
+import { LANG, LANG_KEY as KEY, initialLang, isEn, type Lang } from './lang';
 
-export function initialLang(): Lang {
-  try {
-    return localStorage.getItem(KEY) === 'en' ? 'en' : 'ar';
-  } catch {
-    return 'ar';
-  }
-}
+export { LANG, initialLang, isEn, type Lang };
 
 function apply(lang: Lang) {
   const el = document.documentElement;
@@ -34,15 +27,16 @@ export function translate(lang: Lang, key: MessageKey, vars?: Record<string, str
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(initialLang);
+  const [lang] = useState<Lang>(LANG);
   useEffect(() => apply(lang), [lang]);
+  // التبديل يعيد تحميل الصفحة ليتحوّل كل شيء دفعة واحدة (النصوص، التواريخ، العملة، الاتجاه)
   const setLang = useCallback((l: Lang) => {
     try {
       localStorage.setItem(KEY, l);
     } catch {
       // التخزين غير متاح
     }
-    setLangState(l);
+    if (l !== LANG) window.location.reload();
   }, []);
   const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(lang, key, vars), [lang]);
   return (
@@ -62,6 +56,7 @@ export function LangSwitch({ className }: { className?: string }) {
   return (
     <button
       type="button"
+      translate="no"
       onClick={toggle}
       lang={lang === 'ar' ? 'en' : 'ar'}
       className={className ?? 'grid h-10 min-w-10 place-items-center rounded-lg px-2 text-sm font-semibold text-muted transition-colors hover:bg-subtle hover:text-ink'}

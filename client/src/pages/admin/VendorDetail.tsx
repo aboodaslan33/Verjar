@@ -77,7 +77,7 @@ export default function VendorDetail() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <Panel
             title={`المستحق (${dueOrders.length} طلب مكتمل)`}
             actions={
@@ -92,6 +92,7 @@ export default function VendorDetail() {
             {dueOrders.length === 0 ? (
               <p className="p-4 text-sm text-muted sm:p-5">لا توجد مستحقات. الطلبات تصبح مستحقة عند اكتمالها.</p>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-subtle/60 text-xs text-muted">
                   <tr>
@@ -121,6 +122,7 @@ export default function VendorDetail() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </Panel>
 

@@ -1,19 +1,22 @@
+import { isEn } from './i18n/lang';
 import type { BookingType, CorporateType, RequestStatus } from './types';
 
 const TZ = 'Asia/Amman';
+/** لغة التواريخ والأوقات حسب لغة الواجهة */
+const LOCALE = isEn() ? 'en-GB' : 'ar-JO-u-nu-latn';
 
-/** 90 د.أ — 12.5 د.أ */
+/** 90 د.أ — 12.5 د.أ (JOD 90 بالإنجليزية) */
 export function formatJOD(v: number | string | null | undefined): string {
   const n = Math.round(Number(v ?? 0) * 1000) / 1000;
   const s = Number.isInteger(n)
     ? n.toLocaleString('en-US')
     : n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
-  return `${s} د.أ`;
+  return isEn() ? `JOD ${s}` : `${s} د.أ`;
 }
 
 export function formatDate(iso: string | Date, withTime = false): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
-  return new Intl.DateTimeFormat('ar-JO-u-nu-latn', {
+  return new Intl.DateTimeFormat(LOCALE, {
     timeZone: TZ,
     weekday: withTime ? 'long' : undefined,
     year: 'numeric',
@@ -30,13 +33,13 @@ export function formatDateShort(iso: string | Date): string {
 
 export function formatTime(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
-  return new Intl.DateTimeFormat('ar-JO-u-nu-latn', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(d);
+  return new Intl.DateTimeFormat(isEn() ? 'en-US' : LOCALE, { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(d);
 }
 
 /** "14:00" → "2:00 م" */
 export function formatSlot(t: string): string {
   const [h, m] = t.split(':').map(Number);
-  const suffix = h < 12 ? 'ص' : 'م';
+  const suffix = isEn() ? (h < 12 ? 'AM' : 'PM') : h < 12 ? 'ص' : 'م';
   const hh = h % 12 === 0 ? 12 : h % 12;
   return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
 }

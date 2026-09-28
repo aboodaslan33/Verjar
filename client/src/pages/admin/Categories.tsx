@@ -45,7 +45,7 @@ export default function Categories() {
   };
 
   const row = (c: AdminCategory, child = false) => (
-    <li key={c.id} className={cx('flex items-center gap-3 px-4 py-3', child && 'bg-subtle/40 ps-10')}>
+    <li key={c.id} className={cx('flex items-center gap-3 px-4 py-3 ltr:max-sm:flex-wrap', child && 'bg-subtle/40 ps-10')}>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className={cx('truncate', child ? 'text-[15px]' : 'font-semibold')}>{c.name}</span>

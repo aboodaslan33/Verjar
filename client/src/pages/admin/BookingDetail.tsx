@@ -344,7 +344,7 @@ function ReschedulePanel({ booking: b, onSaved }: { booking: Booking; onSaved: (
     <Panel title="إعادة جدولة">
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          الموعد الحالي: <b className="text-ink">{b.localDate}</b> الساعة <b className="text-ink ltr">{b.localTime}</b>
+          الموعد الحالي: <b className="text-ink">{b.localDate}</b> <span data-en="at">الساعة</span> <b className="text-ink ltr">{b.localTime}</b>
         </p>
         <Input label="التاريخ" type="date" className="ltr text-start" value={date} min={todayAmman()} onChange={(e) => setDate(e.target.value)} error={m.fieldErrors.date} />
         <div>

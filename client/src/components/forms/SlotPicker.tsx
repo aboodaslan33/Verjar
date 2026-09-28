@@ -4,8 +4,9 @@ import { api, ApiError } from '../../lib/api';
 import { WEEKDAYS, WEEKDAYS_SHORT, addDays, cx, formatSlot, todayAmman, weekdayOf } from '../../lib/format';
 import type { DaySlots } from '../../lib/types';
 import { Button, Icon, Skeleton } from '../ui';
+import { isEn } from '../../lib/i18n/lang';
 
-const monthFmt = new Intl.DateTimeFormat('ar-JO-u-nu-latn', { month: 'long', timeZone: 'UTC' });
+const monthFmt = new Intl.DateTimeFormat(isEn() ? 'en-GB' : 'ar-JO-u-nu-latn', { month: 'long', timeZone: 'UTC' });
 const monthShort = (d: string) => monthFmt.format(new Date(`${d}T00:00:00Z`));
 const dayNum = (d: string) => Number(d.slice(8, 10));
 

@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { FILE_KIND_LABEL } from '../../lib/format';
+import { tr } from '../../lib/i18n/lang';
 import { Button, Checkbox, Input, Select } from '../ui';
 import { useMutation } from './hooks';
 import { FILE_KINDS } from './labels';
@@ -40,7 +41,7 @@ export function FileUploadForm({
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [kind, setKind] = useState<FileKind>(defaultKind);
-  const [title, setTitle] = useState(defaultTitle || FILE_KIND_LABEL[defaultKind]);
+  const [title, setTitle] = useState(defaultTitle || tr(FILE_KIND_LABEL[defaultKind]));
   const [amount, setAmount] = useState('');
   const [notify, setNotify] = useState(true);
   const [fileError, setFileError] = useState<string>();
@@ -92,7 +93,7 @@ export function FileUploadForm({
             value={kind}
             onChange={(e) => {
               const k = e.target.value as FileKind;
-              if (!title || title === FILE_KIND_LABEL[kind]) setTitle(FILE_KIND_LABEL[k]);
+              if (!title || title === tr(FILE_KIND_LABEL[kind])) setTitle(tr(FILE_KIND_LABEL[k]));
               setKind(k);
             }}
             error={m.fieldErrors.kind}

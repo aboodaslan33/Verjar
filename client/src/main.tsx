@@ -7,10 +7,10 @@ import { AuthProvider } from './context/Auth';
 import { SiteProvider } from './context/SiteContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
-import { I18nProvider } from './lib/i18n';
+import { I18nProvider, isEn } from './lib/i18n';
 import './styles/index.css';
 
-createRoot(document.getElementById('root')!).render(
+const render = () => createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <I18nProvider>
@@ -29,3 +29,7 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+// الإنجليزية: نحمّل القاموس ونبدأ الترجمة قبل الرسم الأول (العربية لا تحمّل شيئًا إضافيًا)
+if (isEn()) import('./lib/i18n/domTranslate').then((m) => m.startDomTranslation()).finally(render);
+else render();

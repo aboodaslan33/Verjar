@@ -54,7 +54,7 @@ export default function Corporate() {
           {OPTIONS.map((o) => {
             const services = data?.filter((s) => s.kind === o.type) ?? [];
             return (
-              <section key={o.type} className="card flex flex-col p-5 md:p-7">
+              <section key={o.type} className="card flex min-w-0 flex-col p-5 md:p-7">
                 <p className="eyebrow">{o.type === 'ANNUAL' ? 'تعاقد' : 'استجابة سريعة'}</p>
                 <h2 className="mt-1 text-2xl">{o.title}</h2>
                 <p className="mt-2 text-muted">{o.lead}</p>
@@ -89,7 +89,7 @@ export default function Corporate() {
                   )}
                 </div>
 
-                <ButtonLink to={`/corporate/${o.slug}`} size="lg" block className="mt-6">
+                <ButtonLink to={`/corporate/${o.slug}`} size="lg" block className="mt-6 h-auto min-h-12 whitespace-normal py-3 text-center">
                   {o.cta}
                   <Icon name="chevronLeft" className="h-4 w-4" />
                 </ButtonLink>

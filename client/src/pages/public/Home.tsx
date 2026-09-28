@@ -278,7 +278,7 @@ function Hero() {
                 </button>
               ))}
             </div>
-            <div key={service.slug} className="anim-fade mt-4 flex flex-col gap-4 border-t border-inverse-fg/10 pt-4 sm:flex-row sm:items-end sm:justify-between">
+            <div key={service.slug} className="anim-fade mt-4 flex flex-col gap-4 border-t border-inverse-fg/10 pt-4 sm:flex-row sm:items-end sm:justify-between ltr:sm:flex-col ltr:sm:items-start">
               <div className="min-w-0">
                 <p className="text-[15px] leading-relaxed text-inverse-fg/70">{service.text}</p>
                 {service.fee && <p className="mt-2 text-sm font-semibold text-primary">{service.fee(settings)}</p>}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from './api';
 import { BRAND } from './brand';
+import { isEn } from './i18n/lang';
 
 /** تحميل بيانات مع حالات loading / error / data و إعادة تحميل */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
@@ -33,6 +34,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
 
 export function useDocumentTitle(title: string) {
   useEffect(() => {
-    document.title = title ? `${title} — ${BRAND.ar}` : `${BRAND.ar} | ${BRAND.en} — ${BRAND.tagline}`;
+    const brand = isEn() ? BRAND.en : BRAND.ar;
+    document.title = title ? `${title} — ${brand}` : isEn() ? `${BRAND.en} — ${BRAND.tagline}` : `${BRAND.ar} | ${BRAND.en} — ${BRAND.tagline}`;
   }, [title]);
 }

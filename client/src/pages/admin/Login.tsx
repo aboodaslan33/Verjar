@@ -6,6 +6,7 @@ import { useAdmin } from '../../context/AdminAuth';
 import { useAuth } from '../../context/Auth';
 import { useTheme } from '../../context/ThemeContext';
 import { api, ApiError } from '../../lib/api';
+import { LangSwitch } from '../../lib/i18n';
 import type { AdminMe } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 import { PasswordInput } from '../auth/shared';
@@ -51,7 +52,8 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <div className="flex justify-end p-4">
+      <div className="flex justify-end gap-1 p-4">
+        <LangSwitch />
         <button
           type="button"
           onClick={toggle}

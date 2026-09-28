@@ -21,6 +21,7 @@ import {
 } from '../../lib/format';
 import type { BookingType, Paged } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
+import { isEn } from '../../lib/i18n/lang';
 
 const TYPES = Object.keys(BOOKING_TYPE_LABEL) as BookingType[];
 const FILTER_KEYS = ['status', 'type', 'urgency', 'technicianId', 'from', 'to', 'q'] as const;
@@ -193,7 +194,7 @@ function shiftMonth(month: string, d: number) {
   const [y, m] = month.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1 + d, 1)).toISOString().slice(0, 7);
 }
-const MONTH_FMT = new Intl.DateTimeFormat('ar-JO-u-nu-latn', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const MONTH_FMT = new Intl.DateTimeFormat(isEn() ? 'en-GB' : 'ar-JO-u-nu-latn', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 function BookingsCalendar() {
   const [params, setParams] = useSearchParams();

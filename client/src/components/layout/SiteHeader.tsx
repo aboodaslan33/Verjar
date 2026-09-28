@@ -110,8 +110,8 @@ export function SiteHeader() {
                     end={n.end}
                     className={({ isActive }) =>
                       cx(
-                        'relative block px-3.5 py-2 text-[15px] font-medium transition-colors',
-                        'after:absolute after:inset-x-3.5 after:-bottom-[15px] after:h-[3px] after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-out',
+                        'relative block whitespace-nowrap px-3.5 py-2 text-[15px] font-medium transition-colors ltr:px-2.5 ltr:2xl:px-3.5',
+                        'after:absolute after:inset-x-3.5 ltr:after:inset-x-2.5 after:-bottom-[15px] after:h-[3px] after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-out',
                         isActive ? 'text-ink after:scale-x-100' : 'text-muted after:scale-x-0 hover:text-ink',
                       )
                     }
@@ -141,13 +141,13 @@ export function SiteHeader() {
               ) : user ? (
                 <>
                   {user.role === 'CUSTOMER' && user.vendor && (
-                    <Link to="/vendor" className="flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle">
-                      <Icon name="store" className="h-4 w-4 text-muted" /> {t('nav.myStore')}
+                    <Link to="/vendor" title={t('nav.myStore')} className="flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle">
+                      <Icon name="store" className="h-4 w-4 text-muted" /> <span className="ltr:hidden ltr:2xl:inline">{t('nav.myStore')}</span>
                     </Link>
                   )}
                   <Link
                     to={homeFor(user)}
-                    className="flex h-10 max-w-[11rem] items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle"
+                    className="flex h-10 max-w-[11rem] items-center gap-2 ltr:max-w-[8rem] ltr:2xl:max-w-[11rem] rounded-lg px-3 text-sm font-medium text-ink transition-colors hover:bg-subtle"
                     title={user.role === 'CUSTOMER' ? t('nav.account') : t('nav.dashboard')}
                   >
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-bg">{user.name.slice(0, 1)}</span>
@@ -180,10 +180,11 @@ export function SiteHeader() {
 
             <Link
               to="/bookings"
-              className="ms-1 inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover active:translate-y-px"
+              className="ms-1 inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-primary-fg shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover active:translate-y-px"
             >
               <Icon name="calendar" className="hidden h-4 w-4 sm:block" />
-              {t('nav.book')}
+              <span className="ltr:max-sm:hidden">{t('nav.book')}</span>
+              <span className="hidden ltr:max-sm:inline">{t('nav.bookShort')}</span>
             </Link>
 
             {/* بين الجوال وسطح المكتب (1024–1279): قائمة كاملة */}
