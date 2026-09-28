@@ -110,6 +110,14 @@ services:
       - path: /*
         name: Permissions-Policy
         value: geolocation=(self), camera=(), microphone=(), payment=(), usb=()
+      # سياسة المحتوى (CSP): السكربتات من الموقع نفسه فقط (لا سكربت مضمَّن ولا من دومين آخر) — تحدّ من أثر أي ثغرة XSS.
+      # الصور: Cloudinary وخرائط OpenStreetMap وملفات الـ API. الإطارات: خريطة Google في صفحة التواصل فقط.
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://res.cloudinary.com https://*.tile.openstreetmap.org https://verjar-api.onrender.com; media-src 'self' blob: https://res.cloudinary.com https://verjar-api.onrender.com; connect-src 'self'; frame-src https://www.google.com https://maps.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
     routes:
       # تمرير الـ API للسيرفر (نفس الدومين → كوكيز httpOnly تعمل على كل المتصفحات)
       # عدّل الرابط إن كان اسم خدمة الـ API مختلفًا

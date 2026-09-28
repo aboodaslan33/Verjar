@@ -11,7 +11,7 @@ import { clearAuthCookie, isAdminRole, passwordFingerprint, principalOf, require
 import { accountLimiter, authLimiter } from '../middleware/rateLimit';
 import { emailReady, sendPasswordReset } from '../services/email.service';
 import { beginLoginAttempt, invalidCredentials, lockKey, loginFailed, loginSucceeded } from '../services/loginLock.service';
-import { nameField } from '../validators/common';
+import { isWeakPassword, nameField } from '../validators/common';
 
 export const authRouter = Router();
 
@@ -45,6 +45,9 @@ function adminPublic(u: { id: string; name: string; email: string; role: 'ADMIN'
   return { role: u.role, id: u.id, name: u.name, email: u.email };
 }
 
+/** بريد حساب إدارة/موظف: لا يُسمح لعميل باستخدامه (وإلا حُجب دخول الأدمن من صفحة الدخول الموحّدة) */
+const isStaffEmail = async (email: string) => Boolean(await prisma.user.findUnique({ where: { email }, select: { id: true } }));
+
 /** هاش ثابت للمقارنة عند عدم وجود الحساب (زمن استجابة متقارب) */
 const DUMMY_HASH = bcrypt.hashSync('farjar-dummy-password', 10);
 const BCRYPT_ROUNDS = 11;
@@ -68,7 +71,8 @@ const emailField = z.string().trim().toLowerCase().email('البريد الإل�
 const passwordField = z
   .string({ required_error: 'كلمة المرور مطلوبة' })
   .min(8, 'كلمة المرور 8 أحرف على الأقل')
-  .max(100, 'كلمة المرور طويلة جدًا');
+  .max(100, 'كلمة المرور طويلة جدًا')
+  .refine((v) => !isWeakPassword(v), 'كلمة المرور سهلة التخمين، اختر كلمة أقوى (امزج حروفًا وأرقامًا)');
 
 // ───────────── الجلسة الموحّدة ─────────────
 
@@ -130,7 +134,7 @@ authRouter.post(
 
     if (input.email) {
       const byEmail = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
-      if (byEmail && byEmail.id !== existing?.id) {
+      if ((byEmail && byEmail.id !== existing?.id) || (await isStaffEmail(input.email))) {
         throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email', code: 'EMAIL_TAKEN' });
       }
     }
@@ -319,7 +323,7 @@ authRouter.patch(
       .parse(req.body);
     if (input.email) {
       const other = await prisma.customer.findUnique({ where: { email: input.email }, select: { id: true } });
-      if (other && other.id !== req.auth!.sub) throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email' });
+      if ((other && other.id !== req.auth!.sub) || (await isStaffEmail(input.email))) throw conflict('هذا البريد مستخدم لحساب آخر', { field: 'email' });
     }
     const c = await prisma.customer.update({ where: { id: req.auth!.sub }, data: input });
     if (input.name) setAuthCookie(res, principalOf(c));

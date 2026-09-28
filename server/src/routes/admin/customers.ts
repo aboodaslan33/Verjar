@@ -7,6 +7,7 @@ import { asyncHandler, conflict, notFound, ok } from '../../lib/http';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { normalizePhone } from '../../lib/phone';
 import { prisma } from '../../lib/prisma';
+import { isWeakPassword } from '../../validators/common';
 import { customerFinance } from '../../services/customer.service';
 
 export const customersRouter = Router();
@@ -92,7 +93,7 @@ customersRouter.patch(
         notes: z.string().max(3000).nullable().optional(),
         resetPassword: z.boolean().optional(),
         /** كلمة مرور مؤقتة يبلّغها الأدمن للعميل (تُنهي جلساته الحالية) */
-        tempPassword: z.string().min(8, 'كلمة المرور المؤقتة 8 أحرف على الأقل').max(100).optional(),
+        tempPassword: z.string().min(8, 'كلمة المرور المؤقتة 8 أحرف على الأقل').max(100).refine((v) => !isWeakPassword(v), 'كلمة المرور سهلة التخمين، اختر كلمة أقوى').optional(),
       })
       .parse(req.body);
     const { resetPassword, tempPassword, ...data } = input;

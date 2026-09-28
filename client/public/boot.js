@@ -1,0 +1,12 @@
+// يُنفَّذ قبل رسم الصفحة (ملف منفصل حتى تمنع سياسة CSP أي سكربت مضمَّن)
+// الوضع الليلي لتجنب الوميض، واللغة: العربية افتراضيًا (RTL) والإنجليزية (LTR) إن اختارها الزائر
+try {
+  var t = localStorage.getItem('vj-theme');
+  if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+  if (localStorage.getItem('vj-lang') === 'en') {
+    document.documentElement.lang = 'en';
+    document.documentElement.dir = 'ltr';
+  }
+} catch (e) {}

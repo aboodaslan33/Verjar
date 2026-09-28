@@ -28,6 +28,12 @@ const schema = z.object({
 });
 
 const parsed = schema.safeParse(process.env);
+// قيمة المثال في .env.example لا تصلح للإنتاج: أي شخص يعرفها يستطيع تزوير الجلسات
+if (parsed.success && parsed.data.NODE_ENV === 'production' && /change-me/i.test(parsed.data.JWT_SECRET)) {
+  // eslint-disable-next-line no-console
+  console.error('JWT_SECRET ما زال قيمة المثال — ضع قيمة عشوائية طويلة في متغيرات البيئة');
+  process.exit(1);
+}
 if (!parsed.success) {
   // eslint-disable-next-line no-console
   console.error('إعدادات البيئة غير صحيحة:', parsed.error.flatten().fieldErrors);

@@ -311,3 +311,33 @@ describe('الإعدادات', () => {
     expect(pub.body.data.inspectionFeeNormal).toBe(17);
   });
 });
+
+describe('تقوية الحسابات', () => {
+  it('يرفض كلمات المرور الشائعة أو المتسلسلة في التسجيل وتغيير كلمة المرور', async () => {
+    for (const password of ['12345678', 'password1', 'aaaaaaaa', '0791112233']) {
+      const res = await request(app).post('/api/auth/register').send({ ...account, password });
+      expect(res.status).toBe(400);
+      expect(res.body.error.fields.password).toMatch(/سهلة التخمين/);
+    }
+    const agent = request.agent(app);
+    expect((await agent.post('/api/auth/register').send(account)).status).toBe(201);
+    const change = await agent.post('/api/auth/customer/password').send({ current: account.password, password: '87654321' });
+    expect(change.status).toBe(400);
+  });
+
+  it('لا يستطيع عميل استخدام بريد حساب إدارة (كان يحجب دخول الأدمن من صفحة الدخول العامة)', async () => {
+    await createAdmin();
+    const reg = await request(app).post('/api/auth/register').send({ ...account, email: 'ADMIN@test.jo' });
+    expect(reg.status).toBe(409);
+    expect(reg.body.error.fields ?? reg.body.error.details).toBeTruthy();
+
+    const agent = request.agent(app);
+    expect((await agent.post('/api/auth/register').send({ ...account, email: '' })).status).toBe(201);
+    expect((await agent.patch('/api/auth/profile').send({ email: 'admin@test.jo' })).status).toBe(409);
+
+    // دخول الأدمن من الصفحة العامة ما زال يعمل
+    const login = await request(app).post('/api/auth/login').send({ identifier: 'admin@test.jo', password: 'Admin@12345' });
+    expect(login.status).toBe(200);
+    expect(login.body.data.role).toBe('ADMIN');
+  });
+});

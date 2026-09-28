@@ -18,20 +18,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta property="og:image" content="/images/work/kitchen-luxury.webp" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <script>
-      // تطبيق الوضع الليلي قبل الرسم لتجنب الوميض
-      try {
-        var t = localStorage.getItem('vj-theme');
-        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
-        // اللغة: العربية افتراضيًا (RTL)، والإنجليزية (LTR) إن اختارها الزائر
-        if (localStorage.getItem('vj-lang') === 'en') {
-          document.documentElement.lang = 'en';
-          document.documentElement.dir = 'ltr';
-        }
-      } catch (e) {}
-    </script>
+    <script src="/boot.js"></script>
   </head>
   <body>
     <div id="root"></div>
