@@ -136,22 +136,30 @@ describe('التوصيل والدفع عند الاستلام وتسوية ال�
 
     const driver = (await admin.post('/api/v1/admin/delivery/drivers').send({ name: 'أحمد', phone: '0790000009' })).body.data;
     const company = (await admin.post('/api/v1/admin/delivery/companies').send({ name: 'أرامكس', defaultFee: 3 })).body.data;
-    expect((await admin.patch(`/api/v1/admin/delivery/orders/${o1.id}`).send({ deliveryStatus: 'OUT_FOR_DELIVERY' })).status).toBe(400);
+    const status = (id: string, s: string, note?: string) => admin.post(`/api/v1/admin/delivery/orders/${id}/status`).send({ status: s, note });
+    // لا خروج للتوصيل قبل الإسناد
+    expect((await status(o1.id, 'IN_TRANSIT')).status).toBe(400);
 
-    const a1 = await admin.patch(`/api/v1/admin/delivery/orders/${o1.id}`).send({ driverId: driver.id });
-    expect(a1.body.data.deliveryStatus).toBe('ASSIGNED');
-    await admin.patch(`/api/v1/admin/delivery/orders/${o1.id}`).send({ deliveryStatus: 'OUT_FOR_DELIVERY' });
-    const d1 = await admin.patch(`/api/v1/admin/delivery/orders/${o1.id}`).send({ deliveryStatus: 'DELIVERED' });
-    expect(d1.body.data).toMatchObject({ deliveryStatus: 'DELIVERED', codStatus: 'COLLECTED', codCollected: 20 });
+    const a1 = await admin.post(`/api/v1/admin/delivery/orders/${o1.id}/assign`).send({ driverId: driver.id });
+    expect(a1.body.data.deliveryStatus).toBe('PICKUP_ASSIGNED');
+    await status(o1.id, 'IN_TRANSIT');
+    const d1 = await status(o1.id, 'DELIVERED');
+    expect(d1.body.data).toMatchObject({ deliveryStatus: 'DELIVERED', codStatus: 'PENDING', financialStatus: 'NOT_COLLECTED' });
     // التسليم يكمل الطلب بنفس مسار الحالات الحالي
     expect((await prisma.order.findUniqueOrThrow({ where: { id: o1.id } })).status).toBe('COMPLETED');
+    const c1 = await admin.post(`/api/v1/admin/delivery/orders/${o1.id}/collect`).send({ amount: 20 });
+    expect(c1.body.data).toMatchObject({ deliveryStatus: 'PAYMENT_COLLECTED', codStatus: 'COLLECTED', codCollected: 20, financialStatus: 'COLLECTED' });
 
-    await admin.patch(`/api/v1/admin/delivery/orders/${o2.id}`).send({ driverId: driver.id });
-    await admin.patch(`/api/v1/admin/delivery/orders/${o2.id}`).send({ deliveryStatus: 'DELIVERED', codCollected: 40 });
+    await admin.post(`/api/v1/admin/delivery/orders/${o2.id}/assign`).send({ driverId: driver.id });
+    await status(o2.id, 'DELIVERED');
+    await admin.post(`/api/v1/admin/delivery/orders/${o2.id}/collect`).send({ amount: 40 });
     const o3 = await codOrder(shopper, p.id, 1);
-    await admin.patch(`/api/v1/admin/delivery/orders/${o3.id}`).send({ deliveryCompanyId: company.id });
-    const failed = await admin.patch(`/api/v1/admin/delivery/orders/${o3.id}`).send({ deliveryStatus: 'FAILED' });
-    expect(failed.body.data).toMatchObject({ deliveryStatus: 'FAILED', codStatus: 'PENDING', deliveryFee: 3 });
+    const withCompany = await admin.patch(`/api/v1/admin/delivery/orders/${o3.id}`).send({ deliveryCompanyId: company.id });
+    // أجرة الشركة الافتراضية تُضاف للمبلغ المطلوب تحصيله (العميل يدفع الأجرة)
+    expect(withCompany.body.data).toMatchObject({ deliveryStatus: 'PICKUP_ASSIGNED', deliveryFee: 3, codAmount: 23 });
+    expect((await status(o3.id, 'DELIVERY_FAILED')).status).toBe(400); // السبب مطلوب
+    const failed = await status(o3.id, 'DELIVERY_FAILED', 'العميل لم يرد');
+    expect(failed.body.data).toMatchObject({ deliveryStatus: 'DELIVERY_FAILED', codStatus: 'PENDING' });
 
     let drivers = (await admin.get('/api/v1/admin/delivery/drivers')).body.data;
     expect(drivers[0].cash).toMatchObject({ collected: 60, settled: 0, pending: 60, pendingOrders: 2 });
@@ -164,8 +172,8 @@ describe('التوصيل والدفع عند الاستلام وتسوية ال�
     expect(drivers[0].cash).toMatchObject({ collected: 60, settled: 60, pending: 0 });
 
     // لا تعديل صامت بعد التسوية
-    expect((await admin.patch(`/api/v1/admin/delivery/orders/${o1.id}`).send({ codCollected: 5, deliveryStatus: 'DELIVERED' })).status).toBe(409);
-    expect((await admin.patch(`/api/v1/admin/delivery/orders/${o1.id}`).send({ deliveryStatus: 'FAILED' })).status).toBe(409);
+    expect((await admin.post(`/api/v1/admin/delivery/orders/${o1.id}/collect`).send({ amount: 5 })).status).toBe(409);
+    expect((await admin.post(`/api/v1/admin/delivery/orders/${o1.id}/status`).send({ status: 'DELIVERY_FAILED', note: 'تجربة' })).status).toBe(409);
     expect((await admin.post('/api/v1/admin/delivery/settlements').send({ driverId: driver.id })).status).toBe(400);
 
     // إلغاء التسوية يبقيها في السجل ويعيد الطلبات للتحصيل المعلّق
@@ -177,7 +185,7 @@ describe('التوصيل والدفع عند الاستلام وتسوية ال�
     expect(again.body.data.ref).toBe(`SET-${year}-00002`);
 
     const cod = (await admin.get('/api/v1/admin/reports/cod')).body.data;
-    expect(cod.totals).toMatchObject({ codAmount: 80, codCollected: 60, settled: 60, pending: 0 });
+    expect(cod.totals).toMatchObject({ codAmount: 83, codCollected: 60, settled: 60, pending: 0 });
     const delivery = (await admin.get('/api/v1/admin/reports/delivery')).body.data;
     expect(delivery.totals).toMatchObject({ total: 3, delivered: 2, failed: 1, fees: 3 });
     const settlements = (await admin.get('/api/v1/admin/reports/settlements')).body.data;
@@ -198,6 +206,7 @@ describe('التوصيل والدفع عند الاستلام وتسوية ال�
     const r = await shopper.post('/api/v1/store/orders').send({ ...buyer, items: [{ productId: p.id, quantity: 1 }] });
     expect(r.status).toBe(201);
     const o = await prisma.order.findUniqueOrThrow({ where: { id: r.body.data.id } });
-    expect(o).toMatchObject({ paymentMethod: null, codStatus: null, deliveryStatus: 'PENDING' });
+    expect(o).toMatchObject({ paymentMethod: null, codStatus: null, deliveryStatus: 'NEW', financialStatus: 'PAYMENT_PENDING' });
+    expect(o.code).toMatch(/^FG-ORD-\d{6}$/);
   });
 });

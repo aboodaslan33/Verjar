@@ -7,7 +7,9 @@ import { audit } from '../lib/audit';
 import { HttpError, asyncHandler, badRequest, conflict, ok, unauthorized } from '../lib/http';
 import { normalizePhone } from '../lib/phone';
 import { prisma } from '../lib/prisma';
-import { clearAuthCookie, isAdminRole, passwordFingerprint, principalOf, requireAdmin, requireAuth, requireCustomer, setAuthCookie } from '../middleware/auth';
+import type { Request, Response } from 'express';
+import { clearAuthCookie, passwordFingerprint, principalOf, requireAdmin, requireAuth, requireCustomer, sessionToken, setAuthCookie, type Principal } from '../middleware/auth';
+import { effectivePermissions } from '../lib/permissions';
 import { accountLimiter, authLimiter } from '../middleware/rateLimit';
 import { emailReady, sendPasswordReset } from '../services/email.service';
 import { beginLoginAttempt, invalidCredentials, lockKey, loginFailed, loginSucceeded } from '../services/loginLock.service';
@@ -41,8 +43,32 @@ async function customerPublic(c: CustomerRow) {
   };
 }
 
-function adminPublic(u: { id: string; name: string; email: string; role: 'ADMIN' | 'STAFF' }) {
-  return { role: u.role, id: u.id, name: u.name, email: u.email };
+type StaffUser = { id: string; name: string; email: string | null; username: string | null; phone: string | null; role: 'ADMIN' | 'STAFF' | 'MANAGER' | 'DRIVER'; permissions: string[] };
+
+/** بيانات حساب الإدارة/التوصيل للواجهة مع صلاحياته الفعلية */
+function adminPublic(u: StaffUser) {
+  return { role: u.role, id: u.id, name: u.name, email: u.email, username: u.username, phone: u.phone, permissions: effectivePermissions(u.role, u.permissions) };
+}
+
+/** اسم المستخدم: أحرف إنجليزية وأرقام و . _ - ويبدأ بحرف (حتى لا يلتبس برقم هاتف) */
+export const USERNAME_RE = /^[a-z][a-z0-9._-]{2,31}$/;
+
+/**
+ * تسجيل الجلسة: كوكي httpOnly للمتصفح، وللتطبيقات (client: "mobile") يُعاد التوكن في الرد
+ * لتُرسله في ترويسة Authorization: Bearer.
+ */
+function startSession(req: Request, res: Response, p: Principal) {
+  setAuthCookie(res, p);
+  const mobile = (req.body as { client?: unknown } | undefined)?.client === 'mobile';
+  return mobile ? { token: sessionToken(p) } : {};
+}
+
+/** حساب إدارة/توصيل نشط بالبريد أو اسم المستخدم */
+async function findStaff(identifier: string) {
+  const id = identifier.trim().toLowerCase();
+  const where = id.includes('@') ? { email: id } : { username: id };
+  const u = await prisma.user.findUnique({ where });
+  return u && !u.deletedAt ? u : null;
 }
 
 /** بريد حساب إدارة/موظف: لا يُسمح لعميل باستخدامه (وإلا حُجب دخول الأدمن من صفحة الدخول الموحّدة) */
@@ -82,9 +108,9 @@ authRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const a = req.auth!;
-    if (isAdminRole(a.role)) {
+    if (a.role !== 'CUSTOMER') {
       const u = await prisma.user.findUnique({ where: { id: a.sub } });
-      if (!u || !u.active) {
+      if (!u || !u.active || u.deletedAt) {
         clearAuthCookie(res);
         throw unauthorized('انتهت الجلسة، سجّل الدخول مجددًا');
       }
@@ -202,8 +228,10 @@ authRouter.post(
       })
       .parse(req.body);
 
-    const phone = identifier.includes('@') ? null : normalizePhone(identifier);
-    if (!identifier.includes('@') && !phone) throw badRequest('رقم الهاتف غير صحيح (مثال: 0791234567)', { field: 'identifier' });
+    const lower = identifier.trim().toLowerCase();
+    const isUsername = !lower.includes('@') && USERNAME_RE.test(lower);
+    const phone = lower.includes('@') || isUsername ? null : normalizePhone(identifier);
+    if (!lower.includes('@') && !isUsername && !phone) throw badRequest('رقم الهاتف غير صحيح (مثال: 0791234567)', { field: 'identifier' });
 
     // قفل بعد 5 محاولات خاطئة (تُحسب المحاولة قبل فحص كلمة المرور)
     const key = lockKey(identifier);
@@ -212,19 +240,26 @@ authRouter.post(
       throw invalidCredentials('رقم الهاتف أو البريد أو كلمة المرور غير صحيحة', await loginFailed(key, attempt));
     };
 
-    const customer = phone
-      ? await prisma.customer.findUnique({ where: { phone } })
-      : await prisma.customer.findUnique({ where: { email: identifier.toLowerCase() } });
+    const customer = isUsername
+      ? null
+      : phone
+        ? await prisma.customer.findUnique({ where: { phone } })
+        : await prisma.customer.findUnique({ where: { email: lower } });
 
-    if ((!customer || customer.deletedAt) && identifier.includes('@')) {
-      const user = await prisma.user.findUnique({ where: { email: identifier.toLowerCase() } });
+    // حساب إدارة أو توصيل: بالبريد (إن لم يكن لعميل) أو باسم المستخدم
+    if ((!customer || customer.deletedAt) && (lower.includes('@') || isUsername)) {
+      const user = await findStaff(lower);
       if (user) {
         if (!user.active || !(await bcrypt.compare(password, user.passwordHash))) return invalid();
         await loginSucceeded(key);
         const updatedUser = await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-        setAuthCookie(res, principalOf(updatedUser));
+        const extra = startSession(req, res, principalOf(updatedUser));
         await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });
-        return ok(res, adminPublic(updatedUser));
+        return ok(res, { ...adminPublic(updatedUser), ...extra });
+      }
+      if (isUsername) {
+        await bcrypt.compare(password, DUMMY_HASH);
+        return invalid();
       }
     }
     if (!customer || customer.deletedAt) {
@@ -242,8 +277,8 @@ authRouter.post(
 
     await loginSucceeded(key);
     const updated = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
-    setAuthCookie(res, principalOf(updated));
-    return ok(res, await customerPublic(updated));
+    const extra = startSession(req, res, principalOf(updated));
+    return ok(res, { ...(await customerPublic(updated)), ...extra });
   }),
 );
 
@@ -338,20 +373,27 @@ authRouter.post(
   authLimiter,
   asyncHandler(async (req, res) => {
     const { email, password } = z
-      .object({ email: z.string().trim().toLowerCase().email('بريد غير صالح'), password: z.string().min(1, 'كلمة المرور مطلوبة').max(100) })
+      .object({
+        email: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .refine((v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || USERNAME_RE.test(v), 'أدخل البريد أو اسم المستخدم'),
+        password: z.string().min(1, 'كلمة المرور مطلوبة').max(100),
+      })
       .parse(req.body);
     const key = lockKey(email);
     const attempt = await beginLoginAttempt(key);
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await findStaff(email);
     const valid = user ? await bcrypt.compare(password, user.passwordHash) : (await bcrypt.compare(password, DUMMY_HASH), false);
     if (!user || !user.active || !valid) {
       throw invalidCredentials('البريد أو كلمة المرور غير صحيحة', await loginFailed(key, attempt));
     }
     await loginSucceeded(key);
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    setAuthCookie(res, principalOf(user));
+    const extra = startSession(req, res, principalOf(user));
     await audit({ actorId: user.id, actorType: 'admin', action: 'login', entity: 'user', entityId: user.id });
-    ok(res, adminPublic(user));
+    ok(res, { ...adminPublic(user), ...extra });
   }),
 );
 
@@ -365,14 +407,14 @@ authRouter.get(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.auth!.sub } });
-    if (!user || !user.active) throw unauthorized();
+    if (!user || !user.active || user.deletedAt) throw unauthorized();
     ok(res, adminPublic(user));
   }),
 );
 
 authRouter.post(
   '/admin/password',
-  requireAdmin,
+  (req, res, next) => (req.auth && req.auth.role !== 'CUSTOMER' ? next() : requireAdmin(req, res, next)),
   asyncHandler(async (req, res) => {
     const { current, next } = z
       .object({ current: z.string().min(1, 'أدخل كلمة المرور الحالية').max(100), next: passwordField })

@@ -9,18 +9,42 @@ import { normalizePhone } from '../../lib/phone';
 import { prisma } from '../../lib/prisma';
 import { nextRef } from '../../lib/refs';
 import { ammanToUtc } from '../../lib/time';
-import { setVendorOrderStatus, syncOrderStatus } from '../../services/vendor.service';
+import { requirePermission } from '../../middleware/auth';
+import {
+  ALL_STATUSES,
+  BUCKETS,
+  DELIVERED_SET,
+  DRIVER_ACTIVE,
+  FAILURES,
+  assignDriver,
+  collectPayment,
+  createDeliveryOrder,
+  liveUpdate,
+  refreshFinance,
+  transition,
+  type Actor,
+} from '../../services/delivery.service';
+import { notify } from '../../services/notifications.service';
+import { deliveryOrderInput, orderDetailInclude } from '../../validators/delivery';
 import { optionalDate } from './shared';
 
 /**
- * التوصيل والتحصيل: شركات التوصيل، السائقون، إسناد الطلبات وحالة التوصيل،
- * النقد المحصّل عند الاستلام، وتسويات النقد مع السائقين وشركات التوصيل.
- * حالة الطلب الموحّدة (RequestStatus) لا تُستبدل؛ التسليم فقط يكمل الطلب عبر المسار الحالي.
+ * إدارة التوصيل (Super Admin / Delivery Manager): الطلبات وتوزيعها ومتابعتها،
+ * موظفو التوصيل وشركات التوصيل، التحصيل والتسويات، ولوحة الإحصائيات.
+ * كل مسار محمي بصلاحيته، وكل تغيير حالة يمر من خدمة التوصيل (سجل + إشعارات).
  */
 export const deliveryRouter = Router();
 
 const money = z.coerce.number().min(0, 'المبلغ لا يمكن أن يكون سالبًا').max(1_000_000);
 const optStr = (max: number) => z.string().trim().max(max).nullable().optional();
+const can = requirePermission;
+
+export const userActor = (req: { auth?: { sub: string; name: string; perms: string[] } }): Extract<Actor, { kind: 'user' }> => ({
+  kind: 'user',
+  id: req.auth!.sub,
+  name: req.auth!.name,
+  perms: req.auth!.perms,
+});
 
 // ───────────── شركات التوصيل ─────────────
 
@@ -45,6 +69,7 @@ deliveryRouter.get(
 
 deliveryRouter.post(
   '/companies',
+  can('delivery.manage'),
   asyncHandler(async (req, res) => {
     const { defaultFee, email, ...input } = companyInput.parse(req.body);
     const c = await prisma.deliveryCompany.create({ data: { ...input, email: email || null, defaultFee: new Prisma.Decimal(defaultFee) } });
@@ -55,6 +80,7 @@ deliveryRouter.post(
 
 deliveryRouter.patch(
   '/companies/:id',
+  can('delivery.manage'),
   asyncHandler(async (req, res) => {
     const { defaultFee, email, ...input } = companyInput.partial().parse(req.body);
     const c = await prisma.deliveryCompany.update({
@@ -66,12 +92,13 @@ deliveryRouter.patch(
   }),
 );
 
-// ───────────── السائقون ─────────────
+// ───────────── موظفو التوصيل ─────────────
 
 const driverInput = z.object({
   name: z.string().trim().min(2, 'اسم السائق مطلوب').max(100),
   phone: z.string().trim().min(5, 'رقم الهاتف مطلوب').max(30),
   status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
+  areas: optStr(300),
   notes: optStr(2000),
 });
 
@@ -79,21 +106,23 @@ deliveryRouter.get(
   '/drivers',
   asyncHandler(async (_req, res) => {
     const [rows, cash, active] = await Promise.all([
-      prisma.driver.findMany({ orderBy: [{ status: 'asc' }, { name: 'asc' }] }),
+      prisma.driver.findMany({ orderBy: [{ status: 'asc' }, { name: 'asc' }], include: { user: { select: { id: true, username: true, active: true } } } }),
       cashSummary('driver'),
       prisma.order.groupBy({
         by: ['driverId'],
-        where: { deletedAt: null, driverId: { not: null }, deliveryStatus: { in: ['ASSIGNED', 'PREPARING', 'OUT_FOR_DELIVERY'] } },
+        where: { deletedAt: null, driverId: { not: null }, deliveryStatus: { in: DRIVER_ACTIVE.filter((s) => s !== 'DELIVERED') } },
         _count: { _all: true },
       }),
     ]);
-    const act = new Map(active.map((a) => [a.driverId, a._count._all]));
+    const act = new Map(active.map((a) => [a.driverId, (a._count as { _all: number })._all]));
     ok(res, rows.map((d) => ({ ...d, activeOrders: act.get(d.id) ?? 0, cash: cash.get(d.id) ?? emptyCash() })));
   }),
 );
 
+/** سائق بدون حساب دخول (مثل سائق خارجي) — حسابات موظفي التوصيل تُنشأ من إدارة المستخدمين */
 deliveryRouter.post(
   '/drivers',
+  can('delivery.manage'),
   asyncHandler(async (req, res) => {
     const input = driverInput.parse(req.body);
     const d = await prisma.driver.create({ data: input });
@@ -104,6 +133,7 @@ deliveryRouter.post(
 
 deliveryRouter.patch(
   '/drivers/:id',
+  can('delivery.manage'),
   asyncHandler(async (req, res) => {
     const input = driverInput.partial().parse(req.body);
     const d = await prisma.driver.update({ where: { id: req.params.id }, data: input });
@@ -112,14 +142,13 @@ deliveryRouter.patch(
   }),
 );
 
-/** السائق: الطلبات المسندة، النقد (محصّل، مُسلَّم، معلّق)، والتسويات */
 deliveryRouter.get(
   '/drivers/:id',
   asyncHandler(async (req, res) => {
-    const d = await prisma.driver.findUnique({ where: { id: req.params.id } });
+    const d = await prisma.driver.findUnique({ where: { id: req.params.id }, include: { user: { select: { id: true, username: true, active: true, lastLoginAt: true } } } });
     if (!d) throw notFound('السائق غير موجود');
     const [orders, settlements, cash] = await Promise.all([
-      prisma.order.findMany({ where: { driverId: d.id, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 100, select: deliveryOrderSelect }),
+      prisma.order.findMany({ where: { driverId: d.id, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 100, select: listSelect }),
       prisma.deliverySettlement.findMany({ where: { driverId: d.id }, orderBy: { receivedAt: 'desc' }, include: { receivedBy: { select: { name: true } } } }),
       cashSummary('driver', d.id),
     ]);
@@ -127,173 +156,358 @@ deliveryRouter.get(
   }),
 );
 
-// ───────────── إسناد الطلبات وحالة التوصيل ─────────────
+// ───────────── الطلبات ─────────────
 
-const deliveryOrderSelect = {
+export const listSelect = {
   id: true,
   number: true,
+  code: true,
   ref: true,
+  source: true,
   customerName: true,
   phone: true,
   address: true,
+  area: true,
   status: true,
+  subtotal: true,
+  discountTotal: true,
   total: true,
   paymentMethod: true,
   deliveryStatus: true,
+  financialStatus: true,
   deliveryFee: true,
+  customerPaysFee: true,
   deliveredAt: true,
+  pickedUpAt: true,
   deliveryNote: true,
+  notes: true,
   codAmount: true,
   codStatus: true,
   codCollected: true,
   codCollectedAt: true,
   createdAt: true,
+  supplier: { select: { id: true, name: true } },
+  vendorOrders: { select: { vendor: { select: { id: true, name: true } } } },
   driver: { select: { id: true, name: true, phone: true } },
   deliveryCompany: { select: { id: true, name: true } },
   settlement: { select: { id: true, ref: true, status: true } },
 } satisfies Prisma.OrderSelect;
 
-const deliveryStatusEnum = z.enum(['PENDING', 'ASSIGNED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'FAILED', 'CANCELLED']);
+const statusEnum = z.enum(ALL_STATUSES as [DeliveryStatus, ...DeliveryStatus[]]);
+const bucketEnum = z.enum(Object.keys(BUCKETS) as [keyof typeof BUCKETS, ...(keyof typeof BUCKETS)[]]);
+
+export const orderFilters = paginationSchema.extend({
+  deliveryStatus: statusEnum.optional(),
+  bucket: bucketEnum.optional(),
+  driverId: z.string().optional(),
+  deliveryCompanyId: z.string().optional(),
+  supplierId: z.string().optional(),
+  area: z.string().trim().max(100).optional(),
+  paymentMethod: z.enum(['COD', 'CASH', 'CLIQ', 'BANK_TRANSFER', 'CARD', 'OTHER']).optional(),
+  financialStatus: z.enum(['PAID', 'COD', 'PARTIAL_PAYMENT', 'PAYMENT_PENDING', 'COLLECTED', 'NOT_COLLECTED']).optional(),
+  codStatus: z.enum(['PENDING', 'COLLECTED', 'SETTLED']).optional(),
+  source: z.enum(['STORE', 'SUPPLIER', 'ADMIN']).optional(),
+  cod: z.enum(['true']).optional(),
+  q: z.string().trim().max(100).optional(),
+  from: optionalDate,
+  to: optionalDate,
+});
+
+/** شروط التصفية المشتركة (القائمة، الإحصائيات، التقارير) */
+export function orderWhere(q: z.infer<typeof orderFilters>): Prisma.OrderWhereInput {
+  const num = q.q && /^#?\d{1,7}$/.test(q.q) ? Number(q.q.replace('#', '')) : null;
+  const phone = q.q ? normalizePhone(q.q) : null;
+  const code = q.q && /^fg-ord-\d+$/i.test(q.q) ? q.q.toUpperCase() : null;
+  return {
+    deletedAt: null,
+    ...(q.deliveryStatus ? { deliveryStatus: q.deliveryStatus } : q.bucket ? { deliveryStatus: { in: BUCKETS[q.bucket] } } : {}),
+    ...(q.driverId ? { driverId: q.driverId } : {}),
+    ...(q.deliveryCompanyId ? { deliveryCompanyId: q.deliveryCompanyId } : {}),
+    ...(q.supplierId ? { OR: [{ supplierId: q.supplierId }, { vendorOrders: { some: { vendorId: q.supplierId } } }] } : {}),
+    ...(q.area ? { area: { contains: q.area, mode: 'insensitive' } } : {}),
+    ...(q.paymentMethod ? { paymentMethod: q.paymentMethod } : {}),
+    ...(q.financialStatus ? { financialStatus: q.financialStatus } : {}),
+    ...(q.codStatus ? { codStatus: q.codStatus } : {}),
+    ...(q.cod ? { codAmount: { gt: 0 } } : {}),
+    ...(q.source ? { source: q.source } : {}),
+    ...dateRange(q.from, q.to),
+    ...(q.q
+      ? {
+          AND: [
+            {
+              OR: [
+                { customerName: { contains: q.q, mode: 'insensitive' } },
+                ...(num ? [{ number: num }] : []),
+                ...(phone ? [{ phone }] : []),
+                ...(code ? [{ code }] : []),
+              ],
+            },
+          ],
+        }
+      : {}),
+  };
+}
 
 deliveryRouter.get(
   '/orders',
+  can('orders.view', 'collections.view'),
   asyncHandler(async (req, res) => {
-    const q = paginationSchema
-      .extend({
-        deliveryStatus: deliveryStatusEnum.optional(),
-        driverId: z.string().optional(),
-        deliveryCompanyId: z.string().optional(),
-        cod: z.enum(['true']).optional(),
-        codStatus: z.enum(['PENDING', 'COLLECTED', 'SETTLED']).optional(),
-        q: z.string().trim().max(100).optional(),
-        from: optionalDate,
-        to: optionalDate,
-      })
-      .parse(req.query);
-    const num = q.q && /^#?\d{1,7}$/.test(q.q) ? Number(q.q.replace('#', '')) : null;
-    const phone = q.q ? normalizePhone(q.q) : null;
-    const where: Prisma.OrderWhereInput = {
-      deletedAt: null,
-      ...(q.deliveryStatus ? { deliveryStatus: q.deliveryStatus } : {}),
-      ...(q.driverId ? { driverId: q.driverId } : {}),
-      ...(q.deliveryCompanyId ? { deliveryCompanyId: q.deliveryCompanyId } : {}),
-      ...(q.cod ? { paymentMethod: 'COD' } : {}),
-      ...(q.codStatus ? { codStatus: q.codStatus } : {}),
-      ...dateRange(q.from, q.to),
-      ...(q.q
-        ? { OR: [{ customerName: { contains: q.q, mode: 'insensitive' } }, ...(num ? [{ number: num }] : []), ...(phone ? [{ phone }] : [])] }
-        : {}),
-    };
+    const q = orderFilters.parse(req.query);
+    const where = orderWhere(q);
     const [items, total] = await Promise.all([
-      prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: deliveryOrderSelect, ...pageArgs(q) }),
+      prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: listSelect, ...pageArgs(q) }),
       prisma.order.count({ where }),
     ]);
     ok(res, paged(items, total, q));
   }),
 );
 
-const OPEN: DeliveryStatus[] = ['PENDING', 'ASSIGNED', 'PREPARING', 'OUT_FOR_DELIVERY'];
+/** الموردون للتصفية ونموذج إنشاء الطلب (اسم ومعرّف فقط) */
+deliveryRouter.get(
+  '/suppliers',
+  can('orders.view'),
+  asyncHandler(async (_req, res) => {
+    ok(res, await prisma.vendor.findMany({ where: { active: true }, orderBy: [{ isHouse: 'desc' }, { name: 'asc' }], select: { id: true, name: true, isHouse: true, pickupAddress: true, phone: true } }));
+  }),
+);
 
-/**
- * تحديث التوصيل لطلب:
- * - إسناد سائق أو شركة توصيل (يحوّل "بانتظار الإسناد" إلى "مُسند")
- * - "تم التسليم": يسجّل النقد المحصّل (افتراضيًا مبلغ الدفع عند الاستلام) ويكمل الطلب
- * - بعد تسوية النقد لا يتغير التسليم ولا المبلغ المحصّل
- */
+deliveryRouter.get(
+  '/orders/:id',
+  can('orders.view', 'collections.view'),
+  asyncHandler(async (req, res) => {
+    const o = await prisma.order.findFirst({ where: { id: req.params.id, deletedAt: null }, include: orderDetailInclude });
+    if (!o) throw notFound('الطلب غير موجود');
+    ok(res, o);
+  }),
+);
+
+/** إنشاء طلب توصيل من الإدارة (باسم مورد) */
+deliveryRouter.post(
+  '/orders',
+  can('orders.manage'),
+  asyncHandler(async (req, res) => {
+    const input = deliveryOrderInput.extend({ supplierId: z.string().min(1, 'اختر المورد'), driverId: z.string().min(1).nullable().optional() }).parse(req.body);
+    const canAmounts = req.auth!.perms.includes('orders.editAmounts');
+    const actor = userActor(req);
+    const order = await prisma.$transaction(async (tx) => {
+      const o = await createDeliveryOrder(tx, input.supplierId, { ...input, deliveryFee: canAmounts ? input.deliveryFee ?? 0 : 0 }, 'ADMIN', actor);
+      if (input.driverId && req.auth!.perms.includes('orders.assign')) await assignDriver(tx, o.id, input.driverId, actor);
+      return o;
+    });
+    liveUpdate(order.id, `طلب توصيل جديد ${order.code}`);
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'create', entity: 'order', entityId: order.id, meta: { code: order.code, source: 'ADMIN' } });
+    ok(res, order, 201);
+  }),
+);
+
+/** تعديل بيانات التوصيل. المبالغ (أجرة التوصيل، الخصم، من يدفع الأجرة) تتطلب orders.editAmounts */
 deliveryRouter.patch(
   '/orders/:id',
+  can('orders.manage', 'orders.assign'),
   asyncHandler(async (req, res) => {
     const input = z
       .object({
-        driverId: z.string().min(1).nullable().optional(),
-        deliveryCompanyId: z.string().min(1).nullable().optional(),
-        deliveryStatus: deliveryStatusEnum.optional(),
-        deliveryFee: money.optional(),
+        address: z.string().trim().min(5).max(300).optional(),
+        area: optStr(100),
+        deliveryLat: z.number().min(-90).max(90).nullable().optional(),
+        deliveryLng: z.number().min(-180).max(180).nullable().optional(),
+        pickupAddress: optStr(300),
+        pickupPhone: optStr(30),
+        pickupLat: z.number().min(-90).max(90).nullable().optional(),
+        pickupLng: z.number().min(-180).max(180).nullable().optional(),
         deliveryNote: optStr(1000),
-        codCollected: money.optional(),
+        deliveryCompanyId: z.string().min(1).nullable().optional(),
+        deliveryFee: money.optional(),
+        customerPaysFee: z.boolean().optional(),
       })
       .parse(req.body);
-    const order = await prisma.order.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { vendorOrders: { include: { items: true } } } });
+    const order = await prisma.order.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!order) throw notFound('الطلب غير موجود');
-    if (order.codStatus === 'SETTLED' && (input.codCollected !== undefined || (input.deliveryStatus && input.deliveryStatus !== 'DELIVERED'))) {
-      throw conflict('تمت تسوية نقد هذا الطلب. ألغِ التسوية أولًا إن لزم التعديل.');
-    }
-    if (input.driverId && !(await prisma.driver.findFirst({ where: { id: input.driverId, status: 'ACTIVE' } }))) throw badRequest('السائق غير موجود أو غير فعّال');
+    const amounts = input.deliveryFee !== undefined || input.customerPaysFee !== undefined;
+    if (amounts && !req.auth!.perms.includes('orders.editAmounts')) throw badRequest('تعديل المبالغ يتطلب صلاحية تعديل المبالغ');
+    if (amounts && (order.codStatus === 'COLLECTED' || order.codStatus === 'SETTLED')) throw conflict('تم تحصيل المبلغ، لا يمكن تعديل أجرة التوصيل');
+    const details = ['address', 'area', 'deliveryLat', 'deliveryLng', 'pickupAddress', 'pickupPhone', 'pickupLat', 'pickupLng', 'deliveryNote'].some((k) => k in input);
+    if (details && !req.auth!.perms.includes('orders.manage')) throw badRequest('تعديل بيانات الطلب يتطلب صلاحية إدارة الطلبات');
     let company = null;
     if (input.deliveryCompanyId) {
       company = await prisma.deliveryCompany.findFirst({ where: { id: input.deliveryCompanyId, active: true } });
       if (!company) throw badRequest('شركة التوصيل غير موجودة أو غير فعّالة');
     }
-
-    const assigning = Boolean(input.driverId || input.deliveryCompanyId);
-    let next = input.deliveryStatus ?? (assigning && order.deliveryStatus === 'PENDING' ? 'ASSIGNED' : order.deliveryStatus);
-    if (next === 'DELIVERED' && order.status === 'CANCELLED') throw badRequest('الطلب ملغي ولا يمكن تسليمه');
-    const willHaveCarrier = (input.driverId !== undefined ? input.driverId : order.driverId) || (input.deliveryCompanyId !== undefined ? input.deliveryCompanyId : order.deliveryCompanyId);
-    if (['OUT_FOR_DELIVERY', 'DELIVERED'].includes(next) && !willHaveCarrier) throw badRequest('أسند الطلب لسائق أو شركة توصيل أولًا');
-    if (input.codCollected !== undefined && order.paymentMethod !== 'COD') throw badRequest('الطلب ليس دفعًا عند الاستلام');
-    if (input.codCollected !== undefined && next !== 'DELIVERED') throw badRequest('يُسجَّل المبلغ المحصّل عند التسليم');
-    if (!input.deliveryStatus && !assigning && input.driverId === null && input.deliveryCompanyId === null && OPEN.includes(order.deliveryStatus)) next = 'PENDING';
-
-    const isCod = order.paymentMethod === 'COD';
-    const becameDelivered = next === 'DELIVERED' && order.deliveryStatus !== 'DELIVERED';
-    const leftDelivered = next !== 'DELIVERED' && order.deliveryStatus === 'DELIVERED';
-
-    const data: Prisma.OrderUncheckedUpdateInput = {
-      ...(input.driverId !== undefined ? { driverId: input.driverId } : {}),
-      ...(input.deliveryCompanyId !== undefined ? { deliveryCompanyId: input.deliveryCompanyId } : {}),
-      ...(input.deliveryNote !== undefined ? { deliveryNote: input.deliveryNote } : {}),
-      ...(input.deliveryFee !== undefined
-        ? { deliveryFee: new Prisma.Decimal(input.deliveryFee) }
-        : company && toNum(order.deliveryFee) === 0
-          ? { deliveryFee: company.defaultFee }
-          : {}),
-      deliveryStatus: next,
-    };
-    if (becameDelivered) {
-      data.deliveredAt = new Date();
-      if (isCod) {
-        data.codCollected = new Prisma.Decimal(input.codCollected ?? toNum(order.codAmount ?? order.total));
-        data.codStatus = 'COLLECTED';
-        data.codCollectedAt = new Date();
-      }
-    } else if (next === 'DELIVERED' && isCod && input.codCollected !== undefined) {
-      // تصحيح المبلغ المحصّل قبل التسوية — يُسجَّل في السجل بالقيمة القديمة والجديدة
-      data.codCollected = new Prisma.Decimal(input.codCollected);
-    }
-    if (leftDelivered) {
-      data.deliveredAt = null;
-      if (isCod) Object.assign(data, { codCollected: null, codCollectedAt: null, codStatus: 'PENDING' });
-    }
-
+    const { deliveryFee, ...rest } = input;
     const updated = await prisma.$transaction(async (tx) => {
-      const u = await tx.order.update({ where: { id: order.id }, data, select: deliveryOrderSelect });
-      // التسليم يكمل الطلب عبر نفس مسار الحالات الحالي (الطلبات الفرعية غير الملغاة فقط)
-      if (becameDelivered) {
-        for (const vo of order.vendorOrders) {
-          if (vo.status !== 'CANCELLED' && vo.status !== 'COMPLETED' && !vo.payoutId) await setVendorOrderStatus(tx, vo, 'COMPLETED');
-        }
-        await syncOrderStatus(tx, order.id);
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          ...rest,
+          ...(deliveryFee !== undefined ? { deliveryFee: new Prisma.Decimal(deliveryFee) } : company && toNum(order.deliveryFee) === 0 ? { deliveryFee: company.defaultFee } : {}),
+          ...(input.deliveryCompanyId ? { driverId: null, deliveryStatus: ['NEW', 'ACCEPTED'].includes(order.deliveryStatus) ? 'PICKUP_ASSIGNED' : order.deliveryStatus } : {}),
+        },
+      });
+      const o = await refreshFinance(tx, order.id);
+      // موظف التوصيل المسند يُبلَّغ بأي تعديل على الطلب
+      if (order.driverId) {
+        const d = await tx.driver.findUnique({ where: { id: order.driverId }, select: { userId: true } });
+        if (d?.userId) await notify(tx, [{ type: 'USER', userId: d.userId }], { title: `تعديل على الطلب ${order.code}`, body: 'راجع تفاصيل الطلب (العنوان أو المبالغ أو الملاحظات).', orderId: order.id });
       }
-      return u;
+      return o;
     });
     await audit({
       actorId: req.auth!.sub,
       actorType: 'admin',
-      action: 'delivery',
+      action: 'update',
       entity: 'order',
       entityId: order.id,
-      meta: JSON.parse(
-        JSON.stringify({
-          deliveryStatus: [order.deliveryStatus, next],
-          driverId: input.driverId,
-          deliveryCompanyId: input.deliveryCompanyId,
-          ...(data.codCollected !== undefined ? { codCollected: [order.codCollected?.toString() ?? null, data.codCollected?.toString() ?? null] } : {}),
-        }),
-      ),
+      meta: JSON.parse(JSON.stringify({ ...input, ...(deliveryFee !== undefined ? { deliveryFee: [order.deliveryFee.toString(), deliveryFee] } : {}) })),
     });
+    liveUpdate(order.id, `تعديل ${order.code}`);
     ok(res, updated);
   }),
 );
+
+deliveryRouter.post(
+  '/orders/:id/assign',
+  can('orders.assign'),
+  asyncHandler(async (req, res) => {
+    const { driverId, note } = z.object({ driverId: z.string().min(1).nullable(), note: optStr(300) }).parse(req.body);
+    const o = await prisma.$transaction((tx) => assignDriver(tx, req.params.id, driverId, userActor(req), note));
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'assign', entity: 'order', entityId: o.id, meta: { driverId } });
+    liveUpdate(o.id, `إسناد ${o.code}`);
+    ok(res, o);
+  }),
+);
+
+/** إسناد عدة طلبات دفعة واحدة */
+deliveryRouter.post(
+  '/orders/assign-bulk',
+  can('orders.assign'),
+  asyncHandler(async (req, res) => {
+    const { orderIds, driverId } = z.object({ orderIds: z.array(z.string().min(1)).min(1).max(100), driverId: z.string().min(1) }).parse(req.body);
+    const actor = userActor(req);
+    const results: { id: string; ok: boolean; error?: string }[] = [];
+    for (const id of orderIds) {
+      try {
+        await prisma.$transaction((tx) => assignDriver(tx, id, driverId, actor));
+        results.push({ id, ok: true });
+      } catch (e) {
+        results.push({ id, ok: false, error: e instanceof Error ? e.message : 'خطأ' });
+      }
+    }
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'assign_bulk', entity: 'order', meta: { driverId, count: results.filter((r) => r.ok).length } });
+    liveUpdate(driverId, 'إسناد طلبات');
+    ok(res, results);
+  }),
+);
+
+deliveryRouter.post(
+  '/orders/:id/status',
+  can('orders.manage'),
+  asyncHandler(async (req, res) => {
+    const { status, note } = z.object({ status: statusEnum, note: optStr(500) }).parse(req.body);
+    const o = await prisma.$transaction((tx) => transition(tx, req.params.id, status, userActor(req), { note }));
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'status', entity: 'order', entityId: o.id, meta: { status } });
+    liveUpdate(o.id, `${o.code}: ${status}`);
+    ok(res, o);
+  }),
+);
+
+/** تسجيل أو تصحيح التحصيل من الإدارة (قبل التسوية) */
+deliveryRouter.post(
+  '/orders/:id/collect',
+  can('orders.manage'),
+  asyncHandler(async (req, res) => {
+    const { amount, method } = z.object({ amount: money, method: z.enum(['CASH', 'CLIQ', 'CARD', 'BANK_TRANSFER', 'OTHER']).default('CASH') }).parse(req.body);
+    const before = await prisma.order.findUnique({ where: { id: req.params.id }, select: { codCollected: true } });
+    const o = await prisma.$transaction((tx) => collectPayment(tx, req.params.id, userActor(req), amount, method));
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'collect', entity: 'order', entityId: o.id, meta: { codCollected: [before?.codCollected?.toString() ?? null, amount], method } });
+    ok(res, o);
+  }),
+);
+
+/** تعديل إثبات التسليم — بصلاحية proofs.edit فقط، ويُسجَّل التعديل */
+deliveryRouter.patch(
+  '/orders/:id/proof',
+  can('proofs.edit'),
+  asyncHandler(async (req, res) => {
+    const input = z.object({ recipientName: z.string().trim().min(2).max(100).optional(), note: optStr(500) }).parse(req.body);
+    const proof = await prisma.deliveryProof.findUnique({ where: { orderId: req.params.id } });
+    if (!proof) throw notFound('لا يوجد إثبات تسليم لهذا الطلب');
+    const updated = await prisma.deliveryProof.update({ where: { id: proof.id }, data: { ...input, editedAt: new Date() } });
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'proof_edit', entity: 'order', entityId: req.params.id, meta: { before: { recipientName: proof.recipientName, note: proof.note }, after: input } });
+    ok(res, updated);
+  }),
+);
+
+// ───────────── لوحة الإحصائيات ─────────────
+
+deliveryRouter.get(
+  '/stats',
+  can('dashboard.view', 'orders.view'),
+  asyncHandler(async (req, res) => {
+    const q = orderFilters.omit({ deliveryStatus: true, bucket: true }).parse(req.query);
+    const where = orderWhere(q);
+    const [byStatus, money, drivers] = await Promise.all([
+      prisma.order.groupBy({ by: ['deliveryStatus'], where, _count: { _all: true } }),
+      prisma.order.aggregate({ where: { ...where, deliveryStatus: { not: 'CANCELLED' }, codAmount: { gt: 0 } }, _sum: { codAmount: true, codCollected: true } }),
+      driverPerformance(where),
+    ]);
+    const count = (list: DeliveryStatus[]) => byStatus.filter((r) => list.includes(r.deliveryStatus)).reduce((n, r) => n + (r._count as { _all: number })._all, 0);
+    const collected = round3(toNum(money._sum.codCollected));
+    ok(res, {
+      total: byStatus.reduce((n, r) => n + (r._count as { _all: number })._all, 0),
+      buckets: Object.fromEntries(Object.entries(BUCKETS).map(([k, list]) => [k, count(list)])),
+      byStatus: Object.fromEntries(byStatus.map((r) => [r.deliveryStatus, (r._count as { _all: number })._all])),
+      collected,
+      uncollected: round3(Math.max(0, toNum(money._sum.codAmount) - collected)),
+      drivers,
+    });
+  }),
+);
+
+/** أداء موظفي التوصيل ضمن نفس التصفية */
+export async function driverPerformance(where: Prisma.OrderWhereInput) {
+  const scoped = { ...where, driverId: where.driverId ?? { not: null } } as Prisma.OrderWhereInput;
+  const [list, rows] = await Promise.all([
+    prisma.driver.findMany({ select: { id: true, name: true, status: true, userId: true } }),
+    prisma.order.findMany({ where: scoped, select: { driverId: true, deliveryStatus: true, pickedUpAt: true, deliveredAt: true, codCollected: true, deliveryFee: true } }),
+  ]);
+  const stats = new Map<string, { assigned: number; delivered: number; failed: number; active: number; cancelled: number; collected: number; fees: number; minutes: number[] }>();
+  for (const r of rows) {
+    if (!r.driverId) continue;
+    const s = stats.get(r.driverId) ?? { assigned: 0, delivered: 0, failed: 0, active: 0, cancelled: 0, collected: 0, fees: 0, minutes: [] };
+    s.assigned++;
+    if (DELIVERED_SET.includes(r.deliveryStatus)) {
+      s.delivered++;
+      s.fees += toNum(r.deliveryFee);
+      if (r.pickedUpAt && r.deliveredAt) s.minutes.push((r.deliveredAt.getTime() - r.pickedUpAt.getTime()) / 60000);
+    } else if (FAILURES.includes(r.deliveryStatus) || r.deliveryStatus === 'RESCHEDULED') s.failed++;
+    else if (r.deliveryStatus === 'CANCELLED') s.cancelled++;
+    else s.active++;
+    s.collected += toNum(r.codCollected);
+    stats.set(r.driverId, s);
+  }
+  return list
+    .filter((d) => stats.has(d.id) || d.status === 'ACTIVE')
+    .map((d) => {
+      const s = stats.get(d.id) ?? { assigned: 0, delivered: 0, failed: 0, active: 0, cancelled: 0, collected: 0, fees: 0, minutes: [] };
+      const done = s.delivered + s.failed;
+      return {
+        driverId: d.id,
+        name: d.name,
+        status: d.status,
+        hasAccount: Boolean(d.userId),
+        assigned: s.assigned,
+        delivered: s.delivered,
+        failed: s.failed,
+        active: s.active,
+        cancelled: s.cancelled,
+        successRate: done ? Math.round((s.delivered / done) * 100) : null,
+        avgMinutes: s.minutes.length ? Math.round(s.minutes.reduce((a, b) => a + b, 0) / s.minutes.length) : null,
+        collected: round3(s.collected),
+        fees: round3(s.fees),
+      };
+    })
+    .sort((a, b) => b.delivered - a.delivered || a.name.localeCompare(b.name));
+}
 
 // ───────────── النقد والتسويات ─────────────
 
@@ -327,6 +541,7 @@ export async function cashSummary(kind: 'driver' | 'company', id?: string) {
 
 deliveryRouter.get(
   '/settlements',
+  can('collections.view'),
   asyncHandler(async (req, res) => {
     const q = paginationSchema
       .extend({ driverId: z.string().optional(), deliveryCompanyId: z.string().optional(), status: z.enum(['CONFIRMED', 'VOIDED']).optional(), from: optionalDate, to: optionalDate })
@@ -361,6 +576,7 @@ deliveryRouter.get(
  */
 deliveryRouter.post(
   '/settlements',
+  can('collections.settle'),
   asyncHandler(async (req, res) => {
     const input = z
       .object({
@@ -402,6 +618,7 @@ deliveryRouter.post(
 /** إلغاء تسوية (لا حذف): تبقى في السجل، وتعود طلباتها "محصّلة" بانتظار تسوية جديدة */
 deliveryRouter.post(
   '/settlements/:id/void',
+  can('collections.settle'),
   asyncHandler(async (req, res) => {
     const { reason } = z.object({ reason: z.string().trim().min(3, 'اكتب سبب الإلغاء').max(500) }).parse(req.body);
     const s = await prisma.$transaction(async (tx) => {

@@ -126,8 +126,8 @@ async function operationsStats(dayStart: Date, dayEnd: Date, monthStart: Date) {
     const created = { deletedAt: null, createdAt: { gte: from, ...(to ? { lt: to } : {}) } } as const;
     const [orders, delivered, failed, cancelled, sales, codCollected, codPending, online, fees] = await Promise.all([
       prisma.order.count({ where: created }),
-      prisma.order.count({ where: { deletedAt: null, deliveryStatus: 'DELIVERED', deliveredAt: { gte: from, ...(to ? { lt: to } : {}) } } }),
-      prisma.order.count({ where: { ...created, deliveryStatus: 'FAILED' } }),
+      prisma.order.count({ where: { deletedAt: null, deliveryStatus: { in: ['DELIVERED', 'PAYMENT_COLLECTED', 'COMPLETED'] }, deliveredAt: { gte: from, ...(to ? { lt: to } : {}) } } }),
+      prisma.order.count({ where: { ...created, deliveryStatus: { in: ['DELIVERY_FAILED', 'CUSTOMER_NOT_AVAILABLE', 'CUSTOMER_REFUSED', 'WRONG_ADDRESS'] } } }),
       prisma.order.count({ where: { ...created, status: 'CANCELLED' } }),
       prisma.order.aggregate({ where: { ...created, status: { not: 'CANCELLED' } }, _sum: { total: true } }),
       prisma.order.aggregate({ where: { deletedAt: null, codStatus: { in: ['COLLECTED', 'SETTLED'] }, codCollectedAt: { gte: from, ...(to ? { lt: to } : {}) } }, _sum: { codCollected: true } }),

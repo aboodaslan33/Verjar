@@ -61,10 +61,13 @@ export async function setVendorOrderStatus(tx: Prisma.TransactionClient, vo: Ven
   if (vo.payoutId) throw conflict(`الطلب الفرعي #${vo.number} تمت تسويته مع المورد ولا يمكن تغيير حالته`);
   if (next === 'CANCELLED') {
     for (const it of vo.items) {
+      // بنود طلبات التوصيل التي كتبها المورد ليست من مخزون المتجر
+      if (!it.productId) continue;
       await tx.product.update({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
     }
   } else if (vo.status === 'CANCELLED') {
     for (const it of vo.items) {
+      if (!it.productId) continue;
       const r = await tx.product.updateMany({ where: { id: it.productId, stock: { gte: it.quantity } }, data: { stock: { decrement: it.quantity } } });
       if (r.count === 0) throw badRequest(`لا يكفي المخزون لإعادة تفعيل "${it.name}"`);
     }

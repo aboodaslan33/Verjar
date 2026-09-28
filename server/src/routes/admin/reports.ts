@@ -7,6 +7,10 @@ import { prisma } from '../../lib/prisma';
 import { ammanParts, ammanToUtc } from '../../lib/time';
 import { contractDisplayStatus, contractTotals } from '../../services/contracts.service';
 import { optionalDate, toCsv } from './shared';
+import ExcelJS from 'exceljs';
+import type { DeliveryStatus } from '@prisma/client';
+import { DELIVERED_SET, FAILURES, STATUS_AR } from '../../services/delivery.service';
+import { driverPerformance, orderFilters, orderWhere } from './delivery';
 
 /**
  * التقارير: كل تقرير يعيد أعمدة (بالعربية والإنجليزية) وصفوفًا وإجماليات،
@@ -17,7 +21,11 @@ export const reportsRouter = Router();
 type Col = { key: string; ar: string; en: string; money?: boolean };
 type Report = { columns: Col[]; rows: Record<string, unknown>[]; totals: Record<string, number> };
 
-const KINDS = ['sales', 'orders', 'delivery', 'cod', 'settlements', 'contracts', 'annual', 'pest', 'tenders', 'commissions'] as const;
+const KINDS = [
+  'sales', 'orders', 'delivery', 'cod', 'settlements', 'contracts', 'annual', 'pest', 'tenders', 'commissions',
+  // نظام إدارة التوصيل
+  'dm_orders', 'dm_delivered', 'dm_failed', 'dm_collections', 'dm_drivers', 'dm_suppliers', 'dm_customers', 'dm_fees',
+] as const;
 type Kind = (typeof KINDS)[number];
 
 const c = (key: string, ar: string, en: string, money = false): Col => ({ key, ar, en, money });
@@ -29,7 +37,10 @@ function range(from?: string, to?: string) {
   return { ...(from ? { gte: ammanToUtc(from, '00:00') } : {}), ...(to ? { lte: ammanToUtc(to, '23:59') } : {}) };
 }
 
-async function build(kind: Kind, q: { from?: string; to?: string; status?: string }): Promise<Report> {
+type Query = { from?: string; to?: string; status?: string; supplierId?: string; driverId?: string; area?: string; paymentMethod?: string; customer?: string };
+
+async function build(kind: Kind, q: Query): Promise<Report> {
+  if (kind.startsWith('dm_')) return buildDelivery(kind, q);
   const r = range(q.from, q.to);
   const orderWhere: Prisma.OrderWhereInput = { deletedAt: null, ...(r ? { createdAt: r } : {}) };
 
@@ -81,8 +92,8 @@ async function build(kind: Kind, q: { from?: string; to?: string; status?: strin
         const carrier = o.driver?.name ?? o.deliveryCompany?.name ?? '—';
         const row = map.get(carrier) ?? { carrier, total: 0, delivered: 0, failed: 0, cancelled: 0, open: 0, fees: 0 };
         (row.total as number)++;
-        if (o.deliveryStatus === 'DELIVERED') (row.delivered as number)++;
-        else if (o.deliveryStatus === 'FAILED') (row.failed as number)++;
+        if (DELIVERED_SET.includes(o.deliveryStatus)) (row.delivered as number)++;
+        else if (['DELIVERY_FAILED', 'CUSTOMER_NOT_AVAILABLE', 'CUSTOMER_REFUSED', 'WRONG_ADDRESS', 'RESCHEDULED'].includes(o.deliveryStatus)) (row.failed as number)++;
         else if (o.deliveryStatus === 'CANCELLED') (row.cancelled as number)++;
         else (row.open as number)++;
         row.fees = round3((row.fees as number) + toNum(o.deliveryFee));
@@ -232,6 +243,7 @@ async function build(kind: Kind, q: { from?: string; to?: string; status?: strin
       };
     }
   }
+  throw new Error(`unknown report ${kind}`);
 }
 
 reportsRouter.get(
@@ -239,9 +251,27 @@ reportsRouter.get(
   asyncHandler(async (req, res) => {
     const kind = z.enum(KINDS).parse(req.params.kind);
     const q = z
-      .object({ from: optionalDate, to: optionalDate, status: z.string().max(30).optional(), format: z.enum(['json', 'csv']).default('json'), lang: z.enum(['ar', 'en']).default('ar') })
+      .object({
+        from: optionalDate,
+        to: optionalDate,
+        status: z.string().max(30).optional(),
+        supplierId: z.string().max(40).optional(),
+        driverId: z.string().max(40).optional(),
+        area: z.string().trim().max(100).optional(),
+        paymentMethod: z.string().max(20).optional(),
+        customer: z.string().trim().max(100).optional(),
+        format: z.enum(['json', 'csv', 'xlsx']).default('json'),
+        lang: z.enum(['ar', 'en']).default('ar'),
+      })
       .parse(req.query);
     const report = await build(kind, q);
+    if (q.format === 'xlsx') {
+      const buf = await toXlsx(report, q.lang, kind);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="farja-group-${kind}-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+      res.send(buf);
+      return;
+    }
     if (q.format === 'csv') {
       const csv = toCsv(report.columns.map((col) => col[q.lang]), report.rows.map((row) => report.columns.map((col) => row[col.key])));
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -252,3 +282,235 @@ reportsRouter.get(
     ok(res, report);
   }),
 );
+
+// ───────────── تقارير نظام التوصيل ─────────────
+
+const FAILED_SET: DeliveryStatus[] = [...FAILURES, 'RESCHEDULED'];
+const PAY_AR: Record<string, string> = { COD: 'عند الاستلام', CASH: 'نقدًا', CLIQ: 'CliQ', BANK_TRANSFER: 'تحويل بنكي', CARD: 'بطاقة', OTHER: 'أخرى' };
+const SOURCE_AR: Record<string, string> = { STORE: 'المتجر', SUPPLIER: 'المورد', ADMIN: 'الإدارة' };
+const minutesBetween = (a: Date | null, b: Date | null) => (a && b ? Math.round((b.getTime() - a.getTime()) / 60000) : '');
+const dt = (d: Date | null) => (d ? `${day(d)} ${ammanParts(d).time}` : '');
+
+async function buildDelivery(kind: Kind, q: Query): Promise<Report> {
+  const filters = orderFilters.parse({
+    from: q.from,
+    to: q.to,
+    supplierId: q.supplierId,
+    driverId: q.driverId,
+    area: q.area,
+    paymentMethod: q.paymentMethod || undefined,
+    q: q.customer,
+    ...(q.status ? { deliveryStatus: q.status } : {}),
+  });
+  const where = orderWhere(filters);
+  const base = {
+    code: true,
+    number: true,
+    createdAt: true,
+    source: true,
+    customerName: true,
+    customerId: true,
+    phone: true,
+    area: true,
+    deliveryStatus: true,
+    paymentMethod: true,
+    financialStatus: true,
+    total: true,
+    subtotal: true,
+    discountTotal: true,
+    deliveryFee: true,
+    codAmount: true,
+    codCollected: true,
+    codCollectedAt: true,
+    collectedMethod: true,
+    codStatus: true,
+    pickedUpAt: true,
+    deliveredAt: true,
+    supplier: { select: { id: true, name: true } },
+    vendorOrders: { select: { vendor: { select: { id: true, name: true } } } },
+    driver: { select: { name: true } },
+    settlement: { select: { ref: true } },
+    proof: { select: { recipientName: true } },
+  } as const;
+  const supplierOf = (o: { supplier: { id: string; name: string } | null; vendorOrders: { vendor: { id: string; name: string } }[] }) =>
+    o.supplier ?? o.vendorOrders[0]?.vendor ?? null;
+  const code = (o: { code: string | null; number: number }) => o.code ?? `#${o.number}`;
+
+  switch (kind) {
+    case 'dm_orders': {
+      const orders = await prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: base, take: 5000 });
+      const rows = orders.map((o) => ({
+        code: code(o),
+        createdAt: dt(o.createdAt),
+        source: SOURCE_AR[o.source] ?? o.source,
+        supplier: supplierOf(o)?.name ?? '',
+        customer: o.customerName,
+        phone: o.phone,
+        area: o.area ?? '',
+        driver: o.driver?.name ?? '',
+        status: o.deliveryStatus,
+        payment: o.paymentMethod ? PAY_AR[o.paymentMethod] ?? o.paymentMethod : '',
+        products: toNum(o.total),
+        fee: toNum(o.deliveryFee),
+        discount: toNum(o.discountTotal),
+        due: toNum(o.codAmount),
+        collected: toNum(o.codCollected),
+        financial: o.financialStatus ?? '',
+      }));
+      return {
+        columns: [c('code', 'رقم الطلب', 'Order ID'), c('createdAt', 'التاريخ', 'Created'), c('source', 'المصدر', 'Source'), c('supplier', 'المورد', 'Supplier'), c('customer', 'العميل', 'Customer'), c('phone', 'الهاتف', 'Phone'), c('area', 'المنطقة', 'Area'), c('driver', 'موظف التوصيل', 'Driver'), c('status', 'الحالة', 'Status'), c('payment', 'الدفع', 'Payment'), c('products', 'قيمة المنتجات', 'Products', true), c('fee', 'أجرة التوصيل', 'Delivery fee', true), c('discount', 'الخصم', 'Discount', true), c('due', 'المطلوب تحصيله', 'To collect', true), c('collected', 'المحصّل', 'Collected', true), c('financial', 'الحالة المالية', 'Financial status')],
+        rows,
+        totals: { count: rows.length, products: sum(rows, 'products'), fee: sum(rows, 'fee'), due: sum(rows, 'due'), collected: sum(rows, 'collected') },
+      };
+    }
+    case 'dm_delivered': {
+      const orders = await prisma.order.findMany({ where: { ...where, deliveryStatus: { in: DELIVERED_SET } }, orderBy: { deliveredAt: 'desc' }, select: base, take: 5000 });
+      const rows = orders.map((o) => ({
+        code: code(o),
+        supplier: supplierOf(o)?.name ?? '',
+        customer: o.customerName,
+        area: o.area ?? '',
+        driver: o.driver?.name ?? '',
+        pickedUpAt: dt(o.pickedUpAt),
+        deliveredAt: dt(o.deliveredAt),
+        minutes: minutesBetween(o.pickedUpAt, o.deliveredAt),
+        recipient: o.proof?.recipientName ?? '',
+        collected: toNum(o.codCollected),
+        status: o.deliveryStatus,
+      }));
+      return {
+        columns: [c('code', 'رقم الطلب', 'Order ID'), c('supplier', 'المورد', 'Supplier'), c('customer', 'العميل', 'Customer'), c('area', 'المنطقة', 'Area'), c('driver', 'موظف التوصيل', 'Driver'), c('pickedUpAt', 'وقت الاستلام', 'Picked up'), c('deliveredAt', 'وقت التسليم', 'Delivered'), c('minutes', 'المدة (دقيقة)', 'Minutes'), c('recipient', 'المستلم', 'Recipient'), c('collected', 'المحصّل', 'Collected', true), c('status', 'الحالة', 'Status')],
+        rows,
+        totals: { count: rows.length, collected: sum(rows, 'collected') },
+      };
+    }
+    case 'dm_failed': {
+      const orders = await prisma.order.findMany({
+        where: { ...where, deliveryStatus: q.status ? where.deliveryStatus : { in: FAILED_SET } },
+        orderBy: { updatedAt: 'desc' },
+        select: { ...base, updatedAt: true, statusEvents: { where: { toStatus: { in: FAILED_SET } }, orderBy: { createdAt: 'desc' }, take: 1, select: { note: true, actorName: true, createdAt: true } } },
+        take: 5000,
+      });
+      const rows = orders.map((o) => ({
+        code: code(o),
+        supplier: supplierOf(o)?.name ?? '',
+        customer: o.customerName,
+        phone: o.phone,
+        area: o.area ?? '',
+        driver: o.driver?.name ?? '',
+        status: o.deliveryStatus,
+        reason: o.statusEvents[0]?.note ?? '',
+        at: dt(o.statusEvents[0]?.createdAt ?? o.updatedAt),
+      }));
+      return {
+        columns: [c('code', 'رقم الطلب', 'Order ID'), c('supplier', 'المورد', 'Supplier'), c('customer', 'العميل', 'Customer'), c('phone', 'الهاتف', 'Phone'), c('area', 'المنطقة', 'Area'), c('driver', 'موظف التوصيل', 'Driver'), c('status', 'الحالة', 'Status'), c('reason', 'السبب', 'Reason'), c('at', 'التاريخ', 'Date')],
+        rows,
+        totals: { count: rows.length },
+      };
+    }
+    case 'dm_collections': {
+      const orders = await prisma.order.findMany({ where: { ...where, codAmount: { gt: 0 }, deliveryStatus: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, select: base, take: 5000 });
+      const rows = orders.map((o) => ({
+        code: code(o),
+        customer: o.customerName,
+        driver: o.driver?.name ?? '',
+        status: o.deliveryStatus,
+        due: toNum(o.codAmount),
+        collected: toNum(o.codCollected),
+        remaining: round3(Math.max(0, toNum(o.codAmount) - toNum(o.codCollected))),
+        method: o.collectedMethod ? PAY_AR[o.collectedMethod] ?? o.collectedMethod : '',
+        collectedAt: dt(o.codCollectedAt),
+        codStatus: o.codStatus ?? '',
+        settlement: o.settlement?.ref ?? '',
+      }));
+      return {
+        columns: [c('code', 'رقم الطلب', 'Order ID'), c('customer', 'العميل', 'Customer'), c('driver', 'موظف التوصيل', 'Driver'), c('status', 'الحالة', 'Status'), c('due', 'المطلوب', 'Due', true), c('collected', 'المحصّل', 'Collected', true), c('remaining', 'غير المحصّل', 'Uncollected', true), c('method', 'طريقة التحصيل', 'Method'), c('collectedAt', 'وقت التحصيل', 'Collected at'), c('codStatus', 'التحصيل', 'Collection'), c('settlement', 'التسوية', 'Settlement')],
+        rows,
+        totals: { count: rows.length, due: sum(rows, 'due'), collected: sum(rows, 'collected'), remaining: sum(rows, 'remaining') },
+      };
+    }
+    case 'dm_drivers': {
+      const rows = await driverPerformance(where);
+      return {
+        columns: [c('name', 'موظف التوصيل', 'Driver'), c('assigned', 'المسندة', 'Assigned'), c('delivered', 'المسلّمة', 'Delivered'), c('failed', 'المتعثرة', 'Failed'), c('active', 'الجارية', 'Active'), c('cancelled', 'الملغاة', 'Cancelled'), c('successRate', 'نسبة النجاح %', 'Success %'), c('avgMinutes', 'متوسط مدة التوصيل (دقيقة)', 'Avg minutes'), c('collected', 'المحصّل', 'Collected', true), c('fees', 'أجور التوصيل', 'Delivery fees', true)],
+        rows: rows as unknown as Record<string, unknown>[],
+        totals: { assigned: rows.reduce((n, r) => n + r.assigned, 0), delivered: rows.reduce((n, r) => n + r.delivered, 0), failed: rows.reduce((n, r) => n + r.failed, 0), collected: round3(rows.reduce((n, r) => n + r.collected, 0)), fees: round3(rows.reduce((n, r) => n + r.fees, 0)) },
+      };
+    }
+    case 'dm_suppliers':
+    case 'dm_customers': {
+      const orders = await prisma.order.findMany({ where, select: base, take: 20000 });
+      const map = new Map<string, { name: string; orders: number; delivered: number; failed: number; cancelled: number; value: number; fees: number; collected: number; last: Date | null }>();
+      for (const o of orders) {
+        const key = kind === 'dm_suppliers' ? supplierOf(o)?.id ?? '—' : o.customerId;
+        const name = kind === 'dm_suppliers' ? supplierOf(o)?.name ?? '—' : `${o.customerName} (${o.phone})`;
+        const r = map.get(key) ?? { name, orders: 0, delivered: 0, failed: 0, cancelled: 0, value: 0, fees: 0, collected: 0, last: null };
+        r.orders++;
+        if (DELIVERED_SET.includes(o.deliveryStatus)) r.delivered++;
+        else if (FAILED_SET.includes(o.deliveryStatus)) r.failed++;
+        else if (o.deliveryStatus === 'CANCELLED') r.cancelled++;
+        if (o.deliveryStatus !== 'CANCELLED') {
+          r.value = round3(r.value + toNum(o.total));
+          r.fees = round3(r.fees + toNum(o.deliveryFee));
+        }
+        r.collected = round3(r.collected + toNum(o.codCollected));
+        if (!r.last || o.createdAt > r.last) r.last = o.createdAt;
+        map.set(key, r);
+      }
+      const rows = [...map.values()].sort((a, b) => b.orders - a.orders).map((r) => ({ ...r, last: r.last ? day(r.last) : '' }));
+      return {
+        columns: [c('name', kind === 'dm_suppliers' ? 'المورد' : 'العميل', kind === 'dm_suppliers' ? 'Supplier' : 'Customer'), c('orders', 'الطلبات', 'Orders'), c('delivered', 'المسلّمة', 'Delivered'), c('failed', 'المتعثرة', 'Failed'), c('cancelled', 'الملغاة', 'Cancelled'), c('value', 'قيمة المنتجات', 'Products value', true), c('fees', 'أجور التوصيل', 'Delivery fees', true), c('collected', 'المحصّل', 'Collected', true), c('last', 'آخر طلب', 'Last order')],
+        rows,
+        totals: { count: rows.length, orders: sum(rows, 'orders'), value: sum(rows, 'value'), fees: sum(rows, 'fees'), collected: sum(rows, 'collected') },
+      };
+    }
+    case 'dm_fees': {
+      // إيراد أجور التوصيل: الطلبات المسلّمة حسب يوم التسليم
+      const orders = await prisma.order.findMany({
+        where: { ...where, ...(q.from || q.to ? { createdAt: undefined, deliveredAt: range(q.from, q.to) } : {}), deliveryStatus: { in: DELIVERED_SET } },
+        select: { deliveredAt: true, deliveryFee: true, customerPaysFee: true },
+      });
+      const byDay = new Map<string, { date: string; orders: number; fees: number; byCustomer: number; bySupplier: number }>();
+      for (const o of orders) {
+        if (!o.deliveredAt) continue;
+        const k = day(o.deliveredAt);
+        const r = byDay.get(k) ?? { date: k, orders: 0, fees: 0, byCustomer: 0, bySupplier: 0 };
+        r.orders++;
+        r.fees = round3(r.fees + toNum(o.deliveryFee));
+        if (o.customerPaysFee) r.byCustomer = round3(r.byCustomer + toNum(o.deliveryFee));
+        else r.bySupplier = round3(r.bySupplier + toNum(o.deliveryFee));
+        byDay.set(k, r);
+      }
+      const rows = [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date));
+      return {
+        columns: [c('date', 'اليوم', 'Date'), c('orders', 'الطلبات المسلّمة', 'Delivered orders'), c('fees', 'أجور التوصيل', 'Delivery fees', true), c('byCustomer', 'يدفعها العميل', 'Paid by customer', true), c('bySupplier', 'يدفعها المورد', 'Paid by supplier', true)],
+        rows,
+        totals: { orders: sum(rows, 'orders'), fees: sum(rows, 'fees'), byCustomer: sum(rows, 'byCustomer'), bySupplier: sum(rows, 'bySupplier') },
+      };
+    }
+    default:
+      throw new Error(`unknown report ${kind}`);
+  }
+}
+
+/** ملف Excel حقيقي (.xlsx): اتجاه الورقة حسب اللغة، عناوين عريضة، أعمدة المبالغ بصيغة 0.000، وصف الإجماليات */
+async function toXlsx(report: Report, lang: 'ar' | 'en', kind: string) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Farja Group';
+  const ws = wb.addWorksheet(kind.slice(0, 31), { views: [{ rightToLeft: lang === 'ar', state: 'frozen', ySplit: 1 }] });
+  ws.columns = report.columns.map((col) => ({ header: col[lang], key: col.key, width: Math.max(12, col[lang].length + 4), style: col.money ? { numFmt: '0.000' } : {} }));
+  ws.getRow(1).font = { bold: true };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+  const statusLabel = (v: unknown) => (lang === 'ar' && typeof v === 'string' && v in STATUS_AR ? STATUS_AR[v as DeliveryStatus] : v);
+  for (const row of report.rows) ws.addRow(Object.fromEntries(report.columns.map((col) => [col.key, col.key === 'status' ? statusLabel(row[col.key]) : row[col.key]])));
+  ws.addRow([]);
+  const totals = ws.addRow([lang === 'ar' ? 'الإجماليات' : 'Totals']);
+  totals.font = { bold: true };
+  for (const [k, v] of Object.entries(report.totals)) {
+    const col = report.columns.findIndex((x) => x.key === k);
+    const r = ws.addRow([]);
+    r.getCell(1).value = col >= 0 ? report.columns[col][lang] : k;
+    r.getCell(2).value = v;
+  }
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}

@@ -14,8 +14,10 @@ datasource db {
 // ─────────────────────────── التعدادات ───────────────────────────
 
 enum UserRole {
-  ADMIN
-  STAFF
+  ADMIN // Super Admin: كل الصلاحيات
+  STAFF // موظف إدارة (صلاحيات كاملة كما في الإصدارات السابقة)
+  MANAGER // Delivery Manager: الطلبات والتوزيع والمتابعة والتحصيل
+  DRIVER // Delivery Admin (موظف توصيل): الطلبات المسندة إليه فقط
 }
 
 /// حالة موحّدة للحجوزات والطلبات وطلبات الشركات
@@ -116,14 +118,53 @@ enum TenderOfferStatus {
 }
 
 /// حالة التوصيل (منفصلة عن حالة الطلب الموحّدة)
+/// مسار الطلب: NEW → ACCEPTED → PICKUP_ASSIGNED → PICKED_UP → IN_TRANSIT → ARRIVED → DELIVERED → PAYMENT_COLLECTED → COMPLETED
 enum DeliveryStatus {
-  PENDING
-  ASSIGNED
-  PREPARING
-  OUT_FOR_DELIVERY
+  NEW
+  ACCEPTED
+  PICKUP_ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  ARRIVED
   DELIVERED
-  FAILED
+  PAYMENT_COLLECTED
+  COMPLETED
+  // حالات استثنائية
+  DELIVERY_FAILED
+  CUSTOMER_NOT_AVAILABLE
+  CUSTOMER_REFUSED
+  WRONG_ADDRESS
+  RESCHEDULED
   CANCELLED
+}
+
+/// الحالة المالية للطلب (تُحسب من طريقة الدفع والمبلغ المطلوب والمحصّل)
+enum FinancialStatus {
+  PAID
+  COD
+  PARTIAL_PAYMENT
+  PAYMENT_PENDING
+  COLLECTED
+  NOT_COLLECTED
+}
+
+/// مصدر الطلب
+enum OrderSource {
+  STORE // من المتجر (سلة العميل)
+  SUPPLIER // أنشأه المورد
+  ADMIN // أنشأته الإدارة
+}
+
+enum AssignmentStatus {
+  ASSIGNED // بانتظار قبول الموظف
+  ACCEPTED
+  UNASSIGNED // أُعيد إسناده أو أُلغي الإسناد
+}
+
+enum NotificationRecipient {
+  USER // موظفو الإدارة والتوصيل
+  CUSTOMER
+  VENDOR
 }
 
 enum DriverStatus {
@@ -184,13 +225,21 @@ enum WhatsAppStatus {
 model User {
   id           String    @id @default(cuid())
   name         String
-  email        String    @unique
+  /// اختياري لموظفي التوصيل (يدخلون باسم المستخدم)
+  email        String?   @unique
+  /// اسم المستخدم للدخول (أحرف إنجليزية صغيرة وأرقام) — يُخزَّن بأحرف صغيرة
+  username     String?   @unique
+  phone        String?
   passwordHash String
   role         UserRole  @default(ADMIN)
+  /// الصلاحيات الفعلية للمستخدم (تبدأ من صلاحيات الدور ويعدّلها الـ Super Admin)
+  permissions  String[]  @default([])
   active       Boolean   @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  /// حذف ناعم: يبقى في السجلات ولا يدخل
+  deletedAt    DateTime?
 
   auditLogs   AuditLog[]
   campaigns   EmailCampaign[]
@@ -198,6 +247,15 @@ model User {
   payouts     VendorPayout[]       @relation("PayoutRecordedBy")
   settlements DeliverySettlement[] @relation("SettlementReceivedBy")
   quotes      QuoteFile[]          @relation("QuoteUploadedBy")
+
+  driver          Driver?
+  statusEvents    OrderStatusEvent[]
+  assignmentsMade DeliveryAssignment[] @relation("AssignedBy")
+  proofs          DeliveryProof[]      @relation("ProofBy")
+  collectedOrders Order[]              @relation("CollectedBy")
+  notifications   Notification[]
+
+  @@index([role])
 }
 
 /// العملاء — يتم إنشاؤهم تلقائيًا عند أول حجز أو طلب برقم الهاتف، أو بالتسجيل من صفحة /register
@@ -288,6 +346,11 @@ model Vendor {
   /// سحب صلاحية المورد: لا يدخل اللوحة ولا تظهر منتجاته
   active            Boolean  @default(true)
   isHouse           Boolean  @default(false)
+  /// عنوان الاستلام الافتراضي لطلبات التوصيل
+  phone             String?
+  pickupAddress     String?
+  pickupLat         Float?
+  pickupLng         Float?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -297,6 +360,7 @@ model Vendor {
   orderItems   OrderItem[]
   payouts      VendorPayout[]
   tenderOffers TenderOffer[]
+  orders       Order[]        @relation("OrderSupplier")
 
   @@index([active])
 }
@@ -353,44 +417,77 @@ model ProductMedia {
 }
 
 model Order {
-  id                String         @id @default(cuid())
+  id                String           @id @default(cuid())
   /// رقم الطلب المعروض (#1042)
-  number            Int            @unique @default(autoincrement())
+  number            Int              @unique @default(autoincrement())
   /// رمز مرجعي عشوائي يستخدمه العميل للدخول لحسابه
-  ref               String         @unique
+  ref               String           @unique
+  /// رقم الطلب الموحّد FG-ORD-000001
+  code              String?          @unique
+  source            OrderSource      @default(STORE)
+  /// المورد صاحب طلب التوصيل (طلبات المورد/الإدارة)؛ طلبات المتجر مرتبطة بالموردين عبر الطلبات الفرعية
+  supplierId        String?
   customerId        String
   customerName      String
   phone             String
+  /// عنوان التسليم
   address           String
+  deliveryLat       Float?
+  deliveryLng       Float?
+  /// منطقة التوصيل (للتصفية والتوزيع)
+  area              String?
+  pickupAddress     String?
+  pickupLat         Float?
+  pickupLng         Float?
+  pickupPhone       String?
   notes             String?
-  status            RequestStatus  @default(NEW)
-  subtotal          Decimal        @db.Decimal(10, 3)
-  discountTotal     Decimal        @db.Decimal(10, 3)
-  total             Decimal        @db.Decimal(10, 3)
+  status            RequestStatus    @default(NEW)
+  subtotal          Decimal          @db.Decimal(10, 3)
+  discountTotal     Decimal          @db.Decimal(10, 3)
+  total             Decimal          @db.Decimal(10, 3)
   whatsappText      String
   /// طريقة الدفع التي اختارها العميل (فارغة للطلبات القديمة)
   paymentMethod     PaymentMethod?
   // ── التوصيل ──
-  deliveryStatus    DeliveryStatus @default(PENDING)
+  deliveryStatus    DeliveryStatus   @default(NEW)
   driverId          String?
   deliveryCompanyId String?
-  deliveryFee       Decimal        @default(0) @db.Decimal(10, 3)
+  deliveryFee       Decimal          @default(0) @db.Decimal(10, 3)
   deliveredAt       DateTime?
   deliveryNote      String?
-  // ── الدفع عند الاستلام ──
-  codAmount         Decimal?       @db.Decimal(10, 3)
+  acceptedAt        DateTime?
+  pickedUpAt        DateTime?
+  arrivedAt         DateTime?
+  completedAt       DateTime?
+  /// العميل يدفع أجرة التوصيل (تُضاف للمبلغ المطلوب تحصيله)
+  customerPaysFee   Boolean          @default(true)
+  financialStatus   FinancialStatus?
+  // ── التحصيل ── codAmount = المبلغ المطلوب تحصيله من العميل (المنتجات حسب طريقة الدفع + أجرة التوصيل)
+  codAmount         Decimal?         @db.Decimal(10, 3)
   codStatus         CodStatus?
-  codCollected      Decimal?       @db.Decimal(10, 3)
+  codCollected      Decimal?         @db.Decimal(10, 3)
   codCollectedAt    DateTime?
+  collectedById     String?
+  collectedMethod   PaymentMethod?
+  /// رمز التحقق عند التسليم (OTP) — مشفّر
+  otpHash           String?
+  otpExpiresAt      DateTime?
+  otpAttempts       Int              @default(0)
   settlementId      String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   deletedAt         DateTime?
 
-  customer        Customer            @relation(fields: [customerId], references: [id])
-  driver          Driver?             @relation(fields: [driverId], references: [id])
-  deliveryCompany DeliveryCompany?    @relation(fields: [deliveryCompanyId], references: [id])
-  settlement      DeliverySettlement? @relation(fields: [settlementId], references: [id])
+  customer        Customer             @relation(fields: [customerId], references: [id])
+  driver          Driver?              @relation(fields: [driverId], references: [id])
+  deliveryCompany DeliveryCompany?     @relation(fields: [deliveryCompanyId], references: [id])
+  settlement      DeliverySettlement?  @relation(fields: [settlementId], references: [id])
+  supplier        Vendor?              @relation("OrderSupplier", fields: [supplierId], references: [id])
+  collectedBy     User?                @relation("CollectedBy", fields: [collectedById], references: [id])
+  statusEvents    OrderStatusEvent[]
+  assignments     DeliveryAssignment[]
+  proof           DeliveryProof?
+  notifications   Notification[]
   items           OrderItem[]
   vendorOrders    VendorOrder[]
   payments        Payment[]
@@ -403,6 +500,9 @@ model Order {
   @@index([deliveryStatus])
   @@index([driverId])
   @@index([codStatus])
+  @@index([supplierId])
+  @@index([area])
+  @@index([financialStatus])
 }
 
 /// طلب فرعي لكل مورد داخل طلب العميل — المورد يتابع حالته
@@ -436,7 +536,8 @@ model OrderItem {
   orderId           String
   vendorOrderId     String
   vendorId          String
-  productId         String
+  /// فارغ لبنود طلبات التوصيل التي يكتبها المورد (بدون منتج من المتجر)
+  productId         String?
   /// نسخة من اسم المنتج وقت الطلب
   name              String
   unitPrice         Decimal @db.Decimal(10, 3)
@@ -452,7 +553,7 @@ model OrderItem {
   order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
   vendor      Vendor      @relation(fields: [vendorId], references: [id])
-  product     Product     @relation(fields: [productId], references: [id])
+  product     Product?    @relation(fields: [productId], references: [id])
 
   @@index([orderId])
   @@index([vendorOrderId])
@@ -757,11 +858,17 @@ model Driver {
   phone     String
   status    DriverStatus @default(ACTIVE)
   notes     String?
+  /// حساب الدخول (موظف توصيل) — فارغ للسائقين المسجّلين بدون حساب
+  userId    String?      @unique
+  /// مناطق العمل (للتوزيع التلقائي لاحقًا)، مفصولة بفواصل
+  areas     String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
+  user        User?                @relation(fields: [userId], references: [id])
   orders      Order[]
   settlements DeliverySettlement[]
+  assignments DeliveryAssignment[]
 }
 
 /// تسليم النقد المحصّل (من سائق أو شركة توصيل) للشركة — لا يُحذف، يُلغى فقط
@@ -926,4 +1033,92 @@ model LoginLock {
   level       Int       @default(0)
   lockedUntil DateTime?
   updatedAt   DateTime  @updatedAt
+}
+
+/// إسناد الطلب لموظف توصيل (سجل كامل لكل إسناد وإعادة إسناد)
+model DeliveryAssignment {
+  id           String           @id @default(cuid())
+  orderId      String
+  driverId     String
+  assignedById String?
+  status       AssignmentStatus @default(ASSIGNED)
+  assignedAt   DateTime         @default(now())
+  acceptedAt   DateTime?
+  endedAt      DateTime?
+  note         String?
+
+  order      Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver     Driver @relation(fields: [driverId], references: [id])
+  assignedBy User?  @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  @@index([orderId])
+  @@index([driverId, status])
+}
+
+/// سجل تغيّر حالة الطلب (Activity Log)
+model OrderStatusEvent {
+  id         String          @id @default(cuid())
+  orderId    String
+  fromStatus DeliveryStatus?
+  toStatus   DeliveryStatus
+  /// المستخدم (إدارة/توصيل)، أو فارغ للعميل/المورد/النظام
+  actorId    String?
+  /// user | vendor | customer | system
+  actorType  String
+  actorName  String?
+  note       String?
+  lat        Float?
+  lng        Float?
+  createdAt  DateTime        @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([orderId, createdAt])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+/// إثبات التسليم — لا يُعدَّل إلا بصلاحية proofs.edit
+model DeliveryProof {
+  id              String    @id @default(cuid())
+  orderId         String    @unique
+  deliveredAt     DateTime  @default(now())
+  lat             Float?
+  lng             Float?
+  accuracy        Float?
+  recipientName   String
+  signatureUrl    String?
+  photoUrl        String?
+  otpVerified     Boolean   @default(false)
+  amountCollected Decimal?  @db.Decimal(10, 3)
+  note            String?
+  createdById     String?
+  editedAt        DateTime?
+  createdAt       DateTime  @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("ProofBy", fields: [createdById], references: [id])
+}
+
+/// الإشعارات داخل النظام (قابلة لإضافة قنوات: واتساب، SMS، بريد)
+model Notification {
+  id            String                @id @default(cuid())
+  recipientType NotificationRecipient
+  /// userId أو customerId أو vendorId حسب النوع
+  recipientId   String
+  userId        String?
+  title         String
+  body          String
+  orderId       String?
+  /// in_app | whatsapp | sms | email
+  channel       String                @default("in_app")
+  readAt        DateTime?
+  createdAt     DateTime              @default(now())
+
+  user  User?  @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([recipientType, recipientId, readAt])
+  @@index([createdAt])
 }

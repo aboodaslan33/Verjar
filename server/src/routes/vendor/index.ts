@@ -17,6 +17,9 @@ import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.
 import { emptyTotals, setVendorOrderStatus, syncOrderStatus, vendorTotals } from '../../services/vendor.service';
 import { type Attachment, assertOpen, offerInput, storeAttachments } from '../../services/tenders.service';
 import { conflict } from '../../lib/http';
+import { deliveryOrderInput } from '../../validators/delivery';
+import { createDeliveryOrder, liveUpdate, transition } from '../../services/delivery.service';
+import { getSettings } from '../../services/settings.service';
 import { notifyCustomer } from '../../services/whatsapp.service';
 
 /**
@@ -38,6 +41,10 @@ const profileSelect = {
   description: true,
   logoUrl: true,
   commissionPercent: true,
+  phone: true,
+  pickupAddress: true,
+  pickupLat: true,
+  pickupLng: true,
   createdAt: true,
 } satisfies Prisma.VendorSelect;
 
@@ -64,6 +71,11 @@ vendorRouter.patch(
       .object({
         name: z.string().trim().min(2, 'اسم المتجر مطلوب').max(60),
         description: z.string().trim().max(1000).default(''),
+        // بيانات الاستلام الافتراضية لطلبات التوصيل
+        phone: z.string().trim().max(30).nullable(),
+        pickupAddress: z.string().trim().max(300).nullable(),
+        pickupLat: z.number().min(-90).max(90).nullable(),
+        pickupLng: z.number().min(-180).max(180).nullable(),
       })
       .partial()
       .parse(req.body);
@@ -506,5 +518,97 @@ vendorRouter.post(
     const o = await ownOffer(vid(req), req.params.id);
     if (o.status !== 'SUBMITTED') throw conflict('لا يمكن سحب هذا العرض');
     ok(res, await prisma.tenderOffer.update({ where: { id: o.id }, data: { status: 'WITHDRAWN' } }));
+  }),
+);
+
+// ───────────── طلبات التوصيل (المورد ينشئ ويتابع طلباته فقط) ─────────────
+
+const vendorOrderSelect2 = {
+  id: true,
+  code: true,
+  number: true,
+  source: true,
+  deliveryStatus: true,
+  financialStatus: true,
+  customerName: true,
+  phone: true,
+  address: true,
+  area: true,
+  deliveryLat: true,
+  deliveryLng: true,
+  pickupAddress: true,
+  total: true,
+  subtotal: true,
+  discountTotal: true,
+  deliveryFee: true,
+  customerPaysFee: true,
+  paymentMethod: true,
+  codAmount: true,
+  codCollected: true,
+  notes: true,
+  createdAt: true,
+  pickedUpAt: true,
+  deliveredAt: true,
+  items: { select: { name: true, quantity: true, unitPrice: true, lineTotal: true } },
+  driver: { select: { name: true, phone: true } },
+  statusEvents: { orderBy: { createdAt: 'asc' }, select: { toStatus: true, fromStatus: true, note: true, createdAt: true, actorType: true } },
+  proof: { select: { recipientName: true, deliveredAt: true } },
+} satisfies Prisma.OrderSelect;
+
+/** طلبات التوصيل التي أنشأها المورد، وطلبات المتجر التي تتضمن منتجاته */
+const ownDeliveryWhere = (vendorId: string): Prisma.OrderWhereInput => ({ deletedAt: null, OR: [{ supplierId: vendorId }, { vendorOrders: { some: { vendorId } } }] });
+
+vendorRouter.get(
+  '/delivery-orders',
+  asyncHandler(async (req, res) => {
+    const q = paginationSchema.extend({ status: z.string().max(40).optional(), q: z.string().trim().max(100).optional() }).parse(req.query);
+    const where: Prisma.OrderWhereInput = {
+      ...ownDeliveryWhere(vid(req)),
+      ...(q.status ? { deliveryStatus: q.status as never } : {}),
+      ...(q.q ? { AND: [{ OR: [{ customerName: { contains: q.q, mode: 'insensitive' } }, { code: { contains: q.q.toUpperCase() } }] }] } : {}),
+    };
+    const [items, total] = await Promise.all([
+      prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: vendorOrderSelect2, ...pageArgs(q) }),
+      prisma.order.count({ where }),
+    ]);
+    ok(res, paged(items, total, q));
+  }),
+);
+
+vendorRouter.get(
+  '/delivery-orders/:id',
+  asyncHandler(async (req, res) => {
+    const o = await prisma.order.findFirst({ where: { id: req.params.id, ...ownDeliveryWhere(vid(req)) }, select: vendorOrderSelect2 });
+    if (!o) throw notFound('الطلب غير موجود');
+    ok(res, o);
+  }),
+);
+
+vendorRouter.post(
+  '/delivery-orders',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const input = deliveryOrderInput.parse(req.body);
+    const settings = await getSettings();
+    // أجرة التوصيل تحددها الإدارة (الافتراضية من الإعدادات)، ولا يكتبها المورد
+    const order = await prisma.$transaction((tx) =>
+      createDeliveryOrder(tx, vid(req), { ...input, deliveryFee: settings.deliveryFeeDefault }, 'SUPPLIER', { kind: 'vendor', vendorId: vid(req), name: req.vendor!.name }),
+    );
+    liveUpdate(order.id, `طلب توصيل جديد ${order.code} من ${req.vendor!.name}`);
+    await audit({ actorType: 'vendor', action: 'create', entity: 'order', entityId: order.id, meta: { code: order.code, vendorId: vid(req) } });
+    ok(res, order, 201);
+  }),
+);
+
+/** إلغاء طلب التوصيل قبل خروجه للاستلام */
+vendorRouter.post(
+  '/delivery-orders/:id/cancel',
+  asyncHandler(async (req, res) => {
+    const { note } = z.object({ note: z.string().trim().max(300).nullable().optional() }).parse(req.body ?? {});
+    const o = await prisma.order.findFirst({ where: { id: req.params.id, supplierId: vid(req), deletedAt: null } });
+    if (!o) throw notFound('الطلب غير موجود');
+    await prisma.$transaction((tx) => transition(tx, o.id, 'CANCELLED', { kind: 'vendor', vendorId: vid(req), name: req.vendor!.name }, { note: note ?? 'ألغاه المورد' }));
+    liveUpdate(o.id, `ألغى المورد ${o.code}`);
+    ok(res, await prisma.order.findUniqueOrThrow({ where: { id: o.id }, select: vendorOrderSelect2 }));
   }),
 );

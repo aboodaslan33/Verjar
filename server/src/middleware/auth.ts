@@ -4,9 +4,12 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { forbidden, unauthorized } from '../lib/http';
 import { prisma } from '../lib/prisma';
+import { effectivePermissions, type Permission } from '../lib/permissions';
 
-export type Role = 'ADMIN' | 'STAFF' | 'CUSTOMER';
+export type Role = 'ADMIN' | 'STAFF' | 'MANAGER' | 'DRIVER' | 'CUSTOMER';
 export type AuthPayload = { sub: string; role: Role; name: string };
+/** الجلسة بعد التحقق: صلاحيات المستخدم تُقرأ من قاعدة البيانات مع كل طلب (السحب يسري فورًا) */
+export type SessionAuth = AuthPayload & { perms: Permission[] };
 
 /** متجر المورد صاحب الجلسة (يُضبط في requireVendor) */
 export type VendorContext = { id: string; name: string; slug: string; commissionPercent: number };
@@ -15,8 +18,10 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      auth?: AuthPayload;
+      auth?: SessionAuth;
       vendor?: VendorContext;
+      /** موظف التوصيل صاحب الجلسة (يُضبط في requireDriver) */
+      driver?: { id: string; name: string };
     }
   }
 }
@@ -30,7 +35,9 @@ export const SESSION_TTL_S = 60 * 60 * 24 * 30; // 30 يومًا
 /** تُجدَّد الجلسة تلقائيًا إذا مضى على إصدارها أكثر من يوم */
 const REFRESH_AFTER_S = 60 * 60 * 24;
 
-export const isAdminRole = (role: Role) => role === 'ADMIN' || role === 'STAFF';
+/** أدوار لوحة التحكم (موظف التوصيل له لوحته الخاصة /driver) */
+export const isAdminRole = (role: Role) => role === 'ADMIN' || role === 'STAFF' || role === 'MANAGER';
+const ROLES: Role[] = ['ADMIN', 'STAFF', 'MANAGER', 'DRIVER', 'CUSTOMER'];
 
 function cookieOptions(maxAgeS: number) {
   return {
@@ -51,20 +58,27 @@ export function passwordFingerprint(passwordHash: string | null | undefined) {
 }
 
 /** صاحب الجلسة كما في قاعدة البيانات */
-export type Principal = AuthPayload & { pv: string };
+export type Principal = AuthPayload & { pv: string; perms: Permission[] };
 
-export function principalOf(
-  row: { id: string; name: string; passwordHash: string | null } & ({ role: 'ADMIN' | 'STAFF' } | { role?: undefined }),
-): Principal {
-  return { sub: row.id, role: row.role ?? 'CUSTOMER', name: row.name, pv: passwordFingerprint(row.passwordHash) };
+type UserRow = { id: string; name: string; passwordHash: string; role: Exclude<Role, 'CUSTOMER'>; permissions?: string[] };
+type CustomerRow = { id: string; name: string; passwordHash: string | null; role?: undefined };
+
+export function principalOf(row: UserRow | CustomerRow): Principal {
+  if (row.role) {
+    return { sub: row.id, role: row.role, name: row.name, pv: passwordFingerprint(row.passwordHash), perms: effectivePermissions(row.role, row.permissions ?? []) };
+  }
+  return { sub: row.id, role: 'CUSTOMER', name: row.name, pv: passwordFingerprint(row.passwordHash), perms: [] };
 }
 
-export function setAuthCookie(res: Response, p: Principal) {
-  const token = jwt.sign({ sub: p.sub, role: p.role, name: p.name, pv: p.pv }, env.JWT_SECRET, {
+export function sessionToken(p: Principal) {
+  return jwt.sign({ sub: p.sub, role: p.role, name: p.name, pv: p.pv }, env.JWT_SECRET, {
     algorithm: 'HS256',
     expiresIn: SESSION_TTL_S,
   });
-  res.cookie(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_S));
+}
+
+export function setAuthCookie(res: Response, p: Principal) {
+  res.cookie(SESSION_COOKIE, sessionToken(p), cookieOptions(SESSION_TTL_S));
 }
 
 export function clearAuthCookie(res: Response) {
@@ -78,7 +92,7 @@ function verify(token: string | undefined): Decoded | null {
   if (!token) return null;
   try {
     const p = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as Decoded;
-    return p && typeof p.sub === 'string' && ['ADMIN', 'STAFF', 'CUSTOMER'].includes(p.role) ? p : null;
+    return p && typeof p.sub === 'string' && ROLES.includes(p.role) ? p : null;
   } catch {
     return null;
   }
@@ -95,9 +109,9 @@ export async function loadPrincipal(p: Pick<AuthPayload, 'sub' | 'role'>): Promi
   }
   const u = await prisma.user.findUnique({
     where: { id: p.sub },
-    select: { id: true, name: true, role: true, active: true, passwordHash: true },
+    select: { id: true, name: true, role: true, active: true, passwordHash: true, permissions: true, deletedAt: true },
   });
-  return u && u.active ? principalOf(u) : null;
+  return u && u.active && !u.deletedAt ? principalOf(u) : null;
 }
 
 /**
@@ -108,7 +122,10 @@ export async function loadPrincipal(p: Pick<AuthPayload, 'sub' | 'role'>): Promi
 export async function attachSession(req: Request, res: Response, next: NextFunction) {
   try {
     const cookies = req.cookies ?? {};
-    const p = verify(cookies[SESSION_COOKIE]);
+    // تطبيقات الجوال (لاحقًا) ترسل التوكن في ترويسة Authorization بدل الكوكي
+    const bearer = /^Bearer\s+(.+)$/i.exec(req.get('authorization') ?? '')?.[1];
+    const viaBearer = !cookies[SESSION_COOKIE] && Boolean(bearer);
+    const p = verify(viaBearer ? bearer : cookies[SESSION_COOKIE]);
     if (!p) {
       if (cookies[SESSION_COOKIE] || LEGACY_COOKIES.some((c) => cookies[c])) clearAuthCookie(res);
       return next();
@@ -119,8 +136,8 @@ export async function attachSession(req: Request, res: Response, next: NextFunct
       return next();
     }
     const age = Math.floor(Date.now() / 1000) - p.iat;
-    if (age > REFRESH_AFTER_S || fresh.name !== p.name) setAuthCookie(res, fresh);
-    req.auth = { sub: fresh.sub, role: fresh.role, name: fresh.name };
+    if (!viaBearer && (age > REFRESH_AFTER_S || fresh.name !== p.name)) setAuthCookie(res, fresh);
+    req.auth = { sub: fresh.sub, role: fresh.role, name: fresh.name, perms: fresh.perms };
     next();
   } catch (e) {
     next(e);
@@ -131,6 +148,42 @@ export async function attachSession(req: Request, res: Response, next: NextFunct
 export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   if (!req.auth) return next(unauthorized());
   next();
+}
+
+/** يتطلب إحدى الصلاحيات المذكورة (الـ Super Admin يملكها كلها) */
+export function requirePermission(...perms: Permission[]) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.auth) return next(unauthorized());
+    if (!perms.some((p) => req.auth!.perms.includes(p))) return next(forbidden('لا تملك صلاحية لهذا الإجراء'));
+    next();
+  };
+}
+
+/**
+ * صلاحية قراءة وكتابة لمسار كامل: GET/HEAD تتطلب صلاحية العرض أو الإدارة، وباقي الطلبات صلاحية الإدارة.
+ */
+export function requireAccess(view: Permission, manage: Permission) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.auth) return next(unauthorized());
+    const read = req.method === 'GET' || req.method === 'HEAD';
+    const ok = read ? req.auth.perms.includes(view) || req.auth.perms.includes(manage) : req.auth.perms.includes(manage);
+    if (!ok) return next(forbidden('لا تملك صلاحية لهذا الإجراء'));
+    next();
+  };
+}
+
+/** موظف التوصيل: حساب بدور DRIVER مرتبط بسجل سائق فعّال */
+export async function requireDriver(req: Request, _res: Response, next: NextFunction) {
+  try {
+    if (!req.auth) return next(unauthorized());
+    if (req.auth.role !== 'DRIVER' || !req.auth.perms.includes('driver.app')) return next(forbidden('هذه الصفحة لموظفي التوصيل'));
+    const d = await prisma.driver.findFirst({ where: { userId: req.auth.sub, status: 'ACTIVE' }, select: { id: true, name: true } });
+    if (!d) return next(forbidden('حساب التوصيل غير مفعّل'));
+    req.driver = d;
+    next();
+  } catch (e) {
+    next(e);
+  }
 }
 
 /** لوحة التحكم: الأدمن والموظفون فقط (الحساب تم التحقق منه في attachSession) */

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin } from '../../middleware/auth';
+import { requireAccess, requireAdmin, requirePermission } from '../../middleware/auth';
 import { bookingsAdminRouter, techniciansRouter } from './bookings';
 import { corporateAdminRouter } from './corporate';
 import { customersRouter } from './customers';
@@ -14,23 +14,27 @@ import { vendorsAdminRouter } from './vendors';
 import { deliveryRouter } from './delivery';
 import { tendersAdminRouter } from './tenders';
 import { reportsRouter } from './reports';
+import { usersRouter } from './users';
 
 export const adminRouter = Router();
 adminRouter.use(requireAdmin);
 
-adminRouter.use('/dashboard', dashboardRouter);
-adminRouter.use('/store', productsRouter);
-adminRouter.use('/orders', ordersRouter);
-adminRouter.use('/bookings', bookingsAdminRouter);
-adminRouter.use('/technicians', techniciansRouter);
-adminRouter.use('/corporate', corporateAdminRouter);
-adminRouter.use('/files', filesRouter);
-adminRouter.use('/finance', financeRouter);
-adminRouter.use('/customers', customersRouter);
-adminRouter.use('/settings', settingsRouter);
-adminRouter.use('/logs', logsRouter);
-adminRouter.use('/newsletter', newsletterRouter);
-adminRouter.use('/vendors', vendorsAdminRouter);
-adminRouter.use('/delivery', deliveryRouter);
-adminRouter.use('/tenders', tendersAdminRouter);
-adminRouter.use('/reports', reportsRouter);
+// كل قسم محمي بصلاحيته: العرض (GET) أو الإدارة (باقي الطلبات) — RBAC
+adminRouter.use('/dashboard', requirePermission('dashboard.view'), dashboardRouter);
+adminRouter.use('/store', requireAccess('catalog.manage', 'catalog.manage'), productsRouter);
+adminRouter.use('/orders', requireAccess('orders.view', 'orders.manage'), ordersRouter);
+adminRouter.use('/bookings', requireAccess('bookings.manage', 'bookings.manage'), bookingsAdminRouter);
+adminRouter.use('/technicians', requireAccess('bookings.manage', 'bookings.manage'), techniciansRouter);
+adminRouter.use('/corporate', requireAccess('corporate.manage', 'corporate.manage'), corporateAdminRouter);
+adminRouter.use('/files', requireAccess('customers.view', 'customers.manage'), filesRouter);
+adminRouter.use('/finance', requireAccess('payments.view', 'payments.manage'), financeRouter);
+adminRouter.use('/customers', requireAccess('customers.view', 'customers.manage'), customersRouter);
+adminRouter.use('/settings', requireAccess('settings.manage', 'settings.manage'), settingsRouter);
+adminRouter.use('/logs', requirePermission('audit.view'), logsRouter);
+adminRouter.use('/newsletter', requireAccess('newsletter.manage', 'newsletter.manage'), newsletterRouter);
+adminRouter.use('/vendors', requireAccess('suppliers.view', 'suppliers.manage'), vendorsAdminRouter);
+// التوصيل: صلاحيات تفصيلية داخل كل مسار
+adminRouter.use('/delivery', requirePermission('orders.view', 'delivery.manage', 'collections.view'), deliveryRouter);
+adminRouter.use('/tenders', requireAccess('corporate.manage', 'corporate.manage'), tendersAdminRouter);
+adminRouter.use('/reports', requirePermission('reports.view'), reportsRouter);
+adminRouter.use('/users', requirePermission('users.manage'), usersRouter);

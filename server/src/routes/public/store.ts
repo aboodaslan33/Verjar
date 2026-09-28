@@ -8,6 +8,7 @@ import { makeRef } from '../../lib/ids';
 import { round3, toNum } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
+import { initStoreOrder } from '../../services/delivery.service';
 import { requireCustomer } from '../../middleware/auth';
 import { formLimiter } from '../../middleware/rateLimit';
 import { accountCustomer } from '../../services/customer.service';
@@ -253,6 +254,9 @@ storeRouter.post(
         });
       }
 
+      // رقم الطلب الموحّد، أول حدث في سجل الحالات، الحالة المالية، وإشعار الموردين
+      await initStoreOrder(tx, created.id);
+
       const full = await tx.order.findUniqueOrThrow({
         where: { id: created.id },
         include: { items: true, vendorOrders: { include: { vendor: { select: { name: true } } } } },
@@ -277,6 +281,7 @@ storeRouter.post(
       {
         id: order.id,
         number: order.number,
+        code: order.code,
         ref: order.ref,
         status: order.status,
         subtotal: order.subtotal,

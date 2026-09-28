@@ -72,6 +72,7 @@ newsletterRouter.post(
     if (!emailReady()) throw new HttpError(503, 'البريد غير مفعّل. أضف إعدادات SMTP في متغيرات البيئة.', 'EMAIL_DISABLED');
     const content = await contentOf(campaignInput.parse(req.body));
     const admin = await prisma.user.findUniqueOrThrow({ where: { id: req.auth!.sub } });
+    if (!admin.email) throw badRequest('أضف بريدًا لحسابك أولًا لاستلام رسالة التجربة');
     try {
       await sendOne(admin.email, { ...content, subject: `[تجربة] ${content.subject}` }, { id: 'test', name: admin.name });
     } catch (e) {

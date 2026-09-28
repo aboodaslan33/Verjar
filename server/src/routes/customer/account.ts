@@ -47,13 +47,20 @@ accountRouter.get(
         select: {
           id: true,
           number: true,
+          code: true,
           ref: true,
           status: true,
+          deliveryStatus: true,
+          financialStatus: true,
           total: true,
           subtotal: true,
           discountTotal: true,
+          deliveryFee: true,
+          codAmount: true,
+          paymentMethod: true,
           address: true,
           createdAt: true,
+          deliveredAt: true,
           items: { select: { id: true, name: true, quantity: true, lineTotal: true, vendorOrderId: true } },
           vendorOrders: {
             orderBy: { number: 'asc' },
@@ -179,5 +186,35 @@ accountRouter.post(
     const t = await ownTender(req.auth!.sub, req.params.id);
     const added = await storeAttachments(req.files as Express.Multer.File[], 'tenders');
     ok(res, await prisma.tender.update({ where: { id: t.id }, data: { attachments: [...((t.attachments as Attachment[]) ?? []), ...added] } }));
+  }),
+);
+
+/** تتبّع طلب العميل: الحالة وسجلها (بدون أسماء الموظفين)، وموظف التوصيل أثناء التوصيل فقط */
+accountRouter.get(
+  '/orders/:id/tracking',
+  asyncHandler(async (req, res) => {
+    const o = await prisma.order.findFirst({
+      where: { id: req.params.id, customerId: req.auth!.sub, deletedAt: null },
+      select: {
+        id: true,
+        code: true,
+        number: true,
+        deliveryStatus: true,
+        financialStatus: true,
+        codAmount: true,
+        deliveredAt: true,
+        driver: { select: { name: true, phone: true } },
+        statusEvents: { orderBy: { createdAt: 'asc' }, select: { toStatus: true, fromStatus: true, createdAt: true } },
+      },
+    });
+    if (!o) throw notFound('الطلب غير موجود');
+    const onTheWay = ['PICKED_UP', 'IN_TRANSIT', 'ARRIVED'].includes(o.deliveryStatus);
+    ok(res, {
+      ...o,
+      driver: onTheWay ? o.driver : null,
+      // التغييرات الفعلية فقط (بدون أحداث القبول/الإرسال الداخلية)
+      timeline: o.statusEvents.filter((e) => e.fromStatus !== e.toStatus).map((e) => ({ status: e.toStatus, at: e.createdAt })),
+      statusEvents: undefined,
+    });
   }),
 );

@@ -30,7 +30,7 @@ export async function resetDb() {
   const tables = [
     'LoginLock', 'EmailCampaign', 'Payment', 'QuoteFile', 'Contract', 'BookingMedia', 'Booking', 'OrderItem', 'VendorOrder', 'VendorPayout',
     'Order', 'ProductMedia', 'Product', 'Vendor', 'ContractVisit', 'TenderOffer', 'Tender', 'DeliverySettlement', 'Driver',
-    'DeliveryCompany', 'RefCounter', '_ContractServices',
+    'DeliveryCompany', 'RefCounter', '_ContractServices', 'OrderStatusEvent', 'DeliveryAssignment', 'DeliveryProof', 'Notification',
     'Category', '_CorporateRequestToCorporateService', 'CorporateRequest', 'CorporateService', 'Customer', 'Technician',
     'WhatsAppLog', 'AuditLog', 'Setting', 'User',
   ];

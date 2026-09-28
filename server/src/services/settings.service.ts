@@ -44,6 +44,12 @@ export const settingsSchema = z.object({
   contractReminderDays: z.number().int().min(1).max(180),
   /** عمولة المنصة من العطاءات المُرسّاة (نسبة مئوية) */
   tenderCommissionPercent: z.number().min(0).max(100),
+  /** أجرة التوصيل الافتراضية لطلبات الموردين (تعدّلها الإدارة لكل طلب) */
+  deliveryFeeDefault: z.number().min(0).max(1000),
+  /** إلزام رمز التحقق (OTP) عند التسليم */
+  deliveryOtpRequired: z.boolean(),
+  /** إلزام صورة إثبات التسليم */
+  deliveryPhotoRequired: z.boolean(),
   aboutTitle: z.string().max(200),
   aboutContent: z.string().max(10000),
   heroTitle: z.string().max(200),
@@ -76,6 +82,9 @@ export const DEFAULT_SETTINGS: Settings = {
   maxDaysAhead: 60,
   contractReminderDays: 30,
   tenderCommissionPercent: 10,
+  deliveryFeeDefault: 3,
+  deliveryOtpRequired: false,
+  deliveryPhotoRequired: false,
   aboutTitle: 'مجموعة فرجا للتصميم والمقاولات والصيانة',
   aboutContent:
     'نحن فريق أردني يعمل في البناء والصيانة والدهان والأعمال المعدنية. نزور الموقع، نكشف على المشكلة، ونعطيك سعرًا مكتوبًا قبل أن نبدأ.\n\nنعمل مع البيوت والشقق والفلل، ومع المصانع والشركات بعقود صيانة سنوية تشمل المرافق والكهرباء والأرضيات الإيبوكسي ومتطلبات GMP وISO.\n\nكل عمل نستلمه يكون له مسؤول واحد يتابعه معك من الكشف حتى التسليم، وتقدر تشوف حالة طلبك وعروض الأسعار من صفحتك على الموقع.',

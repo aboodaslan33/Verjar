@@ -20,6 +20,9 @@ import { emailRouter } from './routes/public/email';
 import { siteRouter } from './routes/public/site';
 import { storeRouter } from './routes/public/store';
 import { vendorRouter } from './routes/vendor';
+import { driverRouter } from './routes/driver';
+import { notificationsRouter } from './routes/notifications';
+import { trackRouter } from './routes/public/track';
 import { LOCAL_UPLOAD_DIR } from './services/upload.service';
 
 export function createApp() {
@@ -70,6 +73,9 @@ export function createApp() {
   api.use('/account', accountRouter);
   api.use('/admin', adminRouter);
   api.use('/vendor', vendorRouter);
+  api.use('/driver', driverRouter);
+  api.use('/notifications', notificationsRouter);
+  api.use('/track', trackRouter);
   app.use('/api/v1', api);
   // نفس المسارات بدون رقم الإصدار: /api/auth/me و /api/admin/...
   app.use('/api', api);
