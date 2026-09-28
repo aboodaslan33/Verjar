@@ -227,7 +227,7 @@ export default function OrderDetail() {
               q.reload();
             }}
           />
-          <OrderDeliveryPanel order={o} onSaved={q.reload} />
+          <OrderDeliveryPanel order={o} />
           <Panel title="واتساب">
             <p className="mb-3 text-sm text-muted">إعادة إرسال رسالة الطلب الأصلية.</p>
             <div className="flex flex-wrap gap-2">

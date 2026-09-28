@@ -13,6 +13,9 @@ const Orders = lazy(() => import('./VendorOrders'));
 const OrderDetail = lazy(() => import('./VendorOrderDetail'));
 const Earnings = lazy(() => import('./VendorEarnings'));
 const Tenders = lazy(() => import('./VendorTenders'));
+const DeliveryList = lazy(() => import('./VendorDeliveryOrders').then((m) => ({ default: m.VendorDeliveryList })));
+const DeliveryNew = lazy(() => import('./VendorDeliveryOrders').then((m) => ({ default: m.VendorDeliveryNew })));
+const DeliveryDetail = lazy(() => import('./VendorDeliveryOrders').then((m) => ({ default: m.VendorDeliveryDetail })));
 
 const s = (el: JSX.Element) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
 
@@ -22,7 +25,7 @@ export default function VendorApp() {
   const location = useLocation();
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to={loginPath(location)} replace />;
-  if (isAdminUser(user) || !user.vendor) {
+  if (user.role !== 'CUSTOMER' || !user.vendor) {
     return (
       <div className="container max-w-xl py-20">
         <EmptyState
@@ -47,6 +50,9 @@ export default function VendorApp() {
         <Route path="products/:id" element={s(<ProductEdit />)} />
         <Route path="orders" element={s(<Orders />)} />
         <Route path="orders/:id" element={s(<OrderDetail />)} />
+        <Route path="delivery" element={s(<DeliveryList />)} />
+        <Route path="delivery/new" element={s(<DeliveryNew />)} />
+        <Route path="delivery/:id" element={s(<DeliveryDetail />)} />
         <Route path="earnings" element={s(<Earnings />)} />
         <Route path="tenders" element={s(<Tenders />)} />
         <Route path="*" element={<Navigate to="/vendor" replace />} />

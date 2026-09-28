@@ -143,6 +143,7 @@ export function invalidateSettingsCache() {
 export function publicSettings(s: Settings) {
   return {
     whatsappNumber: s.whatsappNumber,
+    deliveryFeeDefault: s.deliveryFeeDefault,
     phone: s.phone,
     email: s.email,
     address: s.address,

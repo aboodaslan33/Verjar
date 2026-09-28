@@ -273,7 +273,7 @@ reportsRouter.get(
       return;
     }
     if (q.format === 'csv') {
-      const csv = toCsv(report.columns.map((col) => col[q.lang]), report.rows.map((row) => report.columns.map((col) => row[col.key])));
+      const csv = toCsv(report.columns.map((col) => col[q.lang]), report.rows.map((row) => report.columns.map((col) => cellLabel(col.key, row[col.key], q.lang))));
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="farja-group-${kind}-${new Date().toISOString().slice(0, 10)}.csv"`);
       res.send(csv);
@@ -494,6 +494,16 @@ async function buildDelivery(kind: Kind, q: Query): Promise<Report> {
 }
 
 /** ملف Excel حقيقي (.xlsx): اتجاه الورقة حسب اللغة، عناوين عريضة، أعمدة المبالغ بصيغة 0.000، وصف الإجماليات */
+const FIN_AR: Record<string, string> = { PAID: 'مدفوع', COD: 'الدفع عند الاستلام', PARTIAL_PAYMENT: 'دفع جزئي', PAYMENT_PENDING: 'بانتظار الدفع', COLLECTED: 'تم التحصيل', NOT_COLLECTED: 'لم يُحصَّل' };
+const enumEn = (v: string) => v.charAt(0) + v.slice(1).toLowerCase().replace(/_/g, ' ');
+/** قيم الحالات في ملفات التصدير: عربية أو إنجليزية مقروءة بدل أسماء الـ enum */
+function cellLabel(key: string, v: unknown, lang: 'ar' | 'en') {
+  if (typeof v !== 'string' || !v) return v;
+  if (key === 'status' && v in STATUS_AR) return lang === 'ar' ? STATUS_AR[v as DeliveryStatus] : enumEn(v);
+  if (key === 'financial' && v in FIN_AR) return lang === 'ar' ? FIN_AR[v] : enumEn(v);
+  return v;
+}
+
 async function toXlsx(report: Report, lang: 'ar' | 'en', kind: string) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Farja Group';
@@ -501,8 +511,7 @@ async function toXlsx(report: Report, lang: 'ar' | 'en', kind: string) {
   ws.columns = report.columns.map((col) => ({ header: col[lang], key: col.key, width: Math.max(12, col[lang].length + 4), style: col.money ? { numFmt: '0.000' } : {} }));
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
-  const statusLabel = (v: unknown) => (lang === 'ar' && typeof v === 'string' && v in STATUS_AR ? STATUS_AR[v as DeliveryStatus] : v);
-  for (const row of report.rows) ws.addRow(Object.fromEntries(report.columns.map((col) => [col.key, col.key === 'status' ? statusLabel(row[col.key]) : row[col.key]])));
+  for (const row of report.rows) ws.addRow(Object.fromEntries(report.columns.map((col) => [col.key, cellLabel(col.key, row[col.key], lang)])));
   ws.addRow([]);
   const totals = ws.addRow([lang === 'ar' ? 'الإجماليات' : 'Totals']);
   totals.font = { bold: true };

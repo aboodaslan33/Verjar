@@ -20,6 +20,7 @@ const COMPANY: { to: string; key: MessageKey }[] = [
   { to: '/store', key: 'nav.store' },
   { to: '/about', key: 'nav.about' },
   { to: '/contact', key: 'footer.contact' },
+  { to: '/track', key: 'footer.track' },
   { to: '/account', key: 'nav.account' },
 ];
 

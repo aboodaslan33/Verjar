@@ -105,7 +105,7 @@ export function FileUploadForm({
             ))}
           </Select>
         )}
-        <Input label="العنوان" value={title} onChange={(e) => setTitle(e.target.value)} error={m.fieldErrors.title} />
+        <Input label="عنوان الملف" value={title} onChange={(e) => setTitle(e.target.value)} error={m.fieldErrors.title} />
         {showAmount && (
           <Input
             label="المبلغ (د.أ)"

@@ -192,7 +192,9 @@ export type OrderDetail = Omit<OrderRow, 'vendorOrders'> & {
   whatsappLogs: WhatsAppLog[];
   quoteFiles?: QuoteFile[];
   paymentMethod: string | null;
-  deliveryStatus: 'PENDING' | 'ASSIGNED' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
+  code: string | null;
+  deliveryStatus: import('../../lib/delivery').DeliveryStatus;
+  financialStatus: import('../../lib/delivery').FinancialStatus | null;
   deliveryFee: number;
   deliveryNote: string | null;
   codAmount: number | null;

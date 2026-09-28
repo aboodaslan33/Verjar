@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
 import type { SettingsResponse } from '../../components/admin/types';
 import { AdminPage, DetailSkeleton, FieldError, Panel } from '../../components/admin/ui';
-import { Alert, Button, ErrorState, Input, Tag, Textarea } from '../../components/ui';
+import { Alert, Button, Checkbox, ErrorState, Input, Tag, Textarea } from '../../components/ui';
 import { api } from '../../lib/api';
 import { WEEKDAYS, cx } from '../../lib/format';
 import type { AdminSettings } from '../../lib/types';
@@ -21,7 +21,11 @@ const RANGES: Partial<Record<Key, [number, number, boolean?]>> = {
   maxDaysAhead: [1, 365, true],
   contractReminderDays: [1, 180, true],
   tenderCommissionPercent: [0, 100],
+  deliveryFeeDefault: [0, 1000],
 };
+
+/** مفاتيح نعم/لا (تُخزَّن في النموذج كنص 'true'/'false') */
+const BOOL: Key[] = ['deliveryOtpRequired', 'deliveryPhotoRequired'];
 
 const NUMERIC: Key[] = [
   'inspectionFeeNormal',
@@ -34,6 +38,7 @@ const NUMERIC: Key[] = [
   'maxDaysAhead',
   'contractReminderDays',
   'tenderCommissionPercent',
+  'deliveryFeeDefault',
 ];
 
 export default function Settings() {
@@ -132,6 +137,8 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
         const a = [...(cur as number[])].sort().join(',');
         const b = [...base.workingDays].sort().join(',');
         if (a !== b) out[k] = [...(cur as number[])].sort();
+      } else if (BOOL.includes(k)) {
+        if ((cur === 'true') !== Boolean(base[k])) out[k] = cur === 'true';
       } else if (NUMERIC.includes(k)) {
         if (Number(cur) !== base[k]) out[k] = (cur as string).trim() === '' ? NaN : Number(cur);
       } else if (cur !== String(base[k] ?? '')) out[k] = cur;
@@ -252,6 +259,24 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
           {num('maxDaysAhead', 'أقصى مدة للحجز المسبق (يوم)', { min: 1, max: 365, step: '1' })}
           {num('contractReminderDays', 'التذكير قبل انتهاء العقد (يوم)', { min: 1, max: 180, step: '1' })}
           {num('tenderCommissionPercent', 'عمولة المنصة على العطاءات (%) · Tender commission', { min: 0, max: 100, hint: 'تُحفظ مع كل ترسية ولا تتغير بتغيير النسبة لاحقًا' })}
+        </div>
+      </Section>
+
+      <Section title="التوصيل" description="إعدادات طلبات التوصيل وإثبات التسليم">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {num('deliveryFeeDefault', 'أجرة التوصيل الافتراضية (د.أ)', { min: 0, max: 1000, hint: 'تُطبَّق على طلبات الموردين الجديدة' })}
+        </div>
+        <div className="mt-4 space-y-3">
+          <Checkbox
+            label="إلزام رمز التحقق (OTP) من العميل عند التسليم"
+            checked={form.deliveryOtpRequired === 'true'}
+            onChange={(v) => setForm((f) => ({ ...f, deliveryOtpRequired: String(v) }))}
+          />
+          <Checkbox
+            label="إلزام صورة إثبات عند التسليم"
+            checked={form.deliveryPhotoRequired === 'true'}
+            onChange={(v) => setForm((f) => ({ ...f, deliveryPhotoRequired: String(v) }))}
+          />
         </div>
       </Section>
 

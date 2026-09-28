@@ -22,6 +22,7 @@ const NotFound = lazy(() => import('./pages/public/NotFound'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const Unsubscribe = lazy(() => import('./pages/public/Unsubscribe'));
+const Track = lazy(() => import('./pages/public/Track'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const Account = lazy(() => import('./pages/account/Account'));
@@ -32,6 +33,8 @@ const VendorApp = lazy(() => import('./pages/vendor/VendorApp'));
 
 // لوحة الأدمن — حزمة منفصلة لا تُحمّل للزوار
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
+// لوحة موظف التوصيل — حزمة منفصلة
+const DriverApp = lazy(() => import('./pages/driver/DriverApp'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -46,6 +49,14 @@ export default function App() {
           element={
             <Suspense fallback={<PageLoader />}>
               <AdminApp />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/driver/*"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <DriverApp />
             </Suspense>
           }
         />
@@ -71,6 +82,7 @@ export default function App() {
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
           <Route path="unsubscribe" element={<Unsubscribe />} />
+          <Route path="track" element={<Track />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="account/login" element={<Navigate to="/login" replace />} />

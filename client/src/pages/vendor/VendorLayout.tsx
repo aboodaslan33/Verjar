@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Logo } from '../../components/layout/Logo';
+import { NotificationsBell } from '../../components/NotificationsBell';
 import { Icon } from '../../components/ui';
 import { useAuth } from '../../context/Auth';
 import { useTheme } from '../../context/ThemeContext';
@@ -9,6 +10,7 @@ import { LangSwitch } from '../../lib/i18n';
 const NAV = [
   { to: '/vendor', label: 'الرئيسية', end: true },
   { to: '/vendor/orders', label: 'الطلبات' },
+  { to: '/vendor/delivery', label: 'طلبات التوصيل' },
   { to: '/vendor/products', label: 'المنتجات' },
   { to: '/vendor/earnings', label: 'الأرباح' },
   { to: '/vendor/tenders', label: 'العطاءات' },
@@ -39,6 +41,7 @@ export function VendorLayout() {
                 <Icon name="external" className="h-4 w-4" /> صفحة متجري
               </a>
             )}
+            <NotificationsBell hrefFor={(n) => (n.orderId && n.recipientType === 'VENDOR' ? `/vendor/delivery/${n.orderId}` : n.orderId ? `/account?tab=orders` : null)} />
             <LangSwitch className="grid h-9 min-w-9 place-items-center rounded-lg px-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink" />
             <button
               type="button"

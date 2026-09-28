@@ -4,6 +4,7 @@ import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminPage } from '../../components/admin/ui';
 import { ButtonLink, EmptyState, Skeleton } from '../../components/ui';
 import { AdminAuthProvider, useAdmin } from '../../context/AdminAuth';
+import { hasPerm, isDriverUser, useAuth } from '../../context/Auth';
 
 const Login = lazy(() => import('./Login'));
 const Dashboard = lazy(() => import('./Dashboard'));
@@ -31,6 +32,9 @@ const Tenders = lazy(() => import('./Tenders'));
 const TenderDetail = lazy(() => import('./TenderDetail'));
 const Delivery = lazy(() => import('./Delivery'));
 const Reports = lazy(() => import('./Reports'));
+const Users = lazy(() => import('./Users'));
+const DeliveryOrderDetail = lazy(() => import('./DeliveryOrderDetail'));
+const DeliveryOrderNew = lazy(() => import('./DeliveryOrderNew'));
 
 /** هيكل تحميل بشكل لوحة التحكم (أثناء التحقق من الجلسة) */
 function ShellSkeleton() {
@@ -69,8 +73,11 @@ function PageFallback() {
 
 function Protected() {
   const { admin, loading } = useAdmin();
+  const { user } = useAuth();
   const location = useLocation();
   if (loading) return <ShellSkeleton />;
+  // موظف التوصيل له لوحته الخاصة
+  if (isDriverUser(user)) return <Navigate to="/driver" replace />;
   if (!admin) return <Navigate to="/admin/login" replace state={{ from: location.pathname + location.search }} />;
   return <AdminLayout />;
 }
@@ -85,6 +92,13 @@ function NotFound() {
 
 const s = (el: JSX.Element) => <Suspense fallback={<PageFallback />}>{el}</Suspense>;
 
+/** الصفحة الأولى: لوحة التحكم لمن يملك صلاحيتها، وإلا لوحة التوصيل */
+function Home() {
+  const { admin } = useAdmin();
+  if (!hasPerm(admin, 'dashboard.view')) return <Navigate to="/admin/delivery" replace />;
+  return s(<Dashboard />);
+}
+
 export default function AdminApp() {
   return (
     <AdminAuthProvider>
@@ -98,7 +112,7 @@ export default function AdminApp() {
           }
         />
         <Route element={<Protected />}>
-          <Route index element={s(<Dashboard />)} />
+          <Route index element={<Home />} />
           <Route path="bookings" element={s(<Bookings />)} />
           <Route path="bookings/:id" element={s(<BookingDetail />)} />
           <Route path="orders" element={s(<Orders />)} />
@@ -114,6 +128,9 @@ export default function AdminApp() {
           <Route path="tenders" element={s(<Tenders />)} />
           <Route path="tenders/:id" element={s(<TenderDetail />)} />
           <Route path="delivery" element={s(<Delivery />)} />
+          <Route path="delivery/new" element={s(<DeliveryOrderNew />)} />
+          <Route path="delivery/orders/:id" element={s(<DeliveryOrderDetail />)} />
+          <Route path="users" element={s(<Users />)} />
           <Route path="reports" element={s(<Reports />)} />
           <Route path="finance" element={s(<Finance />)} />
           <Route path="customers" element={s(<Customers />)} />

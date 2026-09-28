@@ -89,12 +89,12 @@ export function DataTable<T>({
       )}
 
       {/* جدول — شاشات متوسطة فأكبر */}
-      <div className="card hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
+      <div className="card hidden overflow-x-auto md:block print:block print:overflow-visible">
+        <table className="w-full text-sm print:text-[9px]">
           <thead>
             <tr className="border-b border-line bg-subtle text-xs text-muted">
               {columns.map((c) => (
-                <th key={c.key} scope="col" className={cx('whitespace-nowrap px-4 py-3 font-semibold', alignCls(c.align), c.className)}>
+                <th key={c.key} scope="col" className={cx('whitespace-nowrap px-4 py-3 font-semibold print:px-1.5 print:py-1', alignCls(c.align), c.className)}>
                   {c.header}
                 </th>
               ))}
@@ -122,7 +122,7 @@ export function DataTable<T>({
                   )}
                 >
                   {columns.map((c, i) => (
-                    <td key={c.key} className={cx('px-4 py-3.5', alignCls(c.align), c.className)}>
+                    <td key={c.key} className={cx('px-4 py-3.5 print:px-1.5 print:py-1', alignCls(c.align), c.className)}>
                       {i === 0 && href ? (
                         <Link to={href} className="font-medium text-ink underline-offset-4 hover:underline">
                           {c.cell(row)}
@@ -140,7 +140,7 @@ export function DataTable<T>({
       </div>
 
       {/* بطاقات — الجوال */}
-      <ul className="space-y-2.5 md:hidden">
+      <ul className="space-y-2.5 md:hidden print:hidden">
         {rows.map((row) => {
           const href = rowHref?.(row);
           const body = (

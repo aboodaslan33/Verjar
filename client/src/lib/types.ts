@@ -7,6 +7,8 @@ export type Paged<T> = { items: T[]; total: number; page: number; pageSize: numb
 
 export type SiteSettings = {
   whatsappNumber: string;
+  /** أجرة التوصيل الافتراضية لطلبات الموردين */
+  deliveryFeeDefault?: number;
   phone: string;
   email: string;
   address: string;
@@ -36,6 +38,9 @@ export type AdminSettings = Omit<SiteSettings, 'whatsappMode'> & {
   slotMinutes: number;
   contractReminderDays: number;
   tenderCommissionPercent: number;
+  deliveryFeeDefault: number;
+  deliveryOtpRequired: boolean;
+  deliveryPhotoRequired: boolean;
 };
 
 export type Category = {
@@ -147,7 +152,9 @@ export type CustomerMe = {
   /** متجر العميل إن كان لديه صلاحية مورد */
   vendor: { id: string; name: string; slug: string } | null;
 };
-export type AdminMe = { id: string; name: string; email: string; role: 'ADMIN' | 'STAFF' };
+export type StaffRole = 'ADMIN' | 'STAFF' | 'MANAGER' | 'DRIVER';
+/** حساب إدارة أو توصيل مع صلاحياته الفعلية (RBAC) */
+export type AdminMe = { id: string; name: string; email: string | null; username: string | null; phone: string | null; role: StaffRole; permissions: string[] };
 /** المستخدم الحالي كما يعيده GET /auth/me */
 export type SessionUser = CustomerMe | AdminMe;
 

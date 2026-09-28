@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
-import type { SessionUser } from '../lib/types';
+import type { AdminMe, SessionUser } from '../lib/types';
 
 type Ctx = {
   /** المستخدم الحالي (عميل أو أدمن) أو null للزائر */
@@ -56,8 +56,19 @@ export function useAuth() {
   return ctx;
 }
 
-export const isAdminUser = (u: SessionUser | null): u is Extract<SessionUser, { role: 'ADMIN' | 'STAFF' }> =>
-  u?.role === 'ADMIN' || u?.role === 'STAFF';
+/** حسابات لوحة التحكم (الإدارة ومديرو التوصيل) */
+export const isAdminUser = (u: SessionUser | null): u is AdminMe =>
+  u?.role === 'ADMIN' || u?.role === 'STAFF' || u?.role === 'MANAGER';
+
+/** موظف التوصيل: لوحته /driver */
+export const isDriverUser = (u: SessionUser | null): u is AdminMe => u?.role === 'DRIVER';
+
+/** أي حساب غير عميل (إدارة أو توصيل) */
+export const isStaffUser = (u: SessionUser | null): u is AdminMe => isAdminUser(u) || isDriverUser(u);
 
 /** الصفحة الرئيسية لكل نوع مستخدم بعد الدخول */
-export const homeFor = (u: SessionUser) => (isAdminUser(u) ? '/admin' : '/account');
+export const homeFor = (u: SessionUser) => (isDriverUser(u) ? '/driver' : isAdminUser(u) ? '/admin' : '/account');
+
+/** هل يملك المستخدم صلاحية (الـ Super Admin يملكها كلها) */
+export const hasPerm = (u: SessionUser | null, ...perms: string[]) =>
+  Boolean(u && u.role !== 'CUSTOMER' && (u.role === 'ADMIN' || perms.some((p) => u.permissions?.includes(p))));

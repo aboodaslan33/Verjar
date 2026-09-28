@@ -43,6 +43,15 @@ const paths = {
   arrowLeft: 'M19 12H5m6-6-6 6 6 6',
   arrowRight: 'M5 12h14m-6-6 6 6-6 6',
   star: 'M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z',
+  bell: 'M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16zM10 20a2 2 0 0 0 4 0',
+  navigation: 'M12 3l7 18-7-4-7 4z',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  pen: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  map: 'M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14',
+  users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6',
+  cash: 'M3 7h18v10H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 10v4M18 10v4',
+  printer: 'M7 9V3h10v6M7 18H4v-7h16v7h-3M7 14h10v7H7z',
+  xCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 9l6 6M15 9l-6 6',
 } as const;
 
 export type IconName = keyof typeof paths | 'whatsapp';

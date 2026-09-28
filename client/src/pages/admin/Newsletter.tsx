@@ -112,7 +112,7 @@ export default function Newsletter() {
             )}
             <Panel title="رسالة جديدة" actions={<span className="text-sm text-muted">المشتركون: <b className="text-ink">{data.subscribers}</b></span>}>
               <div className="space-y-4">
-                <Input label="العنوان" value={subject} maxLength={150} onChange={(e) => setSubject(e.target.value)} error={fe.subject} placeholder="مثال: خدمة جديدة — عزل الأسطح" />
+                <Input label="عنوان الرسالة" value={subject} maxLength={150} onChange={(e) => setSubject(e.target.value)} error={fe.subject} placeholder="مثال: خدمة جديدة — عزل الأسطح" />
                 <Textarea
                   label="نص الرسالة"
                   rows={7}

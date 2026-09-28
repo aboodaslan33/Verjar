@@ -10,54 +10,60 @@ import { useAdminQuery } from './hooks';
 import { LiveProvider, useLive } from './live';
 import type { DashboardStats } from './types';
 import { LangSwitch, useI18n, type MessageKey } from '../../lib/i18n';
+import { hasPerm } from '../../context/Auth';
+import { NotificationsBell } from '../NotificationsBell';
 
-type NavItem = { to: string; label: string; k?: MessageKey; end?: boolean; badge?: (s: DashboardStats) => number };
+type NavItem = { to: string; label: string; k?: MessageKey; end?: boolean; badge?: (s: DashboardStats) => number; perm: string[] };
 
 const NAV: { group?: string; items: NavItem[] }[] = [
-  { items: [{ to: '/admin', label: 'لوحة التحكم', end: true }] },
+  { items: [{ to: '/admin', label: 'لوحة التحكم', end: true, perm: ['dashboard.view'] }] },
   {
     group: 'العمليات',
     items: [
-      { to: '/admin/bookings', label: 'الحجوزات', badge: (s) => s.newBookings },
-      { to: '/admin/orders', label: 'طلبات المتجر', badge: (s) => s.newOrders },
-      { to: '/admin/corporate', label: 'طلبات الشركات', badge: (s) => s.pendingCorporate },
-      { to: '/admin/contracts', label: 'عقود الشركات', k: 'admin.contracts', badge: (s) => s.expiringContracts },
-      { to: '/admin/tenders', label: 'العطاءات', k: 'admin.tenders' },
-      { to: '/admin/delivery', label: 'التوصيل والتحصيل', k: 'admin.delivery' },
+      { to: '/admin/bookings', label: 'الحجوزات', badge: (s) => s.newBookings, perm: ['bookings.manage'] },
+      { to: '/admin/orders', label: 'طلبات المتجر', badge: (s) => s.newOrders, perm: ['orders.view'] },
+      { to: '/admin/corporate', label: 'طلبات الشركات', badge: (s) => s.pendingCorporate, perm: ['corporate.manage'] },
+      { to: '/admin/contracts', label: 'عقود الشركات', k: 'admin.contracts', badge: (s) => s.expiringContracts, perm: ['corporate.manage'] },
+      { to: '/admin/tenders', label: 'العطاءات', k: 'admin.tenders', perm: ['corporate.manage'] },
+      { to: '/admin/delivery', label: 'التوصيل والتحصيل', k: 'admin.delivery', perm: ['orders.view', 'delivery.manage', 'collections.view'] },
     ],
   },
   {
     group: 'السوق',
     items: [
-      { to: '/admin/products', label: 'المنتجات', badge: (s) => s.pendingProducts ?? 0 },
-      { to: '/admin/categories', label: 'الأقسام' },
-      { to: '/admin/vendors', label: 'الموردون' },
+      { to: '/admin/products', label: 'المنتجات', badge: (s) => s.pendingProducts ?? 0, perm: ['catalog.manage'] },
+      { to: '/admin/categories', label: 'الأقسام', perm: ['catalog.manage'] },
+      { to: '/admin/vendors', label: 'الموردون', perm: ['suppliers.view', 'suppliers.manage'] },
     ],
   },
   {
     group: 'الحسابات',
     items: [
-      { to: '/admin/finance', label: 'المالية' },
-      { to: '/admin/reports', label: 'التقارير', k: 'admin.reports' },
-      { to: '/admin/customers', label: 'العملاء' },
-      { to: '/admin/newsletter', label: 'النشرة البريدية' },
-      { to: '/admin/technicians', label: 'الفنيون' },
+      { to: '/admin/finance', label: 'المالية', perm: ['payments.view'] },
+      { to: '/admin/reports', label: 'التقارير', k: 'admin.reports', perm: ['reports.view'] },
+      { to: '/admin/customers', label: 'العملاء', perm: ['customers.view'] },
+      { to: '/admin/newsletter', label: 'النشرة البريدية', perm: ['newsletter.manage'] },
+      { to: '/admin/technicians', label: 'الفنيون', perm: ['bookings.manage'] },
     ],
   },
   {
     group: 'النظام',
     items: [
-      { to: '/admin/settings', label: 'الإعدادات' },
-      { to: '/admin/logs', label: 'السجلات' },
+      { to: '/admin/users', label: 'المستخدمون والصلاحيات', perm: ['users.manage'] },
+      { to: '/admin/settings', label: 'الإعدادات', perm: ['settings.manage'] },
+      { to: '/admin/logs', label: 'السجلات', perm: ['audit.view'] },
     ],
   },
 ];
 
 function Sidebar({ stats, onNavigate }: { stats: DashboardStats | null; onNavigate?: () => void }) {
   const { t } = useI18n();
+  const { admin } = useAdmin();
+  // القائمة حسب صلاحيات المستخدم (RBAC)؛ المجموعة الفارغة لا تظهر
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((n) => hasPerm(admin, ...n.perm)) })).filter((g) => g.items.length);
   return (
     <nav aria-label="قائمة لوحة التحكم" className="flex-1 overflow-y-auto px-3 py-4">
-      {NAV.map((g, gi) => (
+      {groups.map((g, gi) => (
         <div key={gi} className={cx(gi > 0 && 'mt-5')}>
           {g.group && <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wide text-inverse-fg/40">{g.group}</p>}
           <ul className="space-y-0.5">
@@ -100,7 +106,12 @@ function Shell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { data: stats } = useAdminQuery(() => api.get<DashboardStats>('/admin/dashboard/stats'), [location.pathname], { live: true, keep: true });
+  const canDashboard = hasPerm(admin, 'dashboard.view');
+  const { data: stats } = useAdminQuery(
+    () => (canDashboard ? api.get<DashboardStats>('/admin/dashboard/stats') : Promise.resolve(null as unknown as DashboardStats)),
+    [location.pathname, canDashboard],
+    { live: true, keep: true },
+  );
 
   useEffect(() => setOpen(false), [location.pathname]);
   useEffect(() => {
@@ -121,7 +132,7 @@ function Shell() {
   return (
     <div className="min-h-screen bg-subtle/50">
       {/* الشريط الجانبي — سطح المكتب (يمين الشاشة في RTL) */}
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col bg-inverse lg:flex">
+      <aside className="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col bg-inverse lg:flex print:!hidden">
         <div className="flex h-16 items-center border-b border-inverse-fg/10 px-5">
           <Logo to="/admin" light className="[&_svg]:h-9" />
         </div>
@@ -144,8 +155,8 @@ function Shell() {
         </div>
       )}
 
-      <div className="lg:ps-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-line bg-surface px-3 sm:px-5">
+      <div className="lg:ps-64 print:!ps-0">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-line bg-surface px-3 sm:px-5 print:hidden">
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -183,6 +194,7 @@ function Shell() {
             >
               <Icon name="external" className="h-4 w-4" /> عرض الموقع
             </a>
+            <NotificationsBell hrefFor={(n) => (n.orderId ? `/admin/delivery/orders/${n.orderId}` : null)} />
             <LangSwitch className="grid h-9 min-w-9 place-items-center rounded-lg px-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink" />
             <button
               type="button"

@@ -8,6 +8,10 @@ export type VendorProfile = {
   description: string;
   logoUrl: string | null;
   commissionPercent: number;
+  phone: string | null;
+  pickupAddress: string | null;
+  pickupLat: number | null;
+  pickupLng: number | null;
   createdAt: string;
 };
 

@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
 import { AdminPage, DetailSkeleton, Panel } from '../../components/admin/ui';
+import { LocationPicker } from '../../components/forms/LocationPicker';
 import { Button, ErrorState, Icon, Input, Textarea } from '../../components/ui';
 import { useAuth } from '../../context/Auth';
 import { api } from '../../lib/api';
@@ -22,10 +23,22 @@ function Form({ profile }: { profile: Profile }) {
   const [name, setName] = useState(profile.name);
   const [description, setDescription] = useState(profile.description);
   const [logo, setLogo] = useState(profile.logoUrl);
+  const [phone, setPhone] = useState(profile.phone ?? '');
+  const [pickupAddress, setPickupAddress] = useState(profile.pickupAddress ?? '');
+  const [lat, setLat] = useState<number | null>(profile.pickupLat);
+  const [lng, setLng] = useState<number | null>(profile.pickupLng);
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    const r = await m.run('save', () => api.patch<Profile>('/vendor/me', { name: name.trim(), description: description.trim() }), 'تم حفظ ملف المتجر');
+    const body = {
+      name: name.trim(),
+      description: description.trim(),
+      phone: phone.trim() || null,
+      pickupAddress: pickupAddress.trim() || null,
+      pickupLat: lat,
+      pickupLng: lng,
+    };
+    const r = await m.run('save', () => api.patch<Profile>('/vendor/me', body), 'تم حفظ ملف المتجر');
     if (r) refresh();
   };
 
@@ -66,6 +79,14 @@ function Form({ profile }: { profile: Profile }) {
               error={m.fieldErrors.description}
               hint="عرّف الزوار بمتجرك: ماذا تبيع، ومن أين، ومدة التوصيل."
             />
+            <div className="space-y-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">بيانات الاستلام لطلبات التوصيل</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input label="هاتف المتجر" optional type="tel" inputMode="tel" dir="ltr" className="text-end" value={phone} onChange={(e) => setPhone(e.target.value)} error={m.fieldErrors.phone} />
+                <Input label="عنوان الاستلام" optional value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} error={m.fieldErrors.pickupAddress} />
+              </div>
+              <LocationPicker lat={lat} lng={lng} onChange={(a, b) => (setLat(a), setLng(b))} hint="اختياري: يساعد موظف التوصيل على الوصول لمتجرك." />
+            </div>
             <Button type="submit" loading={m.pending === 'save'} disabled={name.trim().length < 2}>
               حفظ
             </Button>

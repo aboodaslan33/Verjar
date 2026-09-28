@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
@@ -16,6 +16,9 @@ import {
   StatusBadge,
   Tag,
 } from '../../components/ui';
+import { DeliveryStatusTag } from '../../components/delivery/Tags';
+import { DeliveryTimeline } from '../../components/delivery/Timeline';
+import { NotificationsBell } from '../../components/NotificationsBell';
 import { isAdminUser, useAuth } from '../../context/Auth';
 import { useCustomer } from '../../context/CustomerAuth';
 import { useToast } from '../../context/ToastContext';
@@ -31,6 +34,7 @@ import {
   formatDate,
   formatJOD,
 } from '../../lib/format';
+import type { DeliveryStatus } from '../../lib/delivery';
 import type { BookingType, CorporateType, CustomerMe, Finance, RequestStatus } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 import { TendersTab } from './AccountTenders';
@@ -57,7 +61,9 @@ type OOrder = {
   id: string;
   number: number;
   ref: string;
+  code: string | null;
   status: RequestStatus;
+  deliveryStatus: DeliveryStatus;
   total: Num;
   subtotal: Num;
   discountTotal: Num;
@@ -179,11 +185,14 @@ function AccountView({ customer }: { customer: CustomerMe }) {
               {customer.companyName && <span> · {customer.companyName}</span>}
             </p>
           </div>
-          {customer.vendor && (
-            <ButtonLink to="/vendor" variant="outline">
-              لوحة متجري: {customer.vendor.name}
-            </ButtonLink>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <NotificationsBell hrefFor={(n) => (n.orderId && n.recipientType === 'VENDOR' ? `/vendor/delivery/${n.orderId}` : n.orderId ? '/account?tab=orders' : null)} />
+            {customer.vendor && (
+              <ButtonLink to="/vendor" variant="outline">
+                لوحة متجري: {customer.vendor.name}
+              </ButtonLink>
+            )}
+          </div>
         </div>
       </header>
 
@@ -392,7 +401,7 @@ function OrdersTab({ items }: { items: OOrder[] }) {
     <ul className="space-y-3">
       {items.map((o) => (
         <ItemCard key={o.id}>
-          <CardHead title="طلب متجر" number={o.number} refCode={o.ref} status={<StatusBadge status={o.status} />} />
+          <CardHead title="طلب متجر" number={o.number} refCode={o.code ?? o.ref} status={<DeliveryStatusTag status={o.deliveryStatus} />} />
           <div className="mt-4 overflow-hidden rounded-xl border border-line text-[15px]">
             {(o.vendorOrders?.length ? o.vendorOrders : [null]).map((vo) => (
               <div key={vo?.id ?? 'all'} className="border-b border-line last:border-b-0">
@@ -426,10 +435,75 @@ function OrdersTab({ items }: { items: OOrder[] }) {
               الإجمالي <b className="text-base">{formatJOD(o.total)}</b>
             </span>
           </div>
-          <StatusProgress status={o.status} />
+          <OrderTracking id={o.id} status={o.deliveryStatus} />
         </ItemCard>
       ))}
     </ul>
+  );
+}
+
+type Tracking = {
+  deliveryStatus: DeliveryStatus;
+  codAmount: Num;
+  driver: { name: string; phone: string | null } | null;
+  timeline: { status: DeliveryStatus; at: string }[];
+};
+
+/** تتبّع التوصيل: يُحمَّل عند الطلب فقط */
+function OrderTracking({ id, status }: { id: string; status: DeliveryStatus }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<Tracking | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setError(null);
+    api
+      .get<Tracking>(`/account/orders/${id}/tracking`)
+      .then((d) => alive && setData(d))
+      .catch((e: Error) => alive && setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [open, id, status]);
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-2 text-sm font-semibold">
+        تتبّع التوصيل
+        <Icon name="chevronDown" className={cx('h-4 w-4 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="mt-4">
+          {error ? (
+            <p className="text-sm text-danger">{error}</p>
+          ) : !data ? (
+            <p className="text-sm text-muted">جاري التحميل…</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <DeliveryTimeline status={data.deliveryStatus} timeline={data.timeline} />
+              <div className="space-y-2 text-sm">
+                {data.driver && (
+                  <p className="rounded-xl bg-subtle px-3 py-2">
+                    موظف التوصيل: <b>{data.driver.name}</b>
+                    {data.driver.phone && (
+                      <a href={`tel:${data.driver.phone}`} className="ms-2 underline ltr">
+                        {data.driver.phone}
+                      </a>
+                    )}
+                  </p>
+                )}
+                {Number(data.codAmount) > 0 && (
+                  <p>
+                    المطلوب عند الاستلام: <b>{formatJOD(data.codAmount)}</b>
+                  </p>
+                )}
+                <p className="text-xs text-muted">رمز التحقق عند التسليم (إن طُلب) يصلك في الإشعارات أعلى الصفحة.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
