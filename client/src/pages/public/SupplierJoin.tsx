@@ -32,6 +32,13 @@ export default function SupplierJoin() {
   const location = useLocation();
   const plans = useAsync(() => api.get<Plan[]>('/market/plans'), [], 'market/plans');
   const customer = user?.role === 'CUSTOMER' ? user : null;
+  const [chosen, setChosen] = useState<string | null>(null);
+  const planId = chosen ?? plans.data?.find((p) => p.isDefault)?.id ?? plans.data?.[0]?.id ?? null;
+  const selectedPlan = plans.data?.find((p) => p.id === planId) ?? null;
+  const choose = (id: string) => {
+    setChosen(id);
+    document.getElementById('join-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <>
@@ -50,7 +57,14 @@ export default function SupplierJoin() {
           <p className="mt-1 text-muted">ابدأ مجانًا، ورقِّ باقتك متى احتجت ظهورًا أوسع.</p>
           <ul className="mt-6 grid gap-4 md:grid-cols-3">
             {plans.data?.map((p) => (
-              <li key={p.id} className={cx('flex flex-col rounded-2xl border p-6', p.code === 'BUSINESS' ? 'border-ink bg-inverse text-inverse-fg' : p.code === 'PRO' ? 'border-primary bg-surface' : 'border-line bg-surface')}>
+              <li
+                key={p.id}
+                className={cx(
+                  'flex flex-col rounded-2xl border p-6 transition',
+                  p.code === 'BUSINESS' ? 'border-ink bg-inverse text-inverse-fg' : p.code === 'PRO' ? 'border-primary bg-surface' : 'border-line bg-surface',
+                  p.id === planId && 'ring-2 ring-primary ring-offset-2 ring-offset-bg',
+                )}
+              >
                 <div className="flex items-center justify-between">
                   <p className="font-display text-xl font-bold">{p.name}</p>
                   {p.code === 'PRO' && <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-fg">الأكثر طلبًا</span>}
@@ -60,7 +74,7 @@ export default function SupplierJoin() {
                   {Number(p.price) > 0 && <span className={cx('text-sm', p.code === 'BUSINESS' ? 'text-inverse-fg/60' : 'text-muted')}> / {p.durationDays === 30 ? 'شهريًا' : `${p.durationDays} يومًا`}</span>}
                 </p>
                 <p className={cx('mt-3 text-sm leading-relaxed', p.code === 'BUSINESS' ? 'text-inverse-fg/70' : 'text-muted')}>{p.description}</p>
-                <ul className="mt-5 space-y-2 text-sm">
+                <ul className="mt-5 flex-1 space-y-2 text-sm">
                   {[
                     p.maxProducts == null ? 'منتجات غير محدودة' : `حتى ${p.maxProducts} منتج`,
                     p.maxRfqPerMonth == null ? 'طلبات عروض أسعار غير محدودة' : `حتى ${p.maxRfqPerMonth} طلبات عروض أسعار شهريًا`,
@@ -75,10 +89,25 @@ export default function SupplierJoin() {
                     </li>
                   ))}
                 </ul>
+                {!customer?.vendor && (
+                  <Button
+                    className={cx('mt-6', p.id !== planId && p.code === 'BUSINESS' && 'border-white/40 bg-transparent text-inverse-fg hover:border-white')}
+                    block
+                    variant={p.id === planId ? 'primary' : 'outline'}
+                    onClick={() => choose(p.id)} aria-pressed={p.id === planId}>
+                    {p.id === planId ? (
+                      <>
+                        <Icon name="check" className="h-4 w-4" /> الباقة المختارة
+                      </>
+                    ) : (
+                      'اختر هذه الباقة'
+                    )}
+                  </Button>
+                )}
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-sm text-muted">التسجيل على الباقة المجانية، والترقية من لوحة المورد بعد اعتماد حسابك.</p>
+          <p className="mt-3 text-sm text-muted">الباقات المدفوعة: بعد التسجيل تحوّل المبلغ عبر CliQ أو تحويل بنكي وترفق صورة الإيصال، وتُفعَّل الباقة بعد تأكيد الإدارة. يمكنك الترقية لاحقًا من لوحة المورد.</p>
         </section>
 
         <section className="mt-14" aria-labelledby="join-title">
@@ -106,7 +135,7 @@ export default function SupplierJoin() {
               </ButtonLink>
             </div>
           ) : (
-            <JoinForm defaults={{ name: customer.name, email: customer.email ?? '', company: customer.companyName ?? '' }} />
+            <JoinForm defaults={{ name: customer.name, email: customer.email ?? '', company: customer.companyName ?? '' }} plan={selectedPlan} />
           )}
         </section>
       </div>
@@ -114,7 +143,7 @@ export default function SupplierJoin() {
   );
 }
 
-function JoinForm({ defaults }: { defaults: { name: string; email: string; company: string } }) {
+function JoinForm({ defaults, plan }: { defaults: { name: string; email: string; company: string }; plan: Plan | null }) {
   const { refresh } = useAuth();
   const cats = useAsync(() => api.get<Category[]>('/store/categories'), [], 'store/categories');
   const [f, setF] = useState({
@@ -137,7 +166,7 @@ function JoinForm({ defaults }: { defaults: { name: string; email: string; compa
   const [accept, setAccept] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [done, setDone] = useState<{ status: string } | null>(null);
+  const [done, setDone] = useState<{ status: string; invoiceId: string | null } | null>(null);
   const top = useRef<HTMLDivElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -146,7 +175,7 @@ function JoinForm({ defaults }: { defaults: { name: string; email: string; compa
     setBusy(true);
     setErrors({});
     try {
-      const r = await api.post<{ status: string }>('/market/suppliers/join', toFormData({ ...f, categoryIds, acceptTerms: accept }, { logo, catalog, certificates: certs }));
+      const r = await api.post<{ status: string; invoiceId: string | null }>('/market/suppliers/join', toFormData({ ...f, categoryIds, planId: plan?.id ?? null, acceptTerms: accept }, { logo, catalog, certificates: certs }));
       setDone(r);
       refresh();
     } catch (err) {
@@ -163,9 +192,20 @@ function JoinForm({ defaults }: { defaults: { name: string; email: string; compa
         <SuccessMark />
         <h3 className="mt-4 text-xl">تم استلام طلب انضمامك</h3>
         <p className="mt-2 text-muted">{done.status === 'PENDING' ? 'تراجع إدارة FARJAR بيانات شركتك، ونرسل لك إشعارًا عند الاعتماد. يمكنك من الآن إضافة منتجاتك من لوحة المورد.' : 'حسابك مفعّل. أضف منتجاتك الآن.'}</p>
-        <ButtonLink to="/vendor" className="mt-5">
-          لوحة المورد
-        </ButtonLink>
+        {done.invoiceId && plan && (
+          <div className="mx-auto mt-5 max-w-md rounded-xl border border-primary bg-primary/10 p-4 text-start">
+            <p className="font-bold">
+              الخطوة التالية: دفع باقة {plan.name} — {formatJOD(plan.price)}
+            </p>
+            <p className="mt-1 text-sm">حوّل المبلغ عبر CliQ أو تحويل بنكي، وأرفق صورة الإيصال لتفعيل الباقة.</p>
+          </div>
+        )}
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          {done.invoiceId && <ButtonLink to={`/vendor/subscription?pay=${done.invoiceId}`}>ادفع وأرفق الإيصال</ButtonLink>}
+          <ButtonLink to="/vendor" variant={done.invoiceId ? 'outline' : 'primary'}>
+            لوحة المورد
+          </ButtonLink>
+        </div>
       </div>
     );
   }
@@ -240,6 +280,18 @@ function JoinForm({ defaults }: { defaults: { name: string; email: string; compa
             <input type="file" multiple accept=".pdf,image/*" onChange={(e) => setCerts(Array.from(e.target.files ?? []).slice(0, 8))} className="block w-full text-sm file:me-3 file:rounded-lg file:border file:border-line file:bg-subtle file:px-3 file:py-1.5" />
             {fileList(certs, setCerts)}
           </label>
+          {plan && (
+            <div className="rounded-xl bg-subtle p-3 text-sm">
+              <p className="text-muted">الباقة المختارة</p>
+              <p className="font-bold">
+                {plan.name} — {Number(plan.price) > 0 ? formatJOD(plan.price) : 'مجانًا'}
+              </p>
+              {Number(plan.price) > 0 && <p className="mt-1 text-xs text-muted">بعد التسجيل تدفع وترفق الإيصال، وتبدأ على المجانية حتى تأكيد الدفع.</p>}
+              <a href="#plans-title" className="mt-1 inline-block text-xs font-semibold underline">
+                تغيير الباقة
+              </a>
+            </div>
+          )}
           <Checkbox label="أوافق على شروط الانضمام وسياسات المنصة" checked={accept} onChange={setAccept} error={fe.acceptTerms} />
           <p className="text-xs text-muted">
             <Link to="/policies" className="underline">

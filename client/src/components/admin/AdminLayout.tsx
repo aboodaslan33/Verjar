@@ -33,11 +33,11 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin/market', label: 'لوحة السوق', end: true, perm: ['market.view', 'market.manage'] },
       { to: '/admin/market/rfqs', label: 'طلبات الأسعار / Leads', perm: ['market.view', 'market.manage'] },
-      { to: '/admin/market/suppliers', label: 'الموردون والاعتماد', perm: ['market.view', 'market.manage'] },
+      { to: '/admin/market/suppliers', label: 'الموردون والاعتماد', badge: (s) => s.pendingSuppliers ?? 0, perm: ['market.view', 'market.manage'] },
       { to: '/admin/market/plans', label: 'الباقات', perm: ['market.view', 'market.finance'] },
       { to: '/admin/market/commissions', label: 'العمولات', perm: ['market.view', 'market.finance'] },
       { to: '/admin/market/ads', label: 'الإعلانات', perm: ['market.view', 'market.manage'] },
-      { to: '/admin/market/invoices', label: 'الفواتير', perm: ['market.view', 'market.finance'] },
+      { to: '/admin/market/invoices', label: 'الفواتير', badge: (s) => s.paymentProofs ?? 0, perm: ['market.view', 'market.finance'] },
       { to: '/admin/market/reviews', label: 'التقييمات', perm: ['market.view', 'market.manage'] },
     ],
   },

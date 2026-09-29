@@ -94,6 +94,9 @@ dashboardRouter.get(
       ordersMonth,
       expiringContracts,
       pendingProducts,
+      /** إثباتات دفع الموردين بانتظار المراجعة + موردون بانتظار الاعتماد (شارات السوق الصناعي) */
+      paymentProofs: await prisma.marketInvoice.count({ where: { status: 'PENDING', proofStatus: 'SUBMITTED' } }),
+      pendingSuppliers: await prisma.vendor.count({ where: { status: 'PENDING' } }),
       upcoming,
       activity,
       ops,

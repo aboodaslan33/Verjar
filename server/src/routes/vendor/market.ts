@@ -9,7 +9,8 @@ import { prisma } from '../../lib/prisma';
 import { ammanParts } from '../../lib/time';
 import { maskContacts, partialEmail, partialPhone } from '../../market/contacts';
 import { contactsRevealed, getThread, postMessage } from '../../market/messaging';
-import { activateSubscription, createInvoice, paymentProvider } from '../../market/payments';
+import { activateSubscription, cancelInvoice, createInvoice, paymentAccount, paymentProvider } from '../../market/payments';
+import { emitAdmin } from '../../lib/events';
 import { assertMemberQuota, effectivePlan, planFeatures, rfqQuotaLeft } from '../../market/plans';
 import { OPEN_STATUSES, rfqEvent, submitQuote } from '../../market/rfq';
 import { requireApprovedVendor, requireVendorOwner } from '../../middleware/auth';
@@ -328,7 +329,17 @@ vendorMarketRouter.get(
       prisma.marketInvoice.findMany({ where: { vendorId: v.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
     ]);
     const plan = await effectivePlan(v);
-    ok(res, { current: plan, planId: v.planId, startedAt: v.planStartedAt, expiresAt: v.planExpiresAt, plans, history, invoices, paymentProvider: paymentProvider().name });
+    ok(res, {
+      current: plan,
+      planId: v.planId,
+      startedAt: v.planStartedAt,
+      expiresAt: v.planExpiresAt,
+      plans,
+      history,
+      invoices: invoices.map(({ proofPublicId: _p, ...i }) => i),
+      paymentProvider: paymentProvider().name,
+      account: await paymentAccount(),
+    });
   }),
 );
 
@@ -356,16 +367,76 @@ vendorMarketRouter.post(
   }),
 );
 
+// ───────────── الدفع اليدوي: إثبات الدفع ─────────────
+
+const proofUpload = memoryUpload(10, 1).single('file');
+
+/** المورد يرفع صورة أو PDF لإيصال الحوالة مع رقم المرجع — تصل للإدارة للمراجعة */
+vendorMarketRouter.post(
+  '/invoices/:id/proof',
+  formLimiter,
+  uploadGuard(15),
+  proofUpload,
+  asyncHandler(async (req, res) => {
+    const raw = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body;
+    const input = z
+      .object({
+        reference: z.string().trim().max(120).optional().nullable(),
+        note: z.string().trim().max(500).optional().nullable(),
+      })
+      .parse(raw ?? {});
+    const inv = await prisma.marketInvoice.findFirst({ where: { id: req.params.id, vendorId: vid(req) } });
+    if (!inv) throw notFound('الفاتورة غير موجودة');
+    if (inv.status !== 'PENDING') throw conflict('هذه الفاتورة ليست بانتظار الدفع');
+    if (!req.file) throw badRequest('أرفق صورة أو ملف PDF لإيصال الدفع', { fields: { file: 'أرفق إثبات الدفع' } });
+    const [file] = await validateAndStore([req.file], POLICIES.documents, 'payments');
+    const updated = await prisma.marketInvoice.update({
+      where: { id: inv.id },
+      data: {
+        proofUrl: file.url,
+        proofPublicId: file.publicId,
+        proofName: file.originalName.slice(0, 120),
+        proofKind: file.kind,
+        proofStatus: 'SUBMITTED',
+        proofSubmittedAt: new Date(),
+        payerReference: input.reference || inv.payerReference,
+        payerNote: input.note || null,
+        reviewNote: null,
+      },
+    });
+    emitAdmin({ type: 'invoice.proof', id: inv.id, title: `إثبات دفع جديد للفاتورة ${inv.number} — ${req.vendor!.name}` });
+    await audit({ actorType: 'vendor', action: 'invoice_proof', entity: 'invoice', entityId: inv.id, meta: { number: inv.number, reference: input.reference ?? null } });
+    const { proofPublicId: _p, ...out } = updated;
+    ok(res, out, 201);
+  }),
+);
+
+/** المورد يلغي طلبًا لم يدفعه بعد (مثلًا اختار باقة خاطئة) — لا يُلغى بعد إرسال إثبات الدفع */
+vendorMarketRouter.post(
+  '/invoices/:id/cancel',
+  requireVendorOwner,
+  asyncHandler(async (req, res) => {
+    const inv = await prisma.marketInvoice.findFirst({ where: { id: req.params.id, vendorId: vid(req) } });
+    if (!inv) throw notFound('الفاتورة غير موجودة');
+    if (inv.status !== 'PENDING') throw conflict('هذه الفاتورة ليست بانتظار الدفع');
+    if (inv.proofStatus === 'SUBMITTED') throw conflict('أرسلت إثبات الدفع وهو قيد المراجعة. تواصل مع الإدارة للإلغاء.');
+    if (inv.purpose !== 'SUBSCRIPTION' && inv.purpose !== 'AD') throw conflict('لا يمكن إلغاء هذه الفاتورة');
+    await prisma.$transaction((tx) => cancelInvoice(tx, inv.id));
+    await audit({ actorType: 'vendor', action: 'invoice_cancel', entity: 'invoice', entityId: inv.id });
+    ok(res, { cancelled: true });
+  }),
+);
+
 // ───────────── الإعلانات ─────────────
 
 vendorMarketRouter.get(
   '/ads',
   asyncHandler(async (req, res) => {
     const [ads, packages] = await Promise.all([
-      prisma.marketAd.findMany({ where: { vendorId: vid(req) }, orderBy: { createdAt: 'desc' }, include: { product: { select: { name: true, slug: true } }, invoice: { select: { number: true, status: true, amount: true } } } }),
+      prisma.marketAd.findMany({ where: { vendorId: vid(req) }, orderBy: { createdAt: 'desc' }, include: { product: { select: { name: true, slug: true } }, invoice: { select: { id: true, number: true, status: true, amount: true, purpose: true, description: true, createdAt: true, dueAt: true, proofStatus: true, proofSubmittedAt: true, reviewNote: true, payerReference: true } } } }),
       prisma.adPackage.findMany({ where: { active: true }, orderBy: { sortOrder: 'asc' } }),
     ]);
-    ok(res, { ads, packages });
+    ok(res, { ads, packages, account: await paymentAccount() });
   }),
 );
 

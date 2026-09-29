@@ -325,6 +325,18 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
         </Section>
       </div>
 
+      <div id="payments">
+        <Section title="الدفع اليدوي للموردين" description="بيانات الحساب التي تظهر للمورد عند دفع الاشتراك أو الإعلان. يحوّل المبلغ ويرفق صورة الإيصال، ثم تؤكد الدفع من فواتير السوق.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="البنك" value={str('paymentBankName')} onChange={set('paymentBankName')} error={fe.paymentBankName} />
+            <Input label="اسم المستفيد" value={str('paymentAccountName')} onChange={set('paymentAccountName')} error={fe.paymentAccountName} />
+            <Input label="CliQ (رقم أو Alias)" className="ltr text-start" value={str('paymentCliq')} onChange={set('paymentCliq')} error={fe.paymentCliq} />
+            <Input label="رقم الحساب / IBAN" optional className="ltr text-start" value={str('paymentIban')} onChange={set('paymentIban')} error={fe.paymentIban} />
+          </div>
+          <Textarea label="تعليمات الدفع" className="mt-4" rows={3} value={str('paymentInstructions')} onChange={set('paymentInstructions')} error={fe.paymentInstructions} />
+        </Section>
+      </div>
+
       <Section title="المحتوى والسياسات" description="نصوص الصفحة الرئيسية وصفحة نبذة عنا وسياسات الحجز والطلب">
         <div className="space-y-4">
           <Input label="عنوان الواجهة" value={str('heroTitle')} onChange={set('heroTitle')} error={fe.heroTitle} />

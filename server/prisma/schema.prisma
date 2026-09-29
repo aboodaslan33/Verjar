@@ -1660,6 +1660,19 @@ model MarketInvoice {
   dueAt       DateTime?
   paidAt      DateTime?
   note        String?
+  /// إثبات الدفع اليدوي (صورة أو PDF للحوالة) يرفعه المورد وتراجعه الإدارة
+  proofUrl         String?
+  proofPublicId    String?
+  proofName        String?
+  proofKind        String?
+  /// SUBMITTED (بانتظار مراجعة الإدارة) | REJECTED (رُفض ويُطلب إثبات جديد)
+  proofStatus      String?
+  proofSubmittedAt DateTime?
+  /// رقم الحوالة/المرجع وملاحظة الدافع
+  payerReference   String?
+  payerNote        String?
+  /// سبب رفض الإثبات (يظهر للمورد)
+  reviewNote       String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -1669,6 +1682,7 @@ model MarketInvoice {
 
   @@index([vendorId, status])
   @@index([purpose, status])
+  @@index([proofStatus])
   @@index([createdAt])
 }
 

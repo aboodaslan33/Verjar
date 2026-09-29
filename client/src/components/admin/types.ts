@@ -424,6 +424,8 @@ export type DashboardStats = {
   expiringContracts: number;
   /** منتجات موردين بانتظار المراجعة */
   pendingProducts: number;
+  paymentProofs?: number;
+  pendingSuppliers?: number;
   /** التوصيل والتحصيل والعقود (اليوم/الشهر) */
   ops?: {
     today: OpsPeriod;
@@ -459,7 +461,7 @@ export type SettingsResponse = {
 };
 
 export type AdminEvent = {
-  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending';
+  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending' | 'invoice.proof';
   id: string;
   title: string;
   at: string;

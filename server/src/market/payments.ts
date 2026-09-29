@@ -1,6 +1,7 @@
 import type { InvoicePurpose, MarketInvoice, Prisma } from '@prisma/client';
 import { Prisma as P } from '@prisma/client';
 import { badRequest, notFound } from '../lib/http';
+import { getSettings } from '../services/settings.service';
 
 type Db = Prisma.TransactionClient;
 
@@ -16,12 +17,25 @@ export interface PaymentProvider {
   startPayment(invoice: MarketInvoice): Promise<{ redirectUrl?: string; instructions?: string }>;
 }
 
-/** الدفع اليدوي (CliQ / تحويل / نقدًا) — الإدارة تؤكد الاستلام */
+/** بيانات الحساب الذي يُحوَّل إليه (تُدار من الإعدادات بدون برمجة) */
+export async function paymentAccount() {
+  const s = await getSettings();
+  return {
+    bankName: s.paymentBankName,
+    accountName: s.paymentAccountName,
+    cliq: s.paymentCliq,
+    iban: s.paymentIban,
+    instructions: s.paymentInstructions,
+  };
+}
+
+/** الدفع اليدوي (CliQ / تحويل بنكي): المورد يرفع إثبات الدفع والإدارة تراجعه وتؤكده */
 class ManualProvider implements PaymentProvider {
   readonly name = 'manual';
   async startPayment(invoice: MarketInvoice) {
+    const a = await paymentAccount();
     return {
-      instructions: `ادفع ${invoice.amount} ${invoice.currency} عبر CliQ أو تحويل بنكي واذكر رقم الفاتورة ${invoice.number}، وتؤكد الإدارة الاستلام فتُفعَّل الخدمة تلقائيًا.`,
+      instructions: `ادفع ${invoice.amount} ${invoice.currency} إلى ${a.bankName} (CliQ: ${a.cliq}) واذكر رقم الفاتورة ${invoice.number}، ثم ارفع إثبات الدفع لتراجعه الإدارة.`,
     };
   }
 }
@@ -98,7 +112,13 @@ export async function markInvoicePaid(db: Db, invoiceId: string, opts: { provide
   if (inv.status !== 'PENDING' && inv.status !== 'FAILED') throw badRequest('لا يمكن تأكيد دفع فاتورة ملغاة');
   const paid = await db.marketInvoice.update({
     where: { id: inv.id },
-    data: { status: 'PAID', paidAt: new Date(), providerRef: opts.providerRef ?? inv.providerRef, note: opts.note ?? inv.note },
+    data: {
+      status: 'PAID',
+      paidAt: new Date(),
+      providerRef: opts.providerRef ?? inv.providerRef ?? inv.payerReference,
+      note: opts.note ?? inv.note,
+      ...(inv.proofStatus ? { proofStatus: 'APPROVED', reviewNote: null } : {}),
+    },
   });
   await onPaid(db, paid);
   return paid;

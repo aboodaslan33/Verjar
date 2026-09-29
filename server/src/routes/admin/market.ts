@@ -681,19 +681,33 @@ marketAdminRouter.patch(
 marketAdminRouter.get(
   '/invoices',
   asyncHandler(async (req, res) => {
-    const q = paginationSchema.extend({ status: z.string().max(20).optional(), purpose: z.string().max(20).optional(), vendorId: z.string().optional(), from: optionalDate, to: optionalDate }).parse(req.query);
+    const q = paginationSchema
+      .extend({ status: z.string().max(20).optional(), purpose: z.string().max(20).optional(), proof: z.enum(['SUBMITTED', 'REJECTED', 'APPROVED']).optional(), vendorId: z.string().optional(), from: optionalDate, to: optionalDate })
+      .parse(req.query);
     const where: Prisma.MarketInvoiceWhereInput = {
       ...(q.status ? { status: q.status as never } : {}),
+      ...(q.proof ? { proofStatus: q.proof, ...(q.proof === 'SUBMITTED' ? { status: 'PENDING' as const } : {}) } : {}),
       ...(q.purpose ? { purpose: q.purpose as never } : {}),
       ...(q.vendorId ? { vendorId: q.vendorId } : {}),
       ...(range(q.from, q.to) ? { createdAt: range(q.from, q.to) } : {}),
     };
-    const [items, total, sums] = await Promise.all([
-      prisma.marketInvoice.findMany({ where, orderBy: { createdAt: 'desc' }, include: { vendor: { select: { id: true, name: true } } }, ...pageArgs(q) }),
+    const [items, total, sums, awaitingReview] = await Promise.all([
+      prisma.marketInvoice.findMany({
+        where,
+        // إثباتات الدفع بانتظار المراجعة أولًا
+        orderBy: q.proof === 'SUBMITTED' ? { proofSubmittedAt: 'asc' } : { createdAt: 'desc' },
+        include: { vendor: { select: { id: true, name: true, phone: true } } },
+        ...pageArgs(q),
+      }),
       prisma.marketInvoice.count({ where }),
       prisma.marketInvoice.groupBy({ by: ['status'], where, _sum: { amount: true }, _count: { _all: true } }),
+      prisma.marketInvoice.count({ where: { status: 'PENDING', proofStatus: 'SUBMITTED' } }),
     ]);
-    ok(res, { ...paged(items, total, q), sums: Object.fromEntries(sums.map((s) => [s.status, { count: s._count._all, amount: toNum(s._sum.amount ?? 0) }])) });
+    ok(res, {
+      ...paged(items, total, q),
+      sums: Object.fromEntries(sums.map((s) => [s.status, { count: s._count._all, amount: toNum(s._sum.amount ?? 0) }])),
+      awaitingReview,
+    });
   }),
 );
 
@@ -703,9 +717,39 @@ marketAdminRouter.post(
   asyncHandler(async (req, res) => {
     const { providerRef, note } = z.object({ providerRef: z.string().trim().max(120).optional().nullable(), note: z.string().trim().max(300).optional().nullable() }).parse(req.body ?? {});
     const inv = await prisma.$transaction((tx) => markInvoicePaid(tx, req.params.id, { providerRef, note }));
-    if (inv.vendorId) await marketNotify(prisma, { vendorIds: [inv.vendorId] }, { title: `تم استلام دفعة الفاتورة ${inv.number}`, body: `${inv.description} — ${toNum(inv.amount)} د.أ. شكرًا لك.`, link: '/vendor/subscription' });
+    if (inv.vendorId) {
+      await marketNotify(prisma, { vendorIds: [inv.vendorId] }, {
+        title: `تم تأكيد دفع الفاتورة ${inv.number}`,
+        body: `${inv.description} — ${toNum(inv.amount)} د.أ. تم تفعيل الخدمة، شكرًا لك.`,
+        link: inv.purpose === 'AD' ? '/vendor/ads' : '/vendor/subscription',
+        cta: 'عرض التفاصيل',
+      });
+    }
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'invoice_paid', entity: 'invoice', entityId: inv.id, meta: { providerRef } });
     ok(res, inv);
+  }),
+);
+
+/** رفض إثبات الدفع (مبلغ ناقص، صورة غير واضحة…): تبقى الفاتورة بانتظار الدفع ويُطلب من المورد إثبات جديد */
+marketAdminRouter.post(
+  '/invoices/:id/reject-proof',
+  finance,
+  asyncHandler(async (req, res) => {
+    const { reason } = z.object({ reason: z.string().trim().min(3, 'اكتب سبب الرفض ليعرفه المورد').max(300) }).parse(req.body ?? {});
+    const inv = await prisma.marketInvoice.findUnique({ where: { id: req.params.id } });
+    if (!inv) throw notFound('الفاتورة غير موجودة');
+    if (inv.status !== 'PENDING' || inv.proofStatus !== 'SUBMITTED') throw conflict('لا يوجد إثبات دفع بانتظار المراجعة');
+    const updated = await prisma.marketInvoice.update({ where: { id: inv.id }, data: { proofStatus: 'REJECTED', reviewNote: reason } });
+    if (inv.vendorId) {
+      await marketNotify(prisma, { vendorIds: [inv.vendorId] }, {
+        title: `لم يُقبل إثبات دفع الفاتورة ${inv.number}`,
+        body: `السبب: ${reason}. ارفع إثبات دفع جديد من صفحة الاشتراك والفواتير.`,
+        link: '/vendor/subscription',
+        cta: 'رفع إثبات جديد',
+      });
+    }
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'invoice_proof_reject', entity: 'invoice', entityId: inv.id, meta: { reason } });
+    ok(res, updated);
   }),
 );
 
@@ -767,7 +811,9 @@ marketAdminRouter.get(
     const paid = { SUBSCRIPTION: inv('SUBSCRIPTION', 'PAID'), AD: inv('AD', 'PAID'), LEAD_FEE: inv('LEAD_FEE', 'PAID'), COMMISSION: inv('COMMISSION', 'PAID'), ORDER: inv('ORDER', 'PAID'), PROCUREMENT: inv('PROCUREMENT', 'PAID') };
     const pending = { SUBSCRIPTION: inv('SUBSCRIPTION', 'PENDING'), AD: inv('AD', 'PENDING'), LEAD_FEE: inv('LEAD_FEE', 'PENDING'), COMMISSION: inv('COMMISSION', 'PENDING') };
     const leadValue = await prisma.rfqRecipient.aggregate({ where: created ? { sentAt: created } : {}, _sum: { leadFee: true }, _count: { _all: true } });
+    const proofsToReview = await prisma.marketInvoice.count({ where: { status: 'PENDING', proofStatus: 'SUBMITTED' } });
     ok(res, {
+      proofsToReview,
       revenueMode: settings.marketRevenueMode,
       suppliers: Object.fromEntries(suppliers.map((s) => [s.status, s._count._all])),
       plans: plans.map((p) => ({ plan: p.planId ? planNames.get(p.planId) ?? '—' : 'بدون', count: p._count._all })),

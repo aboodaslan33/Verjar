@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 
 export type AdminEvent = {
-  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending';
+  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending' | 'invoice.proof';
   id: string;
   title: string;
   at: string;

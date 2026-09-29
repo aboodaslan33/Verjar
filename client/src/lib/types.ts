@@ -53,6 +53,11 @@ export type AdminSettings = Omit<SiteSettings, 'whatsappMode'> & {
   supplierApprovalRequired: boolean;
   hideContactsUntilAward: boolean;
   subscriptionReminderDays: number;
+  paymentBankName: string;
+  paymentAccountName: string;
+  paymentCliq: string;
+  paymentIban: string;
+  paymentInstructions: string;
 };
 
 export type Category = {

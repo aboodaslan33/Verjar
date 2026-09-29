@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { app, createAdmin, createCustomer, prisma, resetDb } from './helpers';
+import { app, createAdmin, createCustomer, PNG_1PX, prisma, resetDb } from './helpers';
 import { runMarketJobs } from '../src/jobs/market';
 
 type Agent = Awaited<ReturnType<typeof createCustomer>>;
@@ -329,5 +329,74 @@ describe('السوق الصناعي B2B', () => {
     expect(await prisma.marketInvoice.count({ where: { vendorId: HOUSE_VENDOR_ID } })).toBe(0);
     // لا عرض جديد بعد الترسية
     expect((await admin.post(`/api/v1/admin/market/rfqs/${id}/house-quote`).send({ unitPrice: 1, quantity: 1 })).status).toBe(409);
+  });
+
+  it('الدفع اليدوي: اختيار باقة عند الانضمام → إيصال → رفض → إيصال جديد → تأكيد الإدارة يفعّل الباقة', async () => {
+    const agent = await createCustomer({ name: 'مورد الكهرباء', phone: '0784444444' });
+    const join = await agent.post('/api/v1/market/suppliers/join').send({
+      companyName: 'كهرباء المصانع',
+      contactName: 'م. رامي',
+      phone: '0784444444',
+      email: 'rami@elec.jo',
+      address: 'سحاب',
+      city: 'سحاب',
+      businessField: 'كهرباء صناعية',
+      productTypes: 'لوحات تحكم',
+      planId: 'plan_business',
+      acceptTerms: true,
+    });
+    expect(join.status).toBe(201);
+    const invoiceId = join.body.data.invoiceId as string;
+    expect(invoiceId).toBeTruthy();
+
+    // بيانات الحساب من الإعدادات تظهر للمورد
+    const sub = await agent.get('/api/v1/vendor/market/subscription');
+    expect(sub.body.data.account).toMatchObject({ bankName: 'بنك الاتحاد', cliq: '0780192930' });
+    expect(sub.body.data.invoices[0]).toMatchObject({ id: invoiceId, status: 'PENDING', amount: 79 });
+    // طلب آخر ممنوع حتى يُدفع أو يُلغى هذا
+    expect((await agent.post('/api/v1/vendor/market/subscription').send({ planId: 'plan_pro' })).status).toBe(409);
+
+    // الإيصال مطلوب، والملف صورة أو PDF فقط
+    expect((await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).field('data', JSON.stringify({ reference: 'x' }))).status).toBe(400);
+    const bad = await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).attach('file', Buffer.from('not an image'), { filename: 'a.png', contentType: 'image/png' });
+    expect(bad.status).toBe(400);
+
+    const up = await agent
+      .post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`)
+      .field('data', JSON.stringify({ reference: 'CLIQ-778899', note: 'حوالة من حساب الشركة' }))
+      .attach('file', PNG_1PX, { filename: 'receipt.png', contentType: 'image/png' });
+    expect(up.status).toBe(201);
+    expect(up.body.data).toMatchObject({ proofStatus: 'SUBMITTED', payerReference: 'CLIQ-778899', proofKind: 'IMAGE' });
+    expect(up.body.data.proofPublicId).toBeUndefined();
+    // لا يُلغى بعد إرسال الإيصال
+    expect((await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/cancel`)).status).toBe(409);
+
+    const list = await admin.get('/api/v1/admin/market/invoices?proof=SUBMITTED');
+    expect(list.body.data.awaitingReview).toBe(1);
+    expect(list.body.data.items[0]).toMatchObject({ id: invoiceId, payerReference: 'CLIQ-778899' });
+    expect((await admin.get('/api/v1/admin/dashboard/stats')).body.data.paymentProofs).toBe(1);
+
+    // رفض الإيصال بسبب → يُبلَّغ المورد ويبقى الطلب بانتظار الدفع
+    expect((await admin.post(`/api/v1/admin/market/invoices/${invoiceId}/reject-proof`).send({ reason: '' })).status).toBe(400);
+    expect((await admin.post(`/api/v1/admin/market/invoices/${invoiceId}/reject-proof`).send({ reason: 'المبلغ المحوّل 70 بدل 79' })).status).toBe(200);
+    const vendorId = join.body.data.id as string;
+    expect(await prisma.notification.count({ where: { recipientId: vendorId, title: { contains: 'لم يُقبل إثبات دفع' } } })).toBe(1);
+    const after = (await agent.get('/api/v1/vendor/market/subscription')).body.data.invoices[0];
+    expect(after).toMatchObject({ status: 'PENDING', proofStatus: 'REJECTED', reviewNote: 'المبلغ المحوّل 70 بدل 79' });
+
+    // إيصال جديد ثم تأكيد الإدارة يفعّل BUSINESS
+    await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).attach('file', PNG_1PX, { filename: 'receipt2.png', contentType: 'image/png' });
+    const paid = await admin.post(`/api/v1/admin/market/invoices/${invoiceId}/paid`).send({});
+    expect(paid.status).toBe(200);
+    expect(paid.body.data).toMatchObject({ status: 'PAID', proofStatus: 'APPROVED', providerRef: 'CLIQ-778899' });
+    const v = await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId }, include: { plan: true } });
+    expect(v.plan?.code).toBe('BUSINESS');
+    // لا رفع إيصال على فاتورة مدفوعة
+    expect((await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).attach('file', PNG_1PX, { filename: 'r.png', contentType: 'image/png' })).status).toBe(409);
+
+    // المورد يلغي طلب ترقية لم يدفعه
+    const again = await agent.post('/api/v1/vendor/market/subscription').send({ planId: 'plan_pro' });
+    expect((await agent.post(`/api/v1/vendor/market/invoices/${again.body.data.invoice.id}/cancel`)).status).toBe(200);
+    expect((await prisma.vendorSubscription.findFirstOrThrow({ where: { invoiceId: again.body.data.invoice.id } })).status).toBe('CANCELLED');
   });
 });

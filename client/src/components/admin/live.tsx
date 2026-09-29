@@ -36,6 +36,7 @@ const TYPE_PREFIX: Record<AdminEvent['type'], string> = {
   'rfq.new': 'طلب عرض سعر جديد',
   'rfq.awarded': 'ترسية طلب',
   'supplier.pending': 'مورد بانتظار المراجعة',
+  'invoice.proof': 'إثبات دفع جديد',
 };
 
 export function LiveProvider({ children }: { children: ReactNode }) {

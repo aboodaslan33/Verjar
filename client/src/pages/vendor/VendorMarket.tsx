@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
 import { AdminPage, DetailSkeleton, Panel, StatTile } from '../../components/admin/ui';
@@ -11,7 +11,6 @@ import {
   AD_TYPE_LABEL,
   FEATURE_LABEL,
   INVOICE_PURPOSE_LABEL,
-  INVOICE_STATUS_LABEL,
   PLACEMENT_LABEL,
   QUOTE_STATUS_LABEL,
   RFQ_STATUS_LABEL,
@@ -24,6 +23,7 @@ import {
   type VendorStatus,
 } from '../../lib/market';
 import { useDocumentTitle } from '../../lib/useAsync';
+import { PaymentProofModal, ProofTag, type PayableInvoice, type PaymentAccount } from '../../components/market/PaymentProof';
 
 // ───────────── ملخص السوق ─────────────
 
@@ -545,7 +545,7 @@ export function VendorStats() {
 // ───────────── الاشتراك والفواتير ─────────────
 
 type Plan = { id: string; code: string; name: string; description: string; price: number; durationDays: number; maxProducts: number | null; maxUsers: number; maxRfqPerMonth: number | null; leadsIncluded: boolean; features: Record<string, boolean> };
-type Invoice = { id: string; number: string; purpose: string; description: string; amount: number; status: string; createdAt: string; paidAt: string | null; dueAt: string | null };
+type Invoice = PayableInvoice & { paidAt: string | null };
 type SubData = {
   current: Plan | null;
   planId: string | null;
@@ -554,35 +554,61 @@ type SubData = {
   plans: Plan[];
   history: { id: string; status: string; amount: number; startsAt: string | null; endsAt: string | null; createdAt: string; plan: { name: string }; invoice: { number: string; status: string } | null }[];
   invoices: Invoice[];
+  account: PaymentAccount;
 };
 
 export function VendorSubscription({ owner }: { owner: boolean }) {
   useDocumentTitle('الاشتراك');
   const q = useAdminQuery(() => api.get<SubData>('/vendor/market/subscription'), []);
   const m = useMutation();
-  const [instructions, setInstructions] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [paying, setPaying] = useState<Invoice | null>(null);
+  const [cancelling, setCancelling] = useState<Invoice | null>(null);
+  // ?pay=<invoiceId>: فتح نافذة الدفع مباشرة (من صفحة الانضمام أو الإشعار)
+  const [params, setParams] = useSearchParams();
+  const payId = params.get('pay');
+  useEffect(() => {
+    if (!payId || !q.data) return;
+    const inv = q.data.invoices.find((i) => i.id === payId && i.status === 'PENDING' && i.proofStatus !== 'SUBMITTED');
+    if (inv) setPaying(inv);
+    setParams((p) => (p.delete('pay'), p), { replace: true });
+  }, [payId, q.data, setParams]);
   if (q.loading) return <DetailSkeleton />;
   if (q.error || !q.data) return <ErrorState message={q.error?.message ?? ''} onRetry={q.retry} />;
   const d = q.data;
+  const open = d.invoices.filter((i) => i.status === 'PENDING');
+  const pendingSub = open.find((i) => i.purpose === 'SUBSCRIPTION');
   const request = async (planId: string) => {
-    const r = await m.run('plan', () => api.post<{ activated: boolean; payment: { instructions?: string } | null }>('/vendor/market/subscription', { planId }), 'تم تسجيل الطلب');
+    setInfo(null);
+    const r = await m.run('plan', () => api.post<{ activated: boolean; invoice: Invoice | null }>('/vendor/market/subscription', { planId }), 'تم تسجيل الطلب');
     if (r) {
-      setInstructions(r.activated ? 'تم تفعيل الباقة.' : r.payment?.instructions ?? 'صدرت فاتورة بانتظار الدفع.');
+      if (r.activated) setInfo('تم تفعيل الباقة.');
+      else if (r.invoice) setPaying(r.invoice);
+      q.retry();
+    }
+  };
+  const cancel = async () => {
+    if (!cancelling) return;
+    if (await m.run('cancel', () => api.post(`/vendor/market/invoices/${cancelling.id}/cancel`), 'تم إلغاء الطلب')) {
+      setCancelling(null);
       q.retry();
     }
   };
   return (
-    <AdminPage title="الاشتراك والفواتير" description="باقتك الحالية، الترقية والتجديد، وفواتيرك.">
-      {instructions && (
-        <Alert tone="info" className="mb-6" title="الخطوة التالية">
-          {instructions}
+    <AdminPage title="الاشتراك والفواتير" description="اختر باقتك، ادفع عبر CliQ أو تحويل بنكي، وأرفق الإيصال لتفعّلها الإدارة.">
+      {info && (
+        <Alert tone="success" className="mb-6">
+          {info}
         </Alert>
       )}
-      {m.error && (
+      {m.error && !paying && (
         <Alert tone="error" className="mb-6">
           {m.error}
         </Alert>
       )}
+      {open.map((i) => (
+        <PendingPayment key={i.id} invoice={i} owner={owner} onPay={() => setPaying(i)} onCancel={() => setCancelling(i)} />
+      ))}
       <Panel title="باقتك الحالية" className="mb-6">
         <p className="font-display text-2xl font-bold">{d.current?.name ?? '—'}</p>
         <p className="mt-1 text-sm text-muted">
@@ -610,7 +636,13 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
                   ))}
               </ul>
               {owner && (
-                <Button className="mt-4" variant={current ? 'outline' : 'primary'} loading={m.pending === 'plan'} disabled={current && Number(p.price) === 0} onClick={() => request(p.id)}>
+                <Button
+                  className="mt-4"
+                  variant={current ? 'outline' : 'primary'}
+                  loading={m.pending === 'plan'}
+                  disabled={(current && Number(p.price) === 0) || Boolean(pendingSub)}
+                  onClick={() => request(p.id)}
+                >
                   {current ? (Number(p.price) > 0 ? 'تجديد' : 'باقتك الحالية') : 'اختيار الباقة'}
                 </Button>
               )}
@@ -618,6 +650,7 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
           );
         })}
       </ul>
+      {pendingSub && owner && <p className="-mt-5 mb-8 text-sm text-muted">لديك طلب اشتراك مفتوح — أكمل دفعه أو ألغه لاختيار باقة أخرى.</p>}
       <Panel title="الفواتير" bodyClassName="p-0 sm:p-0">
         {d.invoices.length === 0 ? (
           <p className="p-4 text-sm text-muted sm:p-5">لا توجد فواتير.</p>
@@ -630,29 +663,93 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
                   <span className="block text-sm">{i.description}</span>
                   <span className="text-xs text-muted">
                     {INVOICE_PURPOSE_LABEL[i.purpose] ?? i.purpose} · {formatDate(i.createdAt)}
+                    {i.paidAt && <> · دُفعت {formatDate(i.paidAt)}</>}
                   </span>
+                  {i.proofUrl && (
+                    <a href={i.proofUrl} target="_blank" rel="noreferrer" className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-primary-ink underline">
+                      <Icon name="file" className="h-3.5 w-3.5" /> إيصال الدفع
+                    </a>
+                  )}
                 </span>
-                <span className="text-end">
+                <span className="flex flex-col items-end gap-1 text-end">
                   <span className="block font-semibold tabular-nums">{formatJOD(i.amount)}</span>
-                  <Tag tone={i.status === 'PAID' ? 'success' : i.status === 'PENDING' ? 'brand' : 'neutral'}>{INVOICE_STATUS_LABEL[i.status] ?? i.status}</Tag>
+                  <ProofTag invoice={i} />
+                  {owner && i.status === 'PENDING' && i.proofStatus !== 'SUBMITTED' && (
+                    <Button size="sm" variant="outline" onClick={() => setPaying(i)}>
+                      ادفع وأرفق الإيصال
+                    </Button>
+                  )}
                 </span>
               </li>
             ))}
           </ul>
         )}
       </Panel>
+      <PaymentProofModal invoice={paying} account={d.account} onClose={() => setPaying(null)} onDone={() => (setPaying(null), setInfo('تم إرسال إثبات الدفع. تراجع الإدارة الإيصال وتفعّل الباقة، ويصلك إشعار بالنتيجة.'), q.retry())} />
+      <Modal
+        open={Boolean(cancelling)}
+        onClose={() => setCancelling(null)}
+        title="إلغاء الطلب؟"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCancelling(null)}>
+              رجوع
+            </Button>
+            <Button variant="danger" loading={m.pending === 'cancel'} onClick={cancel}>
+              إلغاء الطلب
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          تُلغى الفاتورة <span className="ltr font-semibold">{cancelling?.number}</span> ويمكنك اختيار باقة أخرى.
+        </p>
+      </Modal>
     </AdminPage>
+  );
+}
+
+/** تنبيه فاتورة مفتوحة: بانتظار الدفع، قيد المراجعة، أو رُفض الإيصال */
+function PendingPayment({ invoice: i, owner, onPay, onCancel }: { invoice: Invoice; owner: boolean; onPay: () => void; onCancel: () => void }) {
+  const review = i.proofStatus === 'SUBMITTED';
+  const rejected = i.proofStatus === 'REJECTED';
+  return (
+    <div className={cx('mb-6 rounded-2xl border p-4 sm:p-5', review ? 'border-line bg-subtle' : rejected ? 'border-danger/40 bg-danger/5' : 'border-primary bg-primary/10')}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-bold">
+            {review ? 'إيصال الدفع قيد المراجعة' : rejected ? 'لم يُقبل إيصال الدفع' : 'أكمل الدفع لتفعيل طلبك'} <ProofTag invoice={i} />
+          </p>
+          <p className="mt-1 text-sm">
+            {i.description} — <b className="tabular-nums">{formatJOD(i.amount)}</b> · <span className="ltr">{i.number}</span>
+          </p>
+          {review && i.proofSubmittedAt && <p className="mt-1 text-sm text-muted">أُرسل {formatDate(i.proofSubmittedAt)}. تُفعَّل الخدمة بعد تأكيد الإدارة.</p>}
+          {rejected && i.reviewNote && <p className="mt-1 text-sm text-danger">السبب: {i.reviewNote}</p>}
+        </div>
+        {owner && !review && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={onPay}>
+              {rejected ? 'رفع إيصال جديد' : 'ادفع وأرفق الإيصال'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onCancel}>
+              إلغاء الطلب
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
 // ───────────── الإعلانات ─────────────
 
-type Ad = { id: string; type: string; placement: string; status: string; startsAt: string; endsAt: string; impressions: number; clicks: number; price: number; product: { name: string; slug: string } | null; invoice: { number: string; status: string; amount: number } | null };
+type Ad = { id: string; type: string; placement: string; status: string; startsAt: string; endsAt: string; impressions: number; clicks: number; price: number; product: { name: string; slug: string } | null; invoice: PayableInvoice | null };
 type Pkg = { id: string; type: string; name: string; placement: string; price: number; durationDays: number };
 
 export function VendorAds({ approved }: { approved: boolean }) {
   useDocumentTitle('الإعلانات');
-  const q = useAdminQuery(() => api.get<{ ads: Ad[]; packages: Pkg[] }>('/vendor/market/ads'), []);
+  const q = useAdminQuery(() => api.get<{ ads: Ad[]; packages: Pkg[]; account: PaymentAccount }>('/vendor/market/ads'), []);
+  const [paying, setPaying] = useState<PayableInvoice | null>(null);
   const products = useAdminQuery(() => api.get<{ items: { id: string; name: string; approvalStatus: string }[] }>('/vendor/products', { pageSize: 100, approval: 'APPROVED' }), []);
   const m = useMutation();
   const [open, setOpen] = useState(false);
@@ -662,10 +759,11 @@ export function VendorAds({ approved }: { approved: boolean }) {
   const pkg = q.data?.packages.find((p) => p.id === pkgId);
   const needsProduct = pkg ? ['FEATURED_PRODUCT', 'PRODUCT_OF_WEEK', 'INDUSTRIAL_DEAL'].includes(pkg.type) : false;
   const submit = async () => {
-    const r = await m.run('ad', () => api.post<{ payment: { instructions?: string } | null }>('/vendor/market/ads', { packageId: pkgId, productId: needsProduct ? productId : null }), 'تم طلب الإعلان');
+    const r = await m.run('ad', () => api.post<{ invoice: PayableInvoice | null }>('/vendor/market/ads', { packageId: pkgId, productId: needsProduct ? productId : null }), 'تم طلب الإعلان');
     if (r) {
       setOpen(false);
-      setInfo(r.payment?.instructions ?? 'بانتظار موافقة الإدارة.');
+      if (r.invoice) setPaying(r.invoice);
+      else setInfo('بانتظار موافقة الإدارة.');
       q.retry();
     }
   };
@@ -686,6 +784,14 @@ export function VendorAds({ approved }: { approved: boolean }) {
           {info}
         </Alert>
       )}
+      {q.data && (
+        <PaymentProofModal
+          invoice={paying}
+          account={q.data.account}
+          onClose={() => setPaying(null)}
+          onDone={() => (setPaying(null), setInfo('تم إرسال إثبات الدفع. يبدأ إعلانك بعد تأكيد الإدارة.'), q.retry())}
+        />
+      )}
       {q.loading ? (
         <SkeletonRows rows={3} />
       ) : !q.data?.ads.length ? (
@@ -705,6 +811,17 @@ export function VendorAds({ approved }: { approved: boolean }) {
                 {PLACEMENT_LABEL[a.placement] ?? a.placement} · {formatDate(a.startsAt)} ← {formatDate(a.endsAt)} · {formatJOD(a.price)}
                 {a.invoice && <> · فاتورة <span className="ltr">{a.invoice.number}</span></>}
               </p>
+              {a.invoice && a.invoice.status === 'PENDING' && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <ProofTag invoice={a.invoice} />
+                  {a.invoice.proofStatus === 'REJECTED' && a.invoice.reviewNote && <span className="text-sm text-danger">{a.invoice.reviewNote}</span>}
+                  {a.invoice.proofStatus !== 'SUBMITTED' && (
+                    <Button size="sm" variant="outline" onClick={() => setPaying(a.invoice)}>
+                      ادفع وأرفق الإيصال
+                    </Button>
+                  )}
+                </div>
+              )}
               <p className="mt-2 text-sm">
                 <span className="num font-semibold">{a.impressions}</span> ظهور · <span className="num font-semibold">{a.clicks}</span> نقرة
                 {a.impressions > 0 && <span className="text-muted"> · نسبة النقر {((a.clicks / a.impressions) * 100).toFixed(1)}%</span>}

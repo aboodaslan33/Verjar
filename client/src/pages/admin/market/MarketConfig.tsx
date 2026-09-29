@@ -542,44 +542,100 @@ function CreateAdDialog({ suppliers, onClose, onSaved }: { suppliers: { id: stri
 
 // ═════════ الفواتير ═════════
 
-type Inv = { id: string; number: string; purpose: string; description: string; amount: number; status: string; provider: string; providerRef: string | null; createdAt: string; paidAt: string | null; vendor: { id: string; name: string } | null };
+type Inv = {
+  id: string;
+  number: string;
+  purpose: string;
+  description: string;
+  amount: number;
+  status: string;
+  provider: string;
+  providerRef: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  proofUrl: string | null;
+  proofName: string | null;
+  proofKind: string | null;
+  proofStatus: string | null;
+  proofSubmittedAt: string | null;
+  payerReference: string | null;
+  payerNote: string | null;
+  reviewNote: string | null;
+  vendor: { id: string; name: string; phone: string | null } | null;
+};
+
+const PROOF_LABEL: Record<string, string> = { SUBMITTED: 'إيصال بانتظار المراجعة', REJECTED: 'إيصال مرفوض', APPROVED: 'إيصال مقبول' };
 
 export function MarketInvoices() {
   useDocumentTitle('فواتير السوق');
-  const f = useFilters(['status', 'purpose'] as const);
-  const q = useAdminQuery(() => api.get<Paged<Inv> & { sums: Record<string, { count: number; amount: number }> }>('/admin/market/invoices', { ...f.values, page: f.page, pageSize: 50 }), [JSON.stringify(f.values), f.page], { keep: true });
+  const f = useFilters(['status', 'purpose', 'proof'] as const);
+  const q = useAdminQuery(
+    () => api.get<Paged<Inv> & { sums: Record<string, { count: number; amount: number }>; awaitingReview: number }>('/admin/market/invoices', { ...f.values, page: f.page, pageSize: 50 }),
+    [JSON.stringify(f.values), f.page],
+    { keep: true, live: true },
+  );
   const m = useMutation();
-  const [paying, setPaying] = useState<Inv | null>(null);
-  const [ref, setRef] = useState('');
+  const [review, setReview] = useState<Inv | null>(null);
   const cols: Column<Inv>[] = [
     { key: 'n', header: 'الفاتورة', cell: (i) => <span><span className="ltr block font-semibold">{i.number}</span><span className="text-xs text-muted">{formatDate(i.createdAt)}</span></span> },
     { key: 'v', header: 'المورد', cell: (i) => (i.vendor ? <Link to={`/admin/market/suppliers/${i.vendor.id}`} className="hover:underline">{i.vendor.name}</Link> : '—') },
     { key: 'p', header: 'البند', cell: (i) => <span><span className="block">{INVOICE_PURPOSE_LABEL[i.purpose] ?? i.purpose}</span><span className="line-clamp-1 text-xs text-muted">{i.description}</span></span> },
     { key: 'a', header: 'المبلغ', cell: (i) => <b className="tabular-nums">{formatJOD(i.amount)}</b> },
-    { key: 's', header: 'الحالة', cell: (i) => <Tag tone={i.status === 'PAID' ? 'success' : i.status === 'PENDING' ? 'brand' : 'neutral'}>{INVOICE_STATUS_LABEL[i.status] ?? i.status}</Tag> },
+    {
+      key: 's',
+      header: 'الحالة',
+      cell: (i) => (
+        <span className="flex flex-col items-start gap-1">
+          <Tag tone={i.status === 'PAID' ? 'success' : i.status === 'PENDING' ? 'brand' : 'neutral'}>{INVOICE_STATUS_LABEL[i.status] ?? i.status}</Tag>
+          {i.proofStatus && i.status === 'PENDING' && <Tag tone={i.proofStatus === 'SUBMITTED' ? 'sand' : 'danger'}>{PROOF_LABEL[i.proofStatus] ?? i.proofStatus}</Tag>}
+        </span>
+      ),
+    },
     {
       key: 'act',
       header: '',
       cell: (i) =>
-        i.status === 'PENDING' && (
+        i.status === 'PENDING' ? (
           <span className="flex gap-1">
-            <Button size="sm" variant="outline" onClick={() => (setRef(''), setPaying(i))}>
-              تأكيد الدفع
+            <Button size="sm" variant={i.proofStatus === 'SUBMITTED' ? 'primary' : 'outline'} onClick={() => setReview(i)}>
+              {i.proofStatus === 'SUBMITTED' ? 'مراجعة الإيصال' : 'تأكيد الدفع'}
             </Button>
             <Button size="sm" variant="ghost" className="text-danger" loading={m.pending === `c${i.id}`} onClick={async () => (await m.run(`c${i.id}`, () => api.post(`/admin/market/invoices/${i.id}/cancel`), 'أُلغيت الفاتورة')) && q.retry()}>
               إلغاء
             </Button>
           </span>
-        ),
+        ) : i.proofUrl ? (
+          <a href={i.proofUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold underline">
+            الإيصال
+          </a>
+        ) : null,
     },
   ];
   const s = q.data?.sums ?? {};
+  const awaiting = q.data?.awaitingReview ?? 0;
   return (
-    <AdminPage title="فواتير السوق" description="اشتراكات، إعلانات، رسوم Leads وعمولات. تأكيد الدفع يُفعّل الخدمة المرتبطة تلقائيًا (بوابة دفع إلكتروني لاحقًا بنفس الفواتير).">
+    <AdminPage title="فواتير السوق" description="اشتراكات وإعلانات الموردين ورسوم Leads وعمولات. يرفع المورد إيصال الدفع (CliQ / تحويل)، وتأكيدك يُفعّل الباقة أو الإعلان تلقائيًا.">
+      {awaiting > 0 && f.values.proof !== 'SUBMITTED' && (
+        <button type="button" onClick={() => f.set({ proof: 'SUBMITTED', status: '' })} className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border border-primary bg-primary/10 p-4 text-start">
+          <span>
+            <b>{awaiting} إيصال دفع بانتظار مراجعتك</b>
+            <span className="block text-sm text-muted">راجع الإيصال وأكّد الدفع لتفعيل خدمة المورد.</span>
+          </span>
+          <Icon name="arrowLeft" className="h-5 w-5 ltr:rotate-180" />
+        </button>
+      )}
       <p className="mb-4 text-sm text-muted">
         مدفوعة: <b className="text-ink">{formatJOD(s.PAID?.amount ?? 0)}</b> ({s.PAID?.count ?? 0}) · بانتظار الدفع: <b className="text-ink">{formatJOD(s.PENDING?.amount ?? 0)}</b> ({s.PENDING?.count ?? 0})
       </p>
       <FilterBar onClear={f.clear} active={f.active}>
+        <FilterSelect label="الإيصال" value={f.values.proof} onChange={(e) => f.set({ proof: e.target.value })}>
+          <option value="">الكل</option>
+          {Object.entries(PROOF_LABEL).map(([k, l]) => (
+            <option key={k} value={k}>
+              {l}
+            </option>
+          ))}
+        </FilterSelect>
         <FilterSelect label="الحالة" value={f.values.status} onChange={(e) => f.set({ status: e.target.value })}>
           <option value="">الكل</option>
           {Object.entries(INVOICE_STATUS_LABEL).map(([k, l]) => (
@@ -598,31 +654,111 @@ export function MarketInvoices() {
         </FilterSelect>
       </FilterBar>
       <DataTable rows={q.data?.items} columns={cols} rowKey={(i) => i.id} loading={q.loading} refreshing={q.refreshing} error={q.error} onRetry={q.retry} total={q.data?.total} page={q.data?.page} pages={q.data?.pages} onPage={f.setPage} empty={{ title: 'لا توجد فواتير' }} />
-      <Modal
-        open={Boolean(paying)}
-        onClose={() => setPaying(null)}
-        title={`تأكيد دفع ${paying?.number ?? ''}`}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setPaying(null)}>
-              إلغاء
-            </Button>
-            <Button loading={m.pending === 'pay'} onClick={async () => paying && (await m.run('pay', () => api.post(`/admin/market/invoices/${paying.id}/paid`, { providerRef: ref.trim() || null }), 'تم تأكيد الدفع')) && (setPaying(null), q.retry())}>
-              تأكيد
-            </Button>
-          </>
-        }
-      >
-        {paying && (
-          <div className="space-y-3">
-            <p>
-              {paying.description} — <b>{formatJOD(paying.amount)}</b>
-            </p>
-            <Input label="مرجع الدفع (CliQ / حوالة)" optional value={ref} onChange={(e) => setRef(e.target.value)} />
-          </div>
-        )}
+      <Modal open={Boolean(review)} onClose={() => setReview(null)} title={review?.proofStatus === 'SUBMITTED' ? `مراجعة إيصال ${review.number}` : `تأكيد دفع ${review?.number ?? ''}`} size="lg">
+        {review && <ReviewPayment key={review.id} inv={review} onClose={() => setReview(null)} onDone={() => (setReview(null), q.retry())} />}
       </Modal>
     </AdminPage>
+  );
+}
+
+/** مراجعة إثبات الدفع: عرض الإيصال والمرجع، ثم تأكيد الدفع (يفعّل الخدمة) أو الرفض مع السبب */
+function ReviewPayment({ inv, onClose, onDone }: { inv: Inv; onClose: () => void; onDone: () => void }) {
+  const m = useMutation();
+  const [ref, setRef] = useState(inv.payerReference ?? '');
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const isImage = inv.proofKind === 'IMAGE';
+  const confirm = async () => {
+    if (await m.run('pay', () => api.post(`/admin/market/invoices/${inv.id}/paid`, { providerRef: ref.trim() || null }), 'تم تأكيد الدفع وتفعيل الخدمة')) onDone();
+  };
+  const reject = async () => {
+    if (await m.run('reject', () => api.post(`/admin/market/invoices/${inv.id}/reject-proof`, { reason: reason.trim() }), 'تم رفض الإيصال وإبلاغ المورد')) onDone();
+  };
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 rounded-xl bg-subtle p-4 text-sm sm:grid-cols-2">
+        <p>
+          <span className="block text-xs text-muted">المورد</span>
+          <b>{inv.vendor?.name ?? '—'}</b>
+          {inv.vendor?.phone && <span className="ltr block text-muted">{inv.vendor.phone}</span>}
+        </p>
+        <p>
+          <span className="block text-xs text-muted">المبلغ المطلوب</span>
+          <b className="text-lg tabular-nums">{formatJOD(inv.amount)}</b>
+        </p>
+        <p className="sm:col-span-2">
+          <span className="block text-xs text-muted">البند</span>
+          {INVOICE_PURPOSE_LABEL[inv.purpose] ?? inv.purpose} — {inv.description}
+        </p>
+        {inv.proofSubmittedAt && (
+          <p>
+            <span className="block text-xs text-muted">أُرسل الإيصال</span>
+            {formatDate(inv.proofSubmittedAt)}
+          </p>
+        )}
+        {inv.payerReference && (
+          <p>
+            <span className="block text-xs text-muted">رقم الحوالة / المرجع</span>
+            <span className="ltr font-semibold">{inv.payerReference}</span>
+          </p>
+        )}
+        {inv.payerNote && (
+          <p className="sm:col-span-2">
+            <span className="block text-xs text-muted">ملاحظة المورد</span>
+            {inv.payerNote}
+          </p>
+        )}
+      </div>
+
+      {inv.proofUrl ? (
+        <div>
+          <p className="mb-2 text-sm font-semibold">إيصال الدفع</p>
+          {isImage ? (
+            <a href={inv.proofUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-line bg-subtle">
+              <img src={inv.proofUrl} alt={`إيصال الدفع ${inv.number}`} className="mx-auto max-h-[420px] w-auto object-contain" />
+            </a>
+          ) : (
+            <a href={inv.proofUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-line p-3 font-semibold hover:border-ink">
+              <Icon name="file" className="h-5 w-5" /> {inv.proofName ?? 'ملف الإيصال (PDF)'}
+            </a>
+          )}
+        </div>
+      ) : (
+        <Alert tone="info">لم يرفع المورد إيصالًا لهذه الفاتورة. أكّد الدفع فقط إذا تأكدت من وصول المبلغ.</Alert>
+      )}
+
+      {rejecting ? (
+        <div className="space-y-3">
+          <Textarea label="سبب الرفض (يظهر للمورد)" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} error={m.fieldErrors.reason} placeholder="المبلغ غير مكتمل، الإيصال غير واضح…" autoFocus />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="danger" loading={m.pending === 'reject'} disabled={reason.trim().length < 3} onClick={reject}>
+              رفض الإيصال
+            </Button>
+            <Button variant="ghost" onClick={() => setRejecting(false)}>
+              رجوع
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <Input label="مرجع الدفع (CliQ / حوالة)" optional className="ltr text-start" value={ref} onChange={(e) => setRef(e.target.value)} />
+          {m.error && !Object.keys(m.fieldErrors).length && <Alert tone="error">{m.error}</Alert>}
+          <div className="flex flex-wrap gap-2">
+            <Button loading={m.pending === 'pay'} onClick={confirm}>
+              <Icon name="check" className="h-4 w-4" /> تأكيد الدفع وتفعيل الخدمة
+            </Button>
+            {inv.proofStatus === 'SUBMITTED' && (
+              <Button variant="outline" className="text-danger" onClick={() => setRejecting(true)}>
+                رفض الإيصال
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose}>
+              إغلاق
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
