@@ -20,6 +20,12 @@ export async function ensureHouseVendor(db: Db = prisma) {
       description: 'منتجات من ورشة مجموعة فرجا.',
       commissionPercent: new Prisma.Decimal(100),
       isHouse: true,
+      status: 'APPROVED',
+      verified: true,
+      verifiedAt: new Date(),
+      city: 'عمّان',
+      // متجر FARJAR على أعلى باقة (إن وُجدت)
+      planId: (await db.supplierPlan.findUnique({ where: { code: 'BUSINESS' }, select: { id: true } }))?.id ?? null,
     },
     update: {},
   });

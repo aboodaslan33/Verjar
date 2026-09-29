@@ -11,6 +11,8 @@ import { memoryUpload } from '../../middleware/upload';
 import { categoryForProduct, cleanSpecs, specFieldsSchema, specsInput } from '../../services/catalog.service';
 import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.service';
 import { HOUSE_VENDOR_ID, ensureHouseVendor } from '../../services/vendor.service';
+import { checkPrice, industrialFields, priceField } from '../../validators/product';
+import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
 
 export const productsRouter = Router();
 
@@ -22,6 +24,9 @@ const categoryInput = z.object({
   specFields: specFieldsSchema.default([]),
   sortOrder: z.coerce.number().int().default(0),
   visible: z.boolean().default(true),
+  /** مجموعة العمولة (قطع غيار، ماكينات…) تُستخدم في محرك العمولات */
+  commissionGroup: z.string().trim().max(40).nullable().optional().transform((v) => v || null),
+  description: z.string().trim().max(300).nullable().optional().transform((v) => v || null),
 });
 
 productsRouter.get(
@@ -97,7 +102,8 @@ productsRouter.delete(
 const productInput = z.object({
   name: z.string().trim().min(2, 'اسم المنتج مطلوب').max(150),
   description: z.string().trim().min(1, 'الشرح مطلوب').max(5000),
-  price: z.coerce.number().positive('السعر يجب أن يكون أكبر من صفر').max(1_000_000),
+  price: priceField,
+  ...industrialFields,
   discountPercent: z.coerce.number().int().min(0).max(90, 'الخصم الأقصى 90%').default(0),
   stock: z.coerce.number().int().min(0, 'المخزون لا يكون سالبًا').default(0),
   visible: z.boolean().default(true),
@@ -172,6 +178,8 @@ productsRouter.post(
   '/products',
   asyncHandler(async (req, res) => {
     const { vendorId, specs, ...input } = productInput.parse(req.body);
+    const pe = checkPrice(input);
+    if (pe) throw badRequest(pe, { fields: { price: pe } });
     const { fields } = await categoryForProduct(prisma, input.categoryId);
     if (vendorId && vendorId !== HOUSE_VENDOR_ID && !(await prisma.vendor.findUnique({ where: { id: vendorId } }))) {
       throw badRequest('المورد غير موجود');
@@ -202,6 +210,8 @@ productsRouter.patch(
     const current = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!current) throw notFound('المنتج غير موجود');
     const price = input.price ?? Number(current.price);
+    const pe = checkPrice({ price, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
+    if (pe) throw badRequest(pe, { fields: { price: pe } });
     const discount = input.discountPercent ?? current.discountPercent;
     // المواصفات تُتحقق من جديد عند تغيير القسم أو المواصفات
     const specsData =
@@ -301,5 +311,23 @@ productsRouter.put(
       ids.map((id, i) => prisma.productMedia.updateMany({ where: { id, productId: req.params.id }, data: { sortOrder: i } })),
     );
     ok(res, await prisma.productMedia.findMany({ where: { productId: req.params.id }, orderBy: { sortOrder: 'asc' } }));
+  }),
+);
+
+const docsUpload = memoryUpload(20, MAX_PRODUCT_DOCS).array('files', MAX_PRODUCT_DOCS);
+
+/** ملفات فنية للمنتج: Datasheet / كتالوج / CAD */
+productsRouter.post(
+  '/products/:id/documents',
+  docsUpload,
+  asyncHandler(async (req, res) => {
+    ok(res, await addProductDocs(req.params.id, (req.files as Express.Multer.File[] | undefined) ?? []), 201);
+  }),
+);
+
+productsRouter.delete(
+  '/products/:id/documents/:index',
+  asyncHandler(async (req, res) => {
+    ok(res, await removeProductDoc(req.params.id, Number(req.params.index)));
   }),
 );

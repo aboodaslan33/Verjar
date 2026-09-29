@@ -24,6 +24,7 @@ import { driverRouter } from './routes/driver';
 import { notificationsRouter } from './routes/notifications';
 import { trackRouter } from './routes/public/track';
 import { LOCAL_UPLOAD_DIR } from './services/upload.service';
+import { marketRouter } from './routes/market';
 
 export function createApp() {
   const app = express();
@@ -76,6 +77,7 @@ export function createApp() {
   api.use('/driver', driverRouter);
   api.use('/notifications', notificationsRouter);
   api.use('/track', trackRouter);
+  api.use('/market', marketRouter);
   app.use('/api/v1', api);
   // نفس المسارات بدون رقم الإصدار: /api/auth/me و /api/admin/...
   app.use('/api', api);

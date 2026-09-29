@@ -12,7 +12,7 @@ export type AuthPayload = { sub: string; role: Role; name: string };
 export type SessionAuth = AuthPayload & { perms: Permission[] };
 
 /** متجر المورد صاحب الجلسة (يُضبط في requireVendor) */
-export type VendorContext = { id: string; name: string; slug: string; commissionPercent: number };
+export type VendorContext = { id: string; name: string; slug: string; commissionPercent: number; status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'; role: 'OWNER' | 'STAFF'; isHouse: boolean };
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -208,14 +208,28 @@ export async function requireVendor(req: Request, _res: Response, next: NextFunc
   try {
     if (!req.auth) return next(unauthorized());
     if (req.auth.role !== 'CUSTOMER') return next(forbidden('لوحة الموردين لحسابات الموردين فقط'));
+    // المالك (customerId) أو موظف في حساب المورد (VendorMember)
     const v = await prisma.vendor.findFirst({
-      where: { customerId: req.auth.sub, active: true },
-      select: { id: true, name: true, slug: true, commissionPercent: true },
+      where: { active: true, OR: [{ customerId: req.auth.sub }, { members: { some: { customerId: req.auth.sub } } }] },
+      select: { id: true, name: true, slug: true, commissionPercent: true, status: true, isHouse: true, customerId: true, members: { where: { customerId: req.auth.sub }, select: { role: true } } },
     });
     if (!v) return next(forbidden('حسابك ليس لديه صلاحية مورد'));
-    req.vendor = { id: v.id, name: v.name, slug: v.slug, commissionPercent: v.commissionPercent.toNumber() };
+    const role = v.customerId === req.auth.sub ? 'OWNER' : (v.members[0]?.role ?? 'STAFF');
+    req.vendor = { id: v.id, name: v.name, slug: v.slug, commissionPercent: v.commissionPercent.toNumber(), status: v.status, role, isHouse: v.isHouse };
     next();
   } catch (e) {
     next(e);
   }
+}
+
+/** عمليات السوق (عروض الأسعار، الإعلانات…) للموردين المعتمدين فقط */
+export function requireApprovedVendor(req: Request, _res: Response, next: NextFunction) {
+  if (req.vendor?.status !== 'APPROVED') return next(forbidden('حسابك كمورد قيد المراجعة أو غير مفعّل. تتاح هذه الميزة بعد اعتماد الإدارة.'));
+  next();
+}
+
+/** إدارة الحساب (الفريق، الاشتراك) لمالك حساب المورد فقط */
+export function requireVendorOwner(req: Request, _res: Response, next: NextFunction) {
+  if (req.vendor?.role !== 'OWNER') return next(forbidden('هذه العملية لمالك حساب المورد فقط'));
+  next();
 }

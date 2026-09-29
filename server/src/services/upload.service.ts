@@ -37,6 +37,11 @@ export function sniff(buf: Buffer): DetectedType | null {
   }
   if (hex.startsWith('1a45dfa3')) return { mime: 'video/webm', ext: 'webm', kind: 'VIDEO' };
   if (buf.subarray(0, 5).toString('ascii') === '%PDF-') return { mime: 'application/pdf', ext: 'pdf', kind: 'DOCUMENT' };
+  // ملفات التصميم الهندسي (CAD): DWG وSTEP وDXF
+  const head = buf.subarray(0, 64).toString('latin1');
+  if (/^AC10\d\d/.test(head)) return { mime: 'image/vnd.dwg', ext: 'dwg', kind: 'DOCUMENT' };
+  if (head.startsWith('ISO-10303-21')) return { mime: 'model/step', ext: 'step', kind: 'DOCUMENT' };
+  if (/^\s*0\r?\nSECTION/.test(head)) return { mime: 'image/vnd.dxf', ext: 'dxf', kind: 'DOCUMENT' };
   return null;
 }
 
@@ -45,6 +50,8 @@ export type UploadPolicy = {
   kinds: MediaKind[];
   /** الحد الأقصى بالبايت لكل نوع */
   maxBytes: Partial<Record<MediaKind, number>>;
+  /** امتدادات مسموحة فقط (اختياري) */
+  exts?: string[];
 };
 
 export const MB = 1024 * 1024;
@@ -53,15 +60,17 @@ export const POLICIES = {
   photos: { kinds: ['IMAGE'], maxBytes: { IMAGE: 5 * MB } },
   designFiles: { kinds: ['IMAGE', 'DOCUMENT'], maxBytes: { IMAGE: 5 * MB, DOCUMENT: 10 * MB } },
   documents: { kinds: ['IMAGE', 'DOCUMENT'], maxBytes: { IMAGE: 5 * MB, DOCUMENT: 10 * MB } },
-  pdfOnly: { kinds: ['DOCUMENT'], maxBytes: { DOCUMENT: 15 * MB } },
+  pdfOnly: { kinds: ['DOCUMENT'], maxBytes: { DOCUMENT: 15 * MB }, exts: ['pdf'] },
+  /** مرفقات السوق الصناعي: صور، PDF، وملفات CAD */
+  technical: { kinds: ['IMAGE', 'DOCUMENT'], maxBytes: { IMAGE: 8 * MB, DOCUMENT: 20 * MB } },
   productMedia: { kinds: ['IMAGE', 'VIDEO'], maxBytes: { IMAGE: 8 * MB, VIDEO: 60 * MB } },
 } satisfies Record<string, UploadPolicy>;
 
-const KIND_AR: Record<MediaKind, string> = { IMAGE: 'صورة', VIDEO: 'فيديو', DOCUMENT: 'ملف PDF' };
+const KIND_AR: Record<MediaKind, string> = { IMAGE: 'صورة', VIDEO: 'فيديو', DOCUMENT: 'ملف PDF أو CAD' };
 
 export function validateFile(file: Express.Multer.File, policy: UploadPolicy): DetectedType {
   const detected = sniff(file.buffer);
-  if (!detected || !policy.kinds.includes(detected.kind)) {
+  if (!detected || !policy.kinds.includes(detected.kind) || (policy.exts && !policy.exts.includes(detected.ext))) {
     const allowed = policy.kinds.map((k) => KIND_AR[k]).join(' أو ');
     throw badRequest(`الملف "${file.originalname}" غير مدعوم. المسموح: ${allowed}`);
   }

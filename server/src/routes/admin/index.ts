@@ -15,6 +15,7 @@ import { deliveryRouter } from './delivery';
 import { tendersAdminRouter } from './tenders';
 import { reportsRouter } from './reports';
 import { usersRouter } from './users';
+import { marketAdminRouter } from './market';
 
 export const adminRouter = Router();
 adminRouter.use(requireAdmin);
@@ -37,4 +38,5 @@ adminRouter.use('/vendors', requireAccess('suppliers.view', 'suppliers.manage'),
 adminRouter.use('/delivery', requirePermission('orders.view', 'delivery.manage', 'collections.view'), deliveryRouter);
 adminRouter.use('/tenders', requireAccess('corporate.manage', 'corporate.manage'), tendersAdminRouter);
 adminRouter.use('/reports', requirePermission('reports.view'), reportsRouter);
+adminRouter.use('/market', requireAccess('market.view', 'market.manage'), marketAdminRouter);
 adminRouter.use('/users', requirePermission('users.manage'), usersRouter);

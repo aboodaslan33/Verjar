@@ -30,7 +30,12 @@ type CustomerRow = {
 
 /** بيانات العميل للواجهة، مع متجره إن كان لديه صلاحية مورد فعّالة */
 async function customerPublic(c: CustomerRow) {
-  const vendor = await prisma.vendor.findFirst({ where: { customerId: c.id, active: true }, select: { id: true, name: true, slug: true } });
+  // المورد: المالك أو موظف في حساب المورد، مع حالة الاعتماد في السوق
+  const v = await prisma.vendor.findFirst({
+    where: { active: true, OR: [{ customerId: c.id }, { members: { some: { customerId: c.id } } }] },
+    select: { id: true, name: true, slug: true, status: true, verified: true, customerId: true },
+  });
+  const vendor = v ? { id: v.id, name: v.name, slug: v.slug, status: v.status, verified: v.verified, role: v.customerId === c.id ? ('OWNER' as const) : ('STAFF' as const) } : null;
   return {
     role: 'CUSTOMER' as const,
     vendor,

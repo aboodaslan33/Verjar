@@ -98,7 +98,7 @@ export function publicProductWhere(extra: Prisma.ProductWhereInput = {}): Prisma
     deletedAt: null,
     visible: true,
     approvalStatus: 'APPROVED',
-    vendor: { active: true },
+    vendor: { active: true, status: 'APPROVED' },
     ...extra,
     category: { ...visibleCategoryWhere, ...((extra.category as Prisma.CategoryWhereInput | undefined) ?? {}) },
   };

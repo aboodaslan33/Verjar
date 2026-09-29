@@ -260,27 +260,27 @@ model User {
 
 /// العملاء — يتم إنشاؤهم تلقائيًا عند أول حجز أو طلب برقم الهاتف، أو بالتسجيل من صفحة /register
 model Customer {
-  id           String    @id @default(cuid())
-  phone        String    @unique
-  name         String
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  name            String
   /// يُخزن بأحرف صغيرة — يُستخدم للدخول مع كلمة المرور
-  email        String?   @unique
-  companyName  String?
-  passwordHash String?
-  otpHash      String?
-  otpExpiresAt DateTime?
-  otpAttempts  Int       @default(0)
-  notes        String?
-  lastLoginAt  DateTime?
+  email           String?   @unique
+  companyName     String?
+  passwordHash    String?
+  otpHash         String?
+  otpExpiresAt    DateTime?
+  otpAttempts     Int       @default(0)
+  notes           String?
+  lastLoginAt     DateTime?
   /// وقت إنشاء الحساب بالتسجيل الذاتي (فارغ للعملاء المنشئين تلقائيًا من الحجز)
-  registeredAt DateTime?
+  registeredAt    DateTime?
   /// موافقة على استلام النشرة البريدية (منتجات وخدمات جديدة) — يمكن إلغاؤها من الحساب أو رابط البريد
-  emailOptIn   Boolean   @default(true)
+  emailOptIn      Boolean   @default(true)
   /// تأكيد ملكية البريد برمز OTP
   emailVerifiedAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   bookings          Booking[]
   orders            Order[]
@@ -290,6 +290,9 @@ model Customer {
   contracts         Contract[]
   quoteFiles        QuoteFile[]
   payments          Payment[]
+  vendorMemberships VendorMember[]
+  rfqs              Rfq[]
+  reviews           SupplierReview[]
 
   @@index([name])
   @@index([deletedAt])
@@ -326,45 +329,92 @@ model Category {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
-  products Product[]
+  /// مجموعة العمولة الافتراضية للقسم (قطع غيار، معدات…) — تُستخدم في قواعد العمولات
+  commissionGroup String?
+  /// وصف قصير يظهر في صفحة السوق
+  description     String?
+
+  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[]       @relation("CategoryTree")
+  products        Product[]
+  rfqs            Rfq[]
+  commissionRules CommissionRule[]
 
   @@index([parentId])
 }
 
 /// المورد (متجر داخل السوق). المورد الافتراضي (isHouse) هو الشركة نفسها وليس له حساب عميل
 model Vendor {
-  id                String   @id @default(cuid())
+  id                String       @id @default(cuid())
   /// حساب العميل صاحب المتجر (فارغ للمورد الافتراضي)
-  customerId        String?  @unique
+  customerId        String?      @unique
   name              String
-  slug              String   @unique
-  description       String   @default("")
+  slug              String       @unique
+  description       String       @default("")
   logoUrl           String?
   logoPublicId      String?
   /// نسبة عمولة المنصة من كل بيع (0–100)
-  commissionPercent Decimal  @default(10) @db.Decimal(5, 2)
+  commissionPercent Decimal      @default(10) @db.Decimal(5, 2)
   /// سحب صلاحية المورد: لا يدخل اللوحة ولا تظهر منتجاته
-  active            Boolean  @default(true)
-  isHouse           Boolean  @default(false)
+  active            Boolean      @default(true)
+  isHouse           Boolean      @default(false)
   /// عنوان الاستلام الافتراضي لطلبات التوصيل
   phone             String?
   pickupAddress     String?
   pickupLat         Float?
   pickupLng         Float?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  // ── السوق الصناعي (B2B) ──
+  /// حالة المورد في السوق: بانتظار المراجعة، معتمد، مرفوض، معلّق
+  status            VendorStatus @default(APPROVED)
+  rejectionReason   String?
+  /// علامة "مورد موثّق" تمنحها الإدارة بعد التحقق
+  verified          Boolean      @default(false)
+  verifiedAt        DateTime?
+  contactName       String?
+  whatsapp          String?
+  email             String?
+  address           String?
+  city              String?
+  /// مجال العمل ونوع المنتجات (نص حر يظهر في صفحة المورد ويُبحث فيه)
+  businessField     String?
+  productTypes      String?
+  licenseNumber     String?
+  /// الكتالوج والشهادات: [{ url, name, kind }]
+  catalogFiles      Json         @default("[]")
+  certificates      Json         @default("[]")
+  /// التصنيفات التي يخدمها (لاقتراحه في طلبات عروض الأسعار)
+  categoryIds       String[]     @default([])
+  // ── الاشتراك الحالي ──
+  planId            String?
+  planStartedAt     DateTime?
+  planExpiresAt     DateTime?
+  /// عدّاد زيارات صفحة المورد
+  profileViews      Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  customer     Customer?      @relation(fields: [customerId], references: [id])
-  products     Product[]
-  vendorOrders VendorOrder[]
-  orderItems   OrderItem[]
-  payouts      VendorPayout[]
-  tenderOffers TenderOffer[]
-  orders       Order[]        @relation("OrderSupplier")
+  customer      Customer?            @relation(fields: [customerId], references: [id])
+  plan          SupplierPlan?        @relation(fields: [planId], references: [id])
+  members       VendorMember[]
+  subscriptions VendorSubscription[]
+  rfqRecipients RfqRecipient[]
+  quotes        Quote[]
+  conversations Conversation[]
+  ads           MarketAd[]
+  invoices      MarketInvoice[]
+  reviews       SupplierReview[]
+  directRfqs    Rfq[]                @relation("RfqDirectVendor")
+  dailyStats    VendorDailyStat[]
+  products      Product[]
+  vendorOrders  VendorOrder[]
+  orderItems    OrderItem[]
+  payouts       VendorPayout[]
+  tenderOffers  TenderOffer[]
+  orders        Order[]              @relation("OrderSupplier")
 
   @@index([active])
+  @@index([status])
+  @@index([verified])
 }
 
 model Product {
@@ -388,6 +438,26 @@ model Product {
   rejectionReason String?
   /// المواصفات حسب حقول القسم، مثل { "size": "L", "color": "أسود" }
   specs           Json            @default("{}")
+  // ── بيانات صناعية (B2B) ──
+  sku             String?
+  /// رقم القطعة لدى الشركة المصنعة
+  partNumber      String?
+  manufacturer    String?
+  brand           String?
+  originCountry   String?
+  /// السعر عند الطلب: لا يظهر السعر ويُطلب عرض سعر
+  priceOnRequest  Boolean         @default(false)
+  minOrderQty     Int             @default(1)
+  availability    Availability    @default(IN_STOCK)
+  /// مدة التوريد بالأيام (تقريبية)
+  leadTimeDays    Int?
+  warranty        String?
+  videoUrl        String?
+  /// كلمات مفتاحية للبحث (مفصولة بفواصل)
+  keywords        String?
+  /// الملفات الفنية والكتالوج: [{ url, name, kind }]
+  documents       Json            @default("[]")
+  views           Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   deletedAt       DateTime?
@@ -396,12 +466,16 @@ model Product {
   vendor     Vendor         @relation(fields: [vendorId], references: [id])
   media      ProductMedia[]
   orderItems OrderItem[]
+  rfqs       Rfq[]
+  ads        MarketAd[]
 
   @@index([categoryId])
   @@index([vendorId])
   @@index([approvalStatus])
   @@index([visible, deletedAt])
   @@index([featured])
+  @@index([brand])
+  @@index([sku])
 }
 
 model ProductMedia {
@@ -589,37 +663,37 @@ model VendorPayout {
 // ─────────────────────────── الحجوزات ───────────────────────────
 
 model Booking {
-  id            String        @id @default(cuid())
-  number        Int           @unique @default(autoincrement())
-  ref           String        @unique
-  type          BookingType
-  status        RequestStatus @default(NEW)
-  customerId    String
+  id               String        @id @default(cuid())
+  number           Int           @unique @default(autoincrement())
+  ref              String        @unique
+  type             BookingType
+  status           RequestStatus @default(NEW)
+  customerId       String
   // الحقول المشتركة (أعمدة مفهرسة)
-  name          String
-  phone         String
-  locationText  String
-  lat           Float?
-  lng           Float?
-  floor         String?
-  scheduledAt   DateTime
-  notes         String?
-  urgency       Urgency       @default(NORMAL)
-  zone          AreaZone?
+  name             String
+  phone            String
+  locationText     String
+  lat              Float?
+  lng              Float?
+  floor            String?
+  scheduledAt      DateTime
+  notes            String?
+  urgency          Urgency       @default(NORMAL)
+  zone             AreaZone?
   /// رسوم الكشف المحسوبة وقت الحجز (لحجوزات الكشف)
-  inspectionFee Decimal?      @db.Decimal(10, 3)
+  inspectionFee    Decimal?      @db.Decimal(10, 3)
   /// المبلغ الذي يسعّره الأدمن للعمل
-  quotedAmount  Decimal?      @db.Decimal(10, 3)
+  quotedAmount     Decimal?      @db.Decimal(10, 3)
   /// الحقول الخاصة بكل نوع
-  details       Json          @default("{}")
-  technicianId  String?
-  adminNotes    String?
-  whatsappText  String
+  details          Json          @default("{}")
+  technicianId     String?
+  adminNotes       String?
+  whatsappText     String
   /// وقت موافقة العميل على سياسة الحجز
   policyAcceptedAt DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
 
   customer   Customer       @relation(fields: [customerId], references: [id])
   technician Technician?    @relation(fields: [technicianId], references: [id])
@@ -1115,6 +1189,8 @@ model Notification {
   title         String
   body          String
   orderId       String?
+  /// رابط داخل الموقع يفتحه الإشعار (مثل /account/rfq/…)
+  link          String?
   /// in_app | whatsapp | sms | email
   channel       String                @default("in_app")
   readAt        DateTime?
@@ -1152,4 +1228,487 @@ model EmailOtp {
 
   @@index([subjectType, subjectId, purpose, createdAt])
   @@index([expiresAt])
+}
+
+// ═════════════════ السوق الصناعي (B2B Industrial Marketplace) ═════════════════
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum Availability {
+  IN_STOCK
+  ON_ORDER
+  OUT_OF_STOCK
+}
+
+enum VendorMemberRole {
+  OWNER
+  STAFF
+}
+
+/// باقات الموردين (Free / PRO / BUSINESS …) — كل الأسعار والحدود من لوحة الإدارة
+model SupplierPlan {
+  id             String   @id @default(cuid())
+  /// FREE | PRO | BUSINESS (أو أي رمز جديد)
+  code           String   @unique
+  name           String
+  description    String   @default("")
+  price          Decimal  @default(0) @db.Decimal(10, 3)
+  /// مدة الاشتراك بالأيام
+  durationDays   Int      @default(30)
+  /// null = غير محدود
+  maxProducts    Int?
+  maxUsers       Int      @default(1)
+  /// طلبات عروض الأسعار شهريًا (null = غير محدود)
+  maxRfqPerMonth Int?
+  /// وزن الترتيب في نتائج البحث (أعلى = أولًا)
+  searchBoost    Int      @default(0)
+  /// أولوية الاقتراح في توزيع طلبات عروض الأسعار
+  rfqPriority    Int      @default(0)
+  /// الـ Leads مشمولة بالاشتراك (بدون رسوم لكل Lead)
+  leadsIncluded  Boolean  @default(false)
+  /// مزايا: { analytics, advancedReports, catalog, specialOffers, featuredBadge, campaigns }
+  features       Json     @default("{}")
+  badge          String?
+  isDefault      Boolean  @default(false)
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vendors       Vendor[]
+  subscriptions VendorSubscription[]
+}
+
+enum SubscriptionStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+/// سجل اشتراكات المورد (التجديد والترقية والفواتير)
+model VendorSubscription {
+  id        String             @id @default(cuid())
+  vendorId  String
+  planId    String
+  status    SubscriptionStatus @default(PENDING_PAYMENT)
+  amount    Decimal            @db.Decimal(10, 3)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  invoiceId String?            @unique
+  note      String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  vendor  Vendor         @relation(fields: [vendorId], references: [id])
+  plan    SupplierPlan   @relation(fields: [planId], references: [id])
+  invoice MarketInvoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([vendorId, status])
+  @@index([endsAt])
+}
+
+/// مستخدمو حساب المورد (المالك وموظفوه) — العدد حسب الباقة
+model VendorMember {
+  id         String           @id @default(cuid())
+  vendorId   String
+  customerId String
+  role       VendorMemberRole @default(STAFF)
+  createdAt  DateTime         @default(now())
+
+  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([vendorId, customerId])
+  @@index([customerId])
+}
+
+enum RfqStatus {
+  NEW
+  DISTRIBUTED
+  QUOTED
+  NEGOTIATING
+  AWARDED
+  CLOSED
+  CANCELLED
+}
+
+/// طلب عرض سعر (RFQ-000001). يمثل أيضًا الـ Lead في لوحة الإدارة
+model Rfq {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  customerId       String
+  companyName      String
+  contactName      String
+  phone            String
+  email            String?
+  city             String?
+  location         String?
+  categoryId       String?
+  /// عنوان الاحتياج (أول بند أو وصف عام)
+  title            String
+  /// الطلب من صفحة منتج أو مورد محدد
+  productId        String?
+  directVendorId   String?
+  budget           Decimal?  @db.Decimal(12, 3)
+  neededBy         DateTime?
+  notes            String?
+  /// صور وملفات: [{ url, name, kind }]
+  attachments      Json      @default("[]")
+  status           RfqStatus @default(NEW)
+  // ── الـ Lead والصفقة ──
+  expectedValue    Decimal?  @db.Decimal(12, 3)
+  finalValue       Decimal?  @db.Decimal(12, 3)
+  acceptedQuoteId  String?   @unique
+  /// نموذج الإيراد وقت الإغلاق: LEAD | COMMISSION | ONLINE_PAYMENT
+  revenueModel     String?
+  commissionRate   Decimal?  @db.Decimal(6, 3)
+  commissionAmount Decimal?  @db.Decimal(12, 3)
+  commissionRuleId String?
+  /// طلب توصيل مرتبط بعد الترسية (نظام التوصيل)
+  orderId          String?
+  adminNote        String?
+  closedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  product       Product?         @relation(fields: [productId], references: [id])
+  directVendor  Vendor?          @relation("RfqDirectVendor", fields: [directVendorId], references: [id])
+  items         RfqItem[]
+  recipients    RfqRecipient[]
+  quotes        Quote[]          @relation("RfqQuotes")
+  acceptedQuote Quote?           @relation("AcceptedQuote", fields: [acceptedQuoteId], references: [id])
+  conversations Conversation[]
+  reviews       SupplierReview[]
+  events        RfqEvent[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([categoryId])
+  @@index([createdAt])
+}
+
+/// بنود الطلب (يدعم طلب احتياج كامل: عدة منتجات في طلب واحد — أساس Procurement)
+model RfqItem {
+  id        String  @id @default(cuid())
+  rfqId     String
+  name      String
+  quantity  Decimal @db.Decimal(12, 3)
+  unit      String  @default("قطعة")
+  specs     String?
+  brand     String?
+  sortOrder Int     @default(0)
+
+  rfq Rfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  @@index([rfqId])
+}
+
+enum RecipientStatus {
+  SENT
+  VIEWED
+  QUOTED
+  DECLINED
+}
+
+/// توزيع الطلب على الموردين (تلقائي أو يدوي) + رسوم الـ Lead إن وُجدت
+model RfqRecipient {
+  id            String          @id @default(cuid())
+  rfqId         String
+  vendorId      String
+  status        RecipientStatus @default(SENT)
+  /// AUTO | MANUAL | DIRECT
+  source        String          @default("MANUAL")
+  leadFee       Decimal         @default(0) @db.Decimal(10, 3)
+  /// الفاتورة التي حُمّلت فيها رسوم الـ Lead (إن وُجدت)
+  leadInvoiceId String?
+  sentAt        DateTime        @default(now())
+  viewedAt      DateTime?
+  respondedAt   DateTime?
+  declineReason String?
+
+  rfq    Rfq    @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId, status])
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  WITHDRAWN
+  ACCEPTED
+  REJECTED
+}
+
+/// عرض سعر من مورد على طلب
+model Quote {
+  id            String      @id @default(cuid())
+  rfqId         String
+  vendorId      String
+  unitPrice     Decimal     @db.Decimal(12, 3)
+  quantity      Decimal     @db.Decimal(12, 3)
+  total         Decimal     @db.Decimal(12, 3)
+  leadTimeDays  Int?
+  warranty      String?
+  originCountry String?
+  brand         String?
+  specs         String?
+  paymentTerms  String?
+  validUntil    DateTime?
+  notes         String?
+  fileUrl       String?
+  filePublicId  String?
+  status        QuoteStatus @default(SUBMITTED)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  rfq        Rfq    @relation("RfqQuotes", fields: [rfqId], references: [id], onDelete: Cascade)
+  acceptedBy Rfq?   @relation("AcceptedQuote")
+  vendor     Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId, status])
+}
+
+/// سجل أحداث الطلب (الإرسال، العروض، القبول، الإغلاق…)
+model RfqEvent {
+  id        String   @id @default(cuid())
+  rfqId     String
+  /// customer | vendor | admin | system
+  actorType String
+  actorId   String?
+  actorName String?
+  action    String
+  note      String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  rfq Rfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  @@index([rfqId, createdAt])
+}
+
+/// محادثة داخل المنصة بين العميل والمورد على طلب (بدون كشف بيانات التواصل)
+model Conversation {
+  id             String    @id @default(cuid())
+  rfqId          String
+  vendorId       String
+  lastAt         DateTime  @default(now())
+  customerReadAt DateTime?
+  vendorReadAt   DateTime?
+  createdAt      DateTime  @default(now())
+
+  rfq      Rfq       @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor   Vendor    @relation(fields: [vendorId], references: [id])
+  messages Message[]
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId, lastAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  /// CUSTOMER | VENDOR | ADMIN
+  senderType     String
+  senderId       String?
+  senderName     String
+  body           String
+  /// أُخفيت بيانات تواصل من النص قبل الحفظ
+  masked         Boolean  @default(false)
+  attachments    Json     @default("[]")
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+/// محرك العمولات: القاعدة الأكثر تحديدًا (تصنيف/مجموعة/باقة/نوع صفقة) هي المطبّقة
+model CommissionRule {
+  id              String   @id @default(cuid())
+  name            String
+  /// تنطبق على تصنيف محدد (وأقسامه الفرعية)
+  categoryId      String?
+  /// أو على مجموعة تصنيفات (spare_parts, machines…)
+  commissionGroup String?
+  /// باقة المورد (FREE/PRO/BUSINESS) أو فارغ للكل
+  planCode        String?
+  /// PRODUCT_SALE | RFQ_DEAL | PROCUREMENT أو فارغ للكل
+  dealType        String?
+  percent         Decimal  @db.Decimal(6, 3)
+  minAmount       Decimal? @db.Decimal(12, 3)
+  maxAmount       Decimal? @db.Decimal(12, 3)
+  priority        Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  category Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([active])
+}
+
+enum AdType {
+  FEATURED_PRODUCT
+  FEATURED_SUPPLIER
+  INDUSTRIAL_DEAL
+  PRODUCT_OF_WEEK
+  SUPPLIER_OF_MONTH
+}
+
+enum AdStatus {
+  REQUESTED
+  PENDING_PAYMENT
+  ACTIVE
+  PAUSED
+  ENDED
+  REJECTED
+}
+
+/// باقات الإعلانات وأسعارها (قابلة للتعديل من الإدارة)
+model AdPackage {
+  id           String   @id @default(cuid())
+  type         AdType
+  name         String
+  /// MARKET_HOME | SEARCH_TOP | CATEGORY_TOP | PRODUCT_PAGE
+  placement    String   @default("MARKET_HOME")
+  price        Decimal  @db.Decimal(10, 3)
+  durationDays Int      @default(7)
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ads MarketAd[]
+}
+
+/// إعلان داخل السوق لمورد أو منتج
+model MarketAd {
+  id          String   @id @default(cuid())
+  type        AdType
+  placement   String   @default("MARKET_HOME")
+  vendorId    String
+  productId   String?
+  packageId   String?
+  title       String?
+  price       Decimal  @default(0) @db.Decimal(10, 3)
+  startsAt    DateTime
+  endsAt      DateTime
+  status      AdStatus @default(REQUESTED)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  invoiceId   String?  @unique
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendor  Vendor         @relation(fields: [vendorId], references: [id])
+  product Product?       @relation(fields: [productId], references: [id])
+  package AdPackage?     @relation(fields: [packageId], references: [id])
+  invoice MarketInvoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([status, placement, startsAt, endsAt])
+  @@index([vendorId])
+}
+
+enum InvoicePurpose {
+  SUBSCRIPTION
+  AD
+  LEAD_FEE
+  COMMISSION
+  ORDER
+  PROCUREMENT
+  OTHER
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+/// فواتير السوق — مستقلة عن مزود الدفع (provider) ليسهل تغييره لاحقًا
+model MarketInvoice {
+  id          String         @id @default(cuid())
+  /// INV-000001
+  number      String         @unique
+  vendorId    String?
+  customerId  String?
+  purpose     InvoicePurpose
+  description String
+  amount      Decimal        @db.Decimal(12, 3)
+  currency    String         @default("JOD")
+  status      InvoiceStatus  @default(PENDING)
+  /// manual | (مستقبلًا: hyperpay, stripe, …)
+  provider    String         @default("manual")
+  providerRef String?
+  /// مرجع العنصر (اشتراك/إعلان/طلب…)
+  refType     String?
+  refId       String?
+  dueAt       DateTime?
+  paidAt      DateTime?
+  note        String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  vendor       Vendor?             @relation(fields: [vendorId], references: [id])
+  subscription VendorSubscription?
+  ad           MarketAd?
+
+  @@index([vendorId, status])
+  @@index([purpose, status])
+  @@index([createdAt])
+}
+
+/// تقييم المورد بعد صفقة حقيقية (طلب عرض سعر تمت ترسيته عليه)
+model SupplierReview {
+  id            String   @id @default(cuid())
+  vendorId      String
+  customerId    String
+  rfqId         String
+  quality       Int
+  delivery      Int
+  commitment    Int
+  communication Int
+  overall       Int
+  comment       String?
+  visible       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  vendor   Vendor   @relation(fields: [vendorId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  rfq      Rfq      @relation(fields: [rfqId], references: [id])
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId, visible])
+}
+
+/// إحصائيات يومية للمورد (مشاهدات الصفحة والمنتجات، الطلبات، العروض)
+model VendorDailyStat {
+  id            String @id @default(cuid())
+  vendorId      String
+  /// YYYY-MM-DD بتوقيت عمّان
+  day           String
+  profileViews  Int    @default(0)
+  productViews  Int    @default(0)
+  rfqs          Int    @default(0)
+  quotes        Int    @default(0)
+  adImpressions Int    @default(0)
+  adClicks      Int    @default(0)
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, day])
 }

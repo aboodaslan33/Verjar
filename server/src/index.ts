@@ -1,6 +1,7 @@
 import { env } from './config/env';
 import { createApp } from './app';
 import { startContractReminderJob } from './jobs/contractReminders';
+import { startMarketJobs } from './jobs/market';
 import { prisma } from './lib/prisma';
 import { markInterruptedCampaigns } from './services/email.service';
 import { purgeOldEmailOtps } from './services/emailOtp.service';
@@ -18,6 +19,7 @@ const server = app.listen(env.PORT, () => {
 });
 
 startContractReminderJob();
+startMarketJobs();
 markInterruptedCampaigns().catch((e) => console.error('markInterruptedCampaigns', e));
 // تنظيف رموز التحقق المنتهية يوميًا
 const purge = () => purgeOldEmailOtps().catch((e) => console.error('purgeOldEmailOtps', e));

@@ -15,7 +15,7 @@ notificationsRouter.get(
     const who = await recipientsOf(req.auth!);
     const where = { OR: who.map((w) => ({ recipientType: w.recipientType, recipientId: w.recipientId })) };
     const [items, unread] = await Promise.all([
-      prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, title: true, body: true, orderId: true, readAt: true, createdAt: true, recipientType: true } }),
+      prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, title: true, body: true, orderId: true, link: true, readAt: true, createdAt: true, recipientType: true } }),
       prisma.notification.count({ where: { ...where, readAt: null } }),
     ]);
     ok(res, { items, unread });

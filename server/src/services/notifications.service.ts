@@ -16,7 +16,7 @@ export type NotifyTarget =
   | { type: 'CUSTOMER'; customerId: string; phone?: string | null }
   | { type: 'VENDOR'; vendorId: string };
 
-export type NotifyInput = { title: string; body: string; orderId?: string | null; whatsapp?: boolean };
+export type NotifyInput = { title: string; body: string; orderId?: string | null; link?: string | null; whatsapp?: boolean };
 
 export async function notify(db: Db, targets: NotifyTarget[], input: NotifyInput) {
   const seen = new Set<string>();
@@ -33,6 +33,7 @@ export async function notify(db: Db, targets: NotifyTarget[], input: NotifyInput
       title: input.title,
       body: input.body,
       orderId: input.orderId ?? null,
+      link: input.link ?? null,
     });
   }
   if (rows.length) await db.notification.createMany({ data: rows });
@@ -50,6 +51,10 @@ export async function notify(db: Db, targets: NotifyTarget[], input: NotifyInput
 /** المستلمون الذين تخصهم جلسة: المستخدم نفسه، أو العميل ومتجره إن كان موردًا */
 export async function recipientsOf(auth: { sub: string; role: string }): Promise<{ recipientType: NotificationRecipient; recipientId: string }[]> {
   if (auth.role !== 'CUSTOMER') return [{ recipientType: 'USER', recipientId: auth.sub }];
-  const vendor = await prisma.vendor.findFirst({ where: { customerId: auth.sub, active: true }, select: { id: true } });
-  return [{ recipientType: 'CUSTOMER', recipientId: auth.sub }, ...(vendor ? [{ recipientType: 'VENDOR' as const, recipientId: vendor.id }] : [])];
+  // المورد: المالك أو أي موظف في حساب المورد يرى إشعارات المتجر
+  const vendors = await prisma.vendor.findMany({
+    where: { active: true, OR: [{ customerId: auth.sub }, { members: { some: { customerId: auth.sub } } }] },
+    select: { id: true },
+  });
+  return [{ recipientType: 'CUSTOMER', recipientId: auth.sub }, ...vendors.map((v) => ({ recipientType: 'VENDOR' as const, recipientId: v.id }))];
 }

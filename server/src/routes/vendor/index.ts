@@ -21,6 +21,10 @@ import { deliveryOrderInput } from '../../validators/delivery';
 import { createDeliveryOrder, liveUpdate, transition } from '../../services/delivery.service';
 import { getSettings } from '../../services/settings.service';
 import { notifyCustomer } from '../../services/whatsapp.service';
+import { checkPrice, industrialFields, priceField } from '../../validators/product';
+import { assertProductQuota } from '../../market/plans';
+import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
+import { vendorMarketRouter } from './market';
 
 /**
  * لوحة المورد. كل استعلام هنا مقيّد بـ req.vendor.id:
@@ -28,6 +32,7 @@ import { notifyCustomer } from '../../services/whatsapp.service';
  */
 export const vendorRouter = Router();
 vendorRouter.use(requireVendor);
+vendorRouter.use('/market', vendorMarketRouter);
 
 const vid = (req: { vendor?: { id: string } }) => req.vendor!.id;
 const MAX_IMAGES = 8;
@@ -45,6 +50,21 @@ const profileSelect = {
   pickupAddress: true,
   pickupLat: true,
   pickupLng: true,
+  status: true,
+  rejectionReason: true,
+  verified: true,
+  contactName: true,
+  whatsapp: true,
+  email: true,
+  address: true,
+  city: true,
+  businessField: true,
+  productTypes: true,
+  licenseNumber: true,
+  catalogFiles: true,
+  certificates: true,
+  categoryIds: true,
+  isHouse: true,
   createdAt: true,
 } satisfies Prisma.VendorSelect;
 
@@ -76,9 +96,22 @@ vendorRouter.patch(
         pickupAddress: z.string().trim().max(300).nullable(),
         pickupLat: z.number().min(-90).max(90).nullable(),
         pickupLng: z.number().min(-180).max(180).nullable(),
+        // بيانات الشركة في السوق الصناعي
+        contactName: z.string().trim().max(100).nullable(),
+        whatsapp: z.string().trim().max(20).nullable(),
+        email: z.union([z.string().trim().toLowerCase().email('البريد غير صحيح').max(120), z.literal('')]).nullable().transform((v) => v || null),
+        address: z.string().trim().max(300).nullable(),
+        city: z.string().trim().max(60).nullable(),
+        businessField: z.string().trim().max(200).nullable(),
+        productTypes: z.string().trim().max(500).nullable(),
+        licenseNumber: z.string().trim().max(60).nullable(),
+        categoryIds: z.array(z.string()).max(20),
       })
       .partial()
       .parse(req.body);
+    if (input.categoryIds) {
+      input.categoryIds = (await prisma.category.findMany({ where: { id: { in: input.categoryIds }, deletedAt: null }, select: { id: true } })).map((c) => c.id);
+    }
     const vendor = await prisma.vendor.update({ where: { id: vid(req) }, data: input, select: profileSelect });
     await audit({ actorType: 'vendor', action: 'update', entity: 'vendor', entityId: vendor.id });
     ok(res, vendor);
@@ -143,7 +176,8 @@ vendorRouter.get(
 const productInput = z.object({
   name: z.string().trim().min(2, 'اسم المنتج مطلوب').max(150),
   description: z.string().trim().min(1, 'الوصف مطلوب').max(5000),
-  price: z.coerce.number().positive('السعر يجب أن يكون أكبر من صفر').max(1_000_000),
+  price: priceField,
+  ...industrialFields,
   discountPercent: z.coerce.number().int().min(0).max(90, 'الخصم الأقصى 90%').default(0),
   stock: z.coerce.number().int().min(0, 'المخزون لا يكون سالبًا').max(100_000).default(0),
   visible: z.boolean().default(true),
@@ -212,6 +246,9 @@ vendorRouter.post(
   formLimiter,
   asyncHandler(async (req, res) => {
     const { specs, ...input } = productInput.parse(req.body);
+    const pe = checkPrice(input);
+    if (pe) throw badRequest(pe, { fields: { price: pe } });
+    await assertProductQuota(vid(req));
     const { fields } = await categoryForProduct(prisma, input.categoryId, { visibleOnly: true });
     const p = await prisma.product.create({
       data: {
@@ -252,6 +289,8 @@ vendorRouter.patch(
       (specsData.specs !== undefined && JSON.stringify(specsData.specs) !== JSON.stringify(current.specs));
     const review = contentChanged || current.approvalStatus === 'REJECTED';
     const price = input.price ?? Number(current.price);
+    const pe = checkPrice({ price, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
+    if (pe) throw badRequest(pe, { fields: { price: pe } });
     const discount = input.discountPercent ?? current.discountPercent;
     const p = await prisma.product.update({
       where: { id: current.id },
@@ -610,5 +649,25 @@ vendorRouter.post(
     await prisma.$transaction((tx) => transition(tx, o.id, 'CANCELLED', { kind: 'vendor', vendorId: vid(req), name: req.vendor!.name }, { note: note ?? 'ألغاه المورد' }));
     liveUpdate(o.id, `ألغى المورد ${o.code}`);
     ok(res, await prisma.order.findUniqueOrThrow({ where: { id: o.id }, select: vendorOrderSelect2 }));
+  }),
+);
+
+const docsUpload = memoryUpload(20, MAX_PRODUCT_DOCS).array('files', MAX_PRODUCT_DOCS);
+
+/** ملفات فنية للمنتج: Datasheet / كتالوج / CAD */
+vendorRouter.post(
+  '/products/:id/documents',
+  formLimiter,
+  uploadGuard(60),
+  docsUpload,
+  asyncHandler(async (req, res) => {
+    ok(res, await addProductDocs(req.params.id, (req.files as Express.Multer.File[] | undefined) ?? [], { vendorId: vid(req) }), 201);
+  }),
+);
+
+vendorRouter.delete(
+  '/products/:id/documents/:index',
+  asyncHandler(async (req, res) => {
+    ok(res, await removeProductDoc(req.params.id, Number(req.params.index), { vendorId: vid(req) }));
   }),
 );
