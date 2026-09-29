@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { cx, formatJOD } from '../../lib/format';
 import type { Product } from '../../lib/types';
 import { Icon, Skeleton } from '../ui';
+import { SupplierLine } from '../market/Badges';
 
 /** أول صورة للمنتج (أو null) */
 export function productImage(p: Pick<Product, 'media'>): string | null {
@@ -62,7 +63,8 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
   const ensureCustomer = useEnsureCustomer();
   const { toast } = useToast();
   const [added, setAdded] = useState(false);
-  const out = product.stock <= 0;
+  const por = Boolean(product.priceOnRequest);
+  const out = !por && product.stock <= 0;
   const low = !out && product.stock <= 3;
   const H = headingLevel === 2 ? 'h2' : 'h3';
   const images = product.media.filter((m) => m.kind === 'IMAGE');
@@ -126,7 +128,9 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
           ) : (
             <span />
           )}
-          {out ? (
+          {product.availability === 'ON_ORDER' && !out ? (
+            <span className="rounded-md bg-surface/95 px-2 py-0.5 text-xs font-semibold text-ink">حسب الطلب</span>
+          ) : out ? (
             <span className="rounded-md bg-surface/95 px-2 py-0.5 text-xs font-semibold text-muted">نفد</span>
           ) : low ? (
             <span className="rounded-md bg-ink px-2 py-0.5 text-xs font-semibold text-bg">
@@ -135,7 +139,17 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
           ) : null}
         </div>
 
-        {!out && (
+        {por && (
+          <Link
+            to={`/rfq/new?product=${product.slug}`}
+            aria-label={`اطلب عرض سعر لـ ${product.name}`}
+            title="اطلب عرض سعر"
+            className="absolute bottom-2.5 end-2.5 z-10 grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-fg shadow-lift transition-transform active:scale-90 md:translate-y-2 md:opacity-0 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100 md:group-hover:translate-y-0 md:group-hover:opacity-100"
+          >
+            <Icon name="file" className="h-5 w-5" />
+          </Link>
+        )}
+        {!out && !por && (
           <button
             type="button"
             onClick={onAdd}
@@ -155,22 +169,34 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
       </div>
 
       <div className="flex flex-1 flex-col pt-3">
-        <p className="line-clamp-1 text-xs text-muted">
-          {product.vendor && !product.vendor.isHouse ? product.vendor.name : product.category.name}
+        <p className="flex min-w-0 items-center text-xs text-muted">
+          {product.vendor ? <SupplierLine vendor={product.vendor} /> : product.category.name}
         </p>
         <H className="mt-1 line-clamp-2 font-sans text-[15px] font-semibold leading-snug text-ink">
           <Link to={href} className="after:absolute after:inset-0 after:content-[''] hover:underline hover:underline-offset-4">
             {product.name}
           </Link>
         </H>
-        <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-          <span className="font-display text-[17px] font-semibold text-ink">{formatJOD(product.finalPrice)}</span>
-          {hasDiscount && (
-            <s className="text-sm text-muted" aria-label={`قبل الخصم ${formatJOD(product.price)}`}>
-              {formatJOD(product.price)}
-            </s>
-          )}
-        </p>
+        {(product.brand || product.sku) && (
+          <p className="mt-1 line-clamp-1 text-xs text-muted">
+            {product.brand}
+            {product.brand && product.sku && ' · '}
+            {product.sku && <span className="ltr">{product.sku}</span>}
+          </p>
+        )}
+        {por ? (
+          <p className="mt-2 text-[15px] font-semibold text-brand-700 dark:text-brand-200">السعر عند الطلب</p>
+        ) : (
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span className="font-display text-[17px] font-semibold text-ink">{formatJOD(product.finalPrice)}</span>
+            {hasDiscount && (
+              <s className="text-sm text-muted" aria-label={`قبل الخصم ${formatJOD(product.price)}`}>
+                {formatJOD(product.price)}
+              </s>
+            )}
+          </p>
+        )}
+        {(product.minOrderQty ?? 1) > 1 && <p className="mt-0.5 text-xs text-muted">الحد الأدنى للطلب: <span className="num">{product.minOrderQty}</span></p>}
       </div>
     </article>
   );

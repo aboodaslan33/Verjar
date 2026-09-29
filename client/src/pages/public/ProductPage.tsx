@@ -10,6 +10,8 @@ import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
 import type { Media, Product } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
+import { SupplierLine } from '../../components/market/Badges';
+import { AVAILABILITY_LABEL, leadTimeText } from '../../lib/market';
 
 type ProductResponse = { product: Product; related: Product[] };
 
@@ -48,9 +50,11 @@ function ProductView({ product, related }: ProductResponse) {
   const { add } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState(Math.max(1, product.minOrderQty ?? 1));
   const [added, setAdded] = useState(false);
-  const out = product.stock <= 0;
+  const por = Boolean(product.priceOnRequest);
+  const out = por || product.stock <= 0;
+  const minQty = Math.max(1, product.minOrderQty ?? 1);
   const ensureCustomer = useEnsureCustomer();
   const buyRef = useRef<HTMLDivElement>(null);
   const [buyVisible, setBuyVisible] = useState(true);
@@ -113,17 +117,56 @@ function ProductView({ product, related }: ProductResponse) {
                       <span className="text-xs font-semibold text-ink">{product.vendor.name.slice(0, 1)}</span>
                     )}
                   </span>
-                  <span className="font-medium text-ink underline-offset-4 group-hover:underline">{product.vendor.name}</span>
+                  <span className="font-medium text-ink underline-offset-4 group-hover:underline">
+                    <SupplierLine vendor={product.vendor} />
+                  </span>
                   <span aria-hidden>·</span>
                   <span>{product.category.name}</span>
                 </Link>
               )}
               <h1 className="mt-3 text-[1.75rem] leading-[1.35] md:text-[2.125rem]">{product.name}</h1>
 
+              {(product.brand || product.sku || product.partNumber) && (
+                <p className="mt-2 flex flex-wrap gap-x-3 text-sm text-muted">
+                  {product.brand && <span>الماركة: <b className="font-semibold text-ink">{product.brand}</b></span>}
+                  {product.sku && <span>SKU: <b className="ltr font-semibold text-ink">{product.sku}</b></span>}
+                  {product.partNumber && <span>رقم القطعة: <b className="ltr font-semibold text-ink">{product.partNumber}</b></span>}
+                </p>
+              )}
               <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-                <Price price={product.price} finalPrice={product.finalPrice} discountPercent={product.discountPercent} size="lg" />
+                {por ? (
+                  <p className="font-display text-2xl font-semibold text-brand-700 dark:text-brand-200">السعر عند الطلب</p>
+                ) : (
+                  <Price price={product.price} finalPrice={product.finalPrice} discountPercent={product.discountPercent} size="lg" />
+                )}
               </div>
-              <StockLine stock={product.stock} />
+              {por || product.availability !== 'IN_STOCK' ? (
+                <p className={cx('mt-3 flex items-center gap-2 text-sm font-medium', product.availability === 'OUT_OF_STOCK' ? 'text-danger' : 'text-ink')}>
+                  <span className={cx('h-2 w-2 rounded-full', product.availability === 'OUT_OF_STOCK' ? 'bg-danger' : product.availability === 'ON_ORDER' ? 'bg-primary' : 'bg-success')} aria-hidden />
+                  {AVAILABILITY_LABEL[product.availability ?? 'IN_STOCK']}
+                </p>
+              ) : (
+                <StockLine stock={product.stock} />
+              )}
+
+              <dl className="mt-6 grid grid-cols-2 gap-2 text-sm">
+                {(
+                  [
+                    ['الشركة المصنعة', product.manufacturer],
+                    ['بلد المنشأ', product.originCountry],
+                    ['الحد الأدنى للطلب', minQty > 1 ? String(minQty) : null],
+                    ['مدة التوريد', leadTimeText(product.leadTimeDays)],
+                    ['الضمان', product.warranty],
+                  ] as const
+                )
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div key={k} className="rounded-lg bg-subtle px-3 py-2.5">
+                      <dt className="text-xs text-muted">{k}</dt>
+                      <dd className="mt-0.5 font-semibold">{v}</dd>
+                    </div>
+                  ))}
+              </dl>
 
               {product.specList && product.specList.length > 0 && (
                 <section className="mt-7" aria-labelledby="specs-title">
@@ -147,9 +190,14 @@ function ProductView({ product, related }: ProductResponse) {
                     <span id="qty-label" className="text-sm font-semibold">
                       الكمية
                     </span>
-                    <QtyStepper value={qty} max={Math.min(product.stock, 20)} onChange={setQty} labelledBy="qty-label" />
+                    <QtyStepper value={qty} min={minQty} max={Math.min(product.stock, 20)} onChange={setQty} labelledBy="qty-label" />
                   </div>
                 )}
+                {por ? (
+                  <ButtonLink to={`/rfq/new?product=${product.slug}`} size="lg" block>
+                    <Icon name="file" className="h-5 w-5" /> اطلب عرض سعر
+                  </ButtonLink>
+                ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button size="lg" block disabled={out} onClick={addToCart} className={cx(added && '!bg-ink !text-bg')}>
                     <span key={String(added)} className="anim-fade inline-flex items-center gap-2">
@@ -163,12 +211,41 @@ function ProductView({ product, related }: ProductResponse) {
                     </Button>
                   )}
                 </div>
+                )}
+                {!por && (
+                  <Link to={`/rfq/new?product=${product.slug}`} className="mt-3 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
+                    <Icon name="file" className="h-4 w-4" /> كمية كبيرة أو مواصفات خاصة؟ اطلب عرض سعر
+                  </Link>
+                )}
               </div>
+
+              {(product.documents?.length ?? 0) > 0 && (
+                <section className="mt-7" aria-labelledby="docs-title">
+                  <h2 id="docs-title" className="text-sm font-semibold">
+                    الملفات الفنية
+                  </h2>
+                  <ul className="mt-3 space-y-2">
+                    {product.documents!.map((d, i) => (
+                      <li key={i}>
+                        <a href={d.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-sm hover:border-ink">
+                          <Icon name="download" className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="min-w-0 truncate">{d.name}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {product.videoUrl && (
+                <a href={product.videoUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold hover:underline">
+                  <Icon name="play" className="h-4 w-4" /> مشاهدة فيديو المنتج
+                </a>
+              )}
 
               <ul className="mt-7 space-y-3 text-sm text-muted">
                 <li className="flex items-start gap-3">
                   <Icon name="truck" className="mt-0.5 h-5 w-5 shrink-0 text-ink" />
-                  <span>نتواصل معك بعد الطلب لتأكيده وتحديد موعد التوصيل.</span>
+                  <span>{por ? 'يصل طلبك للمورد مباشرة، وتستلم عرضه وتقارنه من حسابك.' : 'نتواصل معك بعد الطلب لتأكيده وتحديد موعد التوصيل.'}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Icon name="shield" className="mt-0.5 h-5 w-5 shrink-0 text-ink" />

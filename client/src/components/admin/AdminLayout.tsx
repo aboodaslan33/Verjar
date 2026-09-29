@@ -29,7 +29,20 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     ],
   },
   {
-    group: 'السوق',
+    group: 'السوق الصناعي',
+    items: [
+      { to: '/admin/market', label: 'لوحة السوق', end: true, perm: ['market.view', 'market.manage'] },
+      { to: '/admin/market/rfqs', label: 'طلبات الأسعار / Leads', perm: ['market.view', 'market.manage'] },
+      { to: '/admin/market/suppliers', label: 'الموردون والاعتماد', perm: ['market.view', 'market.manage'] },
+      { to: '/admin/market/plans', label: 'الباقات', perm: ['market.view', 'market.finance'] },
+      { to: '/admin/market/commissions', label: 'العمولات', perm: ['market.view', 'market.finance'] },
+      { to: '/admin/market/ads', label: 'الإعلانات', perm: ['market.view', 'market.manage'] },
+      { to: '/admin/market/invoices', label: 'الفواتير', perm: ['market.view', 'market.finance'] },
+      { to: '/admin/market/reviews', label: 'التقييمات', perm: ['market.view', 'market.manage'] },
+    ],
+  },
+  {
+    group: 'المنتجات والكتالوج',
     items: [
       { to: '/admin/products', label: 'المنتجات', badge: (s) => s.pendingProducts ?? 0, perm: ['catalog.manage'] },
       { to: '/admin/categories', label: 'الأقسام', perm: ['catalog.manage'] },

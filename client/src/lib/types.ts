@@ -43,6 +43,16 @@ export type AdminSettings = Omit<SiteSettings, 'whatsappMode'> & {
   deliveryFeeDefault: number;
   deliveryOtpRequired: boolean;
   deliveryPhotoRequired: boolean;
+  marketRevenueMode: 'LEAD' | 'COMMISSION' | 'ONLINE_PAYMENT';
+  leadFeeStandard: number;
+  leadFeeLarge: number;
+  leadLargeThreshold: number;
+  leadFeesEnabled: boolean;
+  rfqAutoDistribute: boolean;
+  rfqSuppliersPerRequest: number;
+  supplierApprovalRequired: boolean;
+  hideContactsUntilAward: boolean;
+  subscriptionReminderDays: number;
 };
 
 export type Category = {
@@ -56,7 +66,16 @@ export type Category = {
 /** حقل مواصفات يحدده الأدمن لكل قسم */
 export type SpecField = { key: string; label: string; type: 'text' | 'number' | 'select'; options: string[]; required: boolean };
 
-export type VendorBrief = { id: string; name: string; slug: string; logoUrl: string | null; isHouse: boolean };
+export type VendorBrief = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  isHouse: boolean;
+  verified?: boolean;
+  city?: string | null;
+  plan?: { code: string; badge: string | null } | null;
+};
 
 export type VendorStore = VendorBrief & { description: string; createdAt: string; productCount: number };
 
@@ -78,6 +97,19 @@ export type Product = {
   media: Media[];
   /** في صفحة المنتج فقط: المواصفات بأسمائها */
   specList?: { key: string; label: string; value: string }[];
+  // ── بيانات صناعية ──
+  sku?: string | null;
+  partNumber?: string | null;
+  manufacturer?: string | null;
+  brand?: string | null;
+  originCountry?: string | null;
+  priceOnRequest?: boolean;
+  minOrderQty?: number;
+  availability?: 'IN_STOCK' | 'ON_ORDER' | 'OUT_OF_STOCK';
+  leadTimeDays?: number | null;
+  warranty?: string | null;
+  videoUrl?: string | null;
+  documents?: { url: string; name: string; kind: string }[];
 };
 
 export type Slot = { time: string; available: boolean; reason?: 'past' | 'booked' };
@@ -152,7 +184,7 @@ export type CustomerMe = {
   hasPassword: boolean;
   emailOptIn: boolean;
   /** متجر العميل إن كان لديه صلاحية مورد */
-  vendor: { id: string; name: string; slug: string } | null;
+  vendor: { id: string; name: string; slug: string; status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'; verified?: boolean; role?: 'OWNER' | 'STAFF' } | null;
 };
 export type StaffRole = 'ADMIN' | 'STAFF' | 'MANAGER' | 'DRIVER';
 /** حساب إدارة أو توصيل مع صلاحياته الفعلية (RBAC) */

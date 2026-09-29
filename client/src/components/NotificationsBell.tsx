@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { cx, formatDate, formatTime } from '../lib/format';
 import { Icon } from './ui';
 
-export type AppNotification = { id: string; title: string; body: string; orderId: string | null; readAt: string | null; createdAt: string; recipientType: 'USER' | 'CUSTOMER' | 'VENDOR' };
+export type AppNotification = { id: string; title: string; body: string; orderId: string | null; link?: string | null; readAt: string | null; createdAt: string; recipientType: 'USER' | 'CUSTOMER' | 'VENDOR' };
 
 const POLL_MS = 45_000;
 
@@ -80,7 +80,7 @@ export function NotificationsBell({ hrefFor, className }: { hrefFor: (n: AppNoti
           ) : (
             <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto">
               {data.items.map((n) => {
-                const href = hrefFor(n);
+                const href = (n.link ?? hrefFor(n));
                 const body = (
                   <>
                     <span className="flex items-start justify-between gap-2">

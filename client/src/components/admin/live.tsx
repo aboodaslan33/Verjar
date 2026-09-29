@@ -33,6 +33,9 @@ const TYPE_PREFIX: Record<AdminEvent['type'], string> = {
   'corporate.created': 'طلب شركة جديد',
   'status.changed': 'تحديث حالة',
   'product.pending': 'مراجعة منتج',
+  'rfq.new': 'طلب عرض سعر جديد',
+  'rfq.awarded': 'ترسية طلب',
+  'supplier.pending': 'مورد بانتظار المراجعة',
 };
 
 export function LiveProvider({ children }: { children: ReactNode }) {

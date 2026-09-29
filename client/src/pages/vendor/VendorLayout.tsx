@@ -9,12 +9,17 @@ import { LangSwitch } from '../../lib/i18n';
 
 const NAV = [
   { to: '/vendor', label: 'الرئيسية', end: true },
-  { to: '/vendor/orders', label: 'الطلبات' },
-  { to: '/vendor/delivery', label: 'طلبات التوصيل' },
+  { to: '/vendor/rfqs', label: 'عروض الأسعار' },
   { to: '/vendor/products', label: 'المنتجات' },
+  { to: '/vendor/orders', label: 'طلبات المتجر' },
+  { to: '/vendor/delivery', label: 'طلبات التوصيل' },
+  { to: '/vendor/stats', label: 'الإحصائيات' },
+  { to: '/vendor/subscription', label: 'الاشتراك' },
+  { to: '/vendor/ads', label: 'الإعلانات' },
+  { to: '/vendor/team', label: 'الفريق' },
   { to: '/vendor/earnings', label: 'الأرباح' },
   { to: '/vendor/tenders', label: 'العطاءات' },
-  { to: '/vendor/profile', label: 'ملف المتجر' },
+  { to: '/vendor/profile', label: 'ملف الشركة' },
 ];
 
 export function VendorLayout() {
@@ -29,7 +34,7 @@ export function VendorLayout() {
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Logo to="/vendor" />
           <span className="hidden h-6 w-px bg-line sm:block" aria-hidden />
-          <span className="hidden min-w-0 truncate text-sm font-semibold sm:block">لوحة المورد · {vendor?.name}</span>
+          <span className="hidden min-w-0 truncate text-sm font-semibold sm:block">لوحة المورد · {vendor?.name}{vendor?.status && vendor.status !== 'APPROVED' ? ' (قيد المراجعة)' : ''}</span>
           <div className="ms-auto flex items-center gap-1">
             {vendor && (
               <a

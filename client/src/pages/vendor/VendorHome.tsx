@@ -7,24 +7,28 @@ import { formatDate, formatJOD } from '../../lib/format';
 import type { Paged } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 import type { VendorMe, VendorOrder } from './types';
+import { MarketSummary, VendorStatusBanner, type MarketOverview } from './VendorMarket';
 
 export default function VendorHome() {
   useDocumentTitle('لوحة المورد');
   const me = useAdminQuery(() => api.get<VendorMe>('/vendor/me'), []);
   const orders = useAdminQuery(() => api.get<Paged<VendorOrder>>('/vendor/orders', { pageSize: 5 }), []);
+  const market = useAdminQuery(() => api.get<MarketOverview>('/vendor/market/overview'), []);
   if (me.error) return <ErrorState message={me.error.message} onRetry={me.retry} />;
   const d = me.data;
 
   return (
     <AdminPage
       title={d ? `أهلًا، ${d.vendor.name}` : 'لوحة المورد'}
-      description={d ? `عمولة المنصة ${d.vendor.commissionPercent}% من كل بيع` : undefined}
+      description="FARJAR Industrial Marketplace — منتجاتك، طلبات عروض الأسعار، وصفقاتك"
       actions={
         <ButtonLink to="/vendor/products/new" size="sm">
           <Icon name="plus" className="h-4 w-4" /> منتج جديد
         </ButtonLink>
       }
     >
+      <VendorStatusBanner o={market.data} />
+      <MarketSummary o={market.data} loading={market.loading} />
       {d && d.counts.rejected > 0 && (
         <Alert tone="error" className="mb-4">
           لديك {d.counts.rejected} منتج مرفوض.{' '}
@@ -39,7 +43,7 @@ export default function VendorHome() {
         </Alert>
       )}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="طلبات جديدة" value={d?.counts.newOrders ?? 0} to="/vendor/orders?status=NEW" tone={d?.counts.newOrders ? 'brand' : 'neutral'} loading={me.loading} />
+        <StatTile label="طلبات متجر جديدة" value={d?.counts.newOrders ?? 0} to="/vendor/orders?status=NEW" tone={d?.counts.newOrders ? 'brand' : 'neutral'} loading={me.loading} />
         <StatTile label="المبيعات" value={formatJOD(d?.totals.salesTotal ?? 0)} sub={`${d?.totals.ordersCount ?? 0} طلب`} loading={me.loading} />
         <StatTile label="المستحق لك" value={formatJOD(d?.totals.due ?? 0)} sub="من الطلبات المكتملة" to="/vendor/earnings" tone="warn" loading={me.loading} />
         <StatTile label="المنتجات" value={d?.counts.products ?? 0} to="/vendor/products" loading={me.loading} />

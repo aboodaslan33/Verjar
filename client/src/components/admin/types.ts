@@ -1,3 +1,4 @@
+import type { Availability, MarketFile } from '../../lib/market';
 /** أنواع بيانات لوحة التحكم — مطابقة لاستجابات /api/v1/admin */
 import type { AdminSettings, BookingType, CorporateType, MediaKind, RequestStatus, SpecField } from '../../lib/types';
 
@@ -215,6 +216,8 @@ export type AdminCategory = {
   visible: boolean;
   productCount: number;
   childCount: number;
+  commissionGroup?: string | null;
+  description?: string | null;
 };
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -293,6 +296,20 @@ export type AdminProduct = {
   specs: Record<string, string | number>;
   media: ProductMedia[];
   createdAt: string;
+  sku: string | null;
+  partNumber: string | null;
+  manufacturer: string | null;
+  brand: string | null;
+  originCountry: string | null;
+  priceOnRequest: boolean;
+  minOrderQty: number;
+  availability: Availability;
+  leadTimeDays: number | null;
+  warranty: string | null;
+  videoUrl: string | null;
+  keywords: string | null;
+  documents: MarketFile[];
+  views?: number;
 };
 
 export type ProductionImpact = 'NO_STOP_NEEDED' | 'CANNOT_STOP' | 'PARTIAL_STOP';
@@ -442,7 +459,7 @@ export type SettingsResponse = {
 };
 
 export type AdminEvent = {
-  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending';
+  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending';
   id: string;
   title: string;
   at: string;

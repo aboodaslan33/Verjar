@@ -8,6 +8,7 @@ import { Alert, Button, ButtonLink, Checkbox, Icon, Input, Select, Tag, Textarea
 import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
 import type { SpecField } from '../../lib/types';
+import { AVAILABILITY_LABEL, type Availability, type MarketFile } from '../../lib/market';
 
 function applyDiscount(price: number, pct: number) {
   return Math.round(price * (1 - Math.min(Math.max(pct, 0), 100) / 100) * 1000) / 1000;
@@ -101,6 +102,19 @@ export function ProductEditorForm({
   const [specs, setSpecs] = useState<Record<string, string>>(() =>
     Object.fromEntries(Object.entries(product?.specs ?? {}).map(([k, v]) => [k, String(v)])),
   );
+  // بيانات صناعية (B2B)
+  const [sku, setSku] = useState(product?.sku ?? '');
+  const [partNumber, setPartNumber] = useState(product?.partNumber ?? '');
+  const [manufacturer, setManufacturer] = useState(product?.manufacturer ?? '');
+  const [brand, setBrand] = useState(product?.brand ?? '');
+  const [originCountry, setOriginCountry] = useState(product?.originCountry ?? '');
+  const [priceOnRequest, setPriceOnRequest] = useState(product?.priceOnRequest ?? false);
+  const [minOrderQty, setMinOrderQty] = useState(String(product?.minOrderQty ?? 1));
+  const [availability, setAvailability] = useState<Availability>(product?.availability ?? 'IN_STOCK');
+  const [leadTimeDays, setLeadTimeDays] = useState(product?.leadTimeDays != null ? String(product.leadTimeDays) : '');
+  const [warranty, setWarranty] = useState(product?.warranty ?? '');
+  const [videoUrl, setVideoUrl] = useState(product?.videoUrl ?? '');
+  const [keywords, setKeywords] = useState(product?.keywords ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -121,6 +135,18 @@ export function ProductEditorForm({
       discountPercent: discN,
       stock: Math.round(Number(stock) || 0),
       visible,
+      sku: sku.trim() || null,
+      partNumber: partNumber.trim() || null,
+      manufacturer: manufacturer.trim() || null,
+      brand: brand.trim() || null,
+      originCountry: originCountry.trim() || null,
+      priceOnRequest,
+      minOrderQty: Math.max(1, Math.round(Number(minOrderQty) || 1)),
+      availability,
+      leadTimeDays: leadTimeDays.trim() === '' ? null : Math.round(Number(leadTimeDays)),
+      warranty: warranty.trim() || null,
+      videoUrl: videoUrl.trim() || null,
+      keywords: keywords.trim() || null,
       ...(isAdmin ? { featured } : {}),
       // فقط حقول القسم الحالي تُرسل
       specs: Object.fromEntries(fields.map((f) => [f.key, specs[f.key] ?? ''])),
@@ -261,6 +287,19 @@ export function ProductEditorForm({
             </div>
           </Panel>
 
+          <Panel title="بيانات صناعية">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input label="رقم المنتج / SKU" optional dir="ltr" className="text-start" value={sku} onChange={(e) => setSku(e.target.value)} error={fe.sku} />
+              <Input label="رقم القطعة (Part No.)" optional dir="ltr" className="text-start" value={partNumber} onChange={(e) => setPartNumber(e.target.value)} error={fe.partNumber} />
+              <Input label="الشركة المصنعة" optional value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} error={fe.manufacturer} />
+              <Input label="الماركة" optional value={brand} onChange={(e) => setBrand(e.target.value)} error={fe.brand} />
+              <Input label="بلد المنشأ" optional value={originCountry} onChange={(e) => setOriginCountry(e.target.value)} error={fe.originCountry} />
+              <Input label="الضمان" optional placeholder="مثال: سنتان" value={warranty} onChange={(e) => setWarranty(e.target.value)} error={fe.warranty} />
+              <Input label="رابط فيديو" optional dir="ltr" className="text-start" placeholder="https://youtube.com/…" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} error={fe.videoUrl} />
+              <Input label="كلمات مفتاحية للبحث" optional placeholder="موتور، محرك، 7.5 حصان" value={keywords} onChange={(e) => setKeywords(e.target.value)} error={fe.keywords} hint="مفصولة بفواصل — تساعد الشركات في إيجاد المنتج" />
+            </div>
+          </Panel>
+
           {categoryId && (
             <Panel title="المواصفات">
               <SpecInputs fields={fields} values={specs} onChange={(k, val) => setSpecs((s) => ({ ...s, [k]: val }))} errors={fe} />
@@ -268,7 +307,10 @@ export function ProductEditorForm({
           )}
 
           {product ? (
-            <MediaManager product={product} apiBase={mode.apiBase} allowVideo={isAdmin} onChanged={onReload} />
+            <>
+              <MediaManager product={product} apiBase={mode.apiBase} allowVideo={isAdmin} onChanged={onReload} />
+              <DocumentsManager product={product} apiBase={mode.apiBase} />
+            </>
           ) : (
             <Panel title="الصور">
               <p className="text-sm text-muted">احفظ المنتج أولًا، ثم أضف الصور.</p>
@@ -277,8 +319,11 @@ export function ProductEditorForm({
         </div>
 
         <div className="space-y-6">
-          <Panel title="السعر والمخزون">
+          <Panel title="السعر والتوفر">
             <div className="space-y-4">
+              <Checkbox label="السعر عند الطلب" description="لا يظهر السعر، ويطلب العميل عرض سعر بدل الشراء المباشر" checked={priceOnRequest} onChange={setPriceOnRequest} />
+              {!priceOnRequest && (
+              <>
               <Input
                 label="السعر (د.أ)"
                 type="number"
@@ -316,6 +361,19 @@ export function ProductEditorForm({
                 {discN > 0 && priceN > 0 && !discountInvalid && (
                   <p className="mt-1 text-xs text-muted">يوفر العميل {formatJOD(priceN - finalN)}</p>
                 )}
+              </div>
+              </>
+              )}
+              <Select label="حالة التوفر" value={availability} onChange={(e) => setAvailability(e.target.value as Availability)} error={fe.availability}>
+                {(Object.keys(AVAILABILITY_LABEL) as Availability[]).map((k) => (
+                  <option key={k} value={k}>
+                    {AVAILABILITY_LABEL[k]}
+                  </option>
+                ))}
+              </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="الحد الأدنى للطلب" type="number" inputMode="numeric" min={1} className="ltr text-start" value={minOrderQty} onChange={(e) => setMinOrderQty(e.target.value)} error={fe.minOrderQty} />
+                <Input label="مدة التوريد (يوم)" optional type="number" inputMode="numeric" min={0} className="ltr text-start" value={leadTimeDays} onChange={(e) => setLeadTimeDays(e.target.value)} error={fe.leadTimeDays} />
               </div>
               <Input
                 label="الكمية في المخزون"
@@ -523,6 +581,51 @@ function MediaManager({
         )}
       </div>
       <p className={cx('mt-2 text-xs text-muted')}>استخدم الأسهم لترتيب الصور. الترتيب يُحفظ فورًا.</p>
+    </Panel>
+  );
+}
+
+/** ملفات فنية للمنتج: Datasheet / كتالوج / رسومات CAD */
+function DocumentsManager({ product, apiBase }: { product: AdminProduct; apiBase: string }) {
+  const m = useMutation();
+  const [docs, setDocs] = useState<MarketFile[]>(product.documents ?? []);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const fd = new FormData();
+    Array.from(files).forEach((f) => fd.append('files', f));
+    const r = await m.run('docs', () => api.post<MarketFile[]>(`${apiBase}/products/${product.id}/documents`, fd), 'تم رفع الملفات');
+    if (r) setDocs(r);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+  const remove = async (i: number) => {
+    const r = await m.run(`doc-${i}`, () => api.del<MarketFile[]>(`${apiBase}/products/${product.id}/documents/${i}`), 'تم حذف الملف');
+    if (r) setDocs(r);
+  };
+  return (
+    <Panel title={`الملفات الفنية (${docs.length})`}>
+      {docs.length > 0 && (
+        <ul className="mb-4 divide-y divide-line rounded-xl border border-line">
+          {docs.map((d, i) => (
+            <li key={i} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+              <a href={d.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 hover:underline">
+                <Icon name="file" className="h-4 w-4 shrink-0 text-muted" />
+                <span className="truncate">{d.name}</span>
+              </a>
+              <button type="button" disabled={m.busy} onClick={() => remove(i)} className="rounded-md p-1.5 text-muted hover:bg-danger/10 hover:text-danger" aria-label="حذف الملف">
+                <Icon name="trash" className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-line p-4 text-center">
+        <Icon name="upload" className="h-6 w-6 text-muted" />
+        <span className="text-sm font-medium">{m.pending === 'docs' ? 'جاري الرفع…' : 'Datasheet أو كتالوج أو ملف CAD'}</span>
+        <span className="text-xs text-muted">PDF أو DWG / DXF / STEP أو صور — حتى 20MB، 6 ملفات كحد أقصى</span>
+        <input ref={inputRef} type="file" multiple accept=".pdf,.dwg,.dxf,.step,.stp,image/*" className="sr-only" disabled={m.busy} onChange={(e) => upload(e.target.files)} />
+      </label>
+      {m.error && <p className="mt-2 text-sm text-danger">{m.error}</p>}
     </Panel>
   );
 }

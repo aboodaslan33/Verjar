@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ProductCard, ProductGridSkeleton } from '../../components/store/ProductCard';
-import { Button, EmptyState, ErrorState, Icon, PageHeader, Pagination, Skeleton } from '../../components/ui';
+import { Button, ButtonLink, Checkbox, EmptyState, ErrorState, Icon, Modal, PageHeader, Pagination, Skeleton } from '../../components/ui';
+import MarketHome from './MarketHome';
 import { api } from '../../lib/api';
 import { cx } from '../../lib/format';
 import type { Category, Paged, Product } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
 const SORTS = [
+  { value: 'relevance', label: 'الأكثر صلة' },
   { value: 'new', label: 'الأحدث' },
   { value: 'price_asc', label: 'السعر: من الأقل' },
   { value: 'price_desc', label: 'السعر: من الأعلى' },
@@ -16,13 +18,26 @@ const SORTS = [
 
 const PAGE_SIZE = 12;
 
+/** فلاتر البحث الصناعي (تُحفظ في رابط الصفحة) */
+const FILTER_KEYS = ['city', 'brand', 'origin', 'minPrice', 'maxPrice', 'inStock', 'verified', 'plan', 'house', 'vendor'] as const;
+type Facets = { brands: { value: string; count: number }[]; origins: { value: string; count: number }[]; cities: { value: string; count: number }[]; price: { min: number; max: number } };
+
+/** السوق: الصفحة الرئيسية للسوق الصناعي، وعند البحث أو الفلترة صفحة النتائج */
 export default function Store() {
+  const [params] = useSearchParams();
+  const browsing = ['q', 'category', 'view', 'page', 'sort', ...FILTER_KEYS].some((k) => params.get(k));
+  return browsing ? <StoreResults /> : <MarketHome />;
+}
+
+function StoreResults() {
   useDocumentTitle('السوق');
   const [params, setParams] = useSearchParams();
   const category = params.get('category') ?? '';
   const q = params.get('q') ?? '';
-  const sortParam = params.get('sort') ?? 'new';
-  const sort = SORTS.some((s) => s.value === sortParam) ? sortParam : 'new';
+  const sortParam = params.get('sort') ?? 'relevance';
+  const sort = SORTS.some((s) => s.value === sortParam) ? sortParam : 'relevance';
+  const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) ?? ''])) as Record<(typeof FILTER_KEYS)[number], string>;
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const page = Math.max(1, Number(params.get('page')) || 1);
 
   const [search, setSearch] = useState(q);
@@ -31,7 +46,7 @@ export default function Store() {
   const update = (patch: Record<string, string | number | null>) => {
     const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(patch)) {
-      if (v === null || v === '' || (k === 'sort' && v === 'new') || (k === 'page' && v === 1)) next.delete(k);
+      if (v === null || v === '' || (k === 'sort' && v === 'relevance') || (k === 'page' && v === 1)) next.delete(k);
       else next.set(k, String(v));
     }
     // أي تغيير في التصفية يعيد إلى الصفحة الأولى
@@ -48,27 +63,36 @@ export default function Store() {
   }, [search]);
 
   const cats = useAsync(() => api.get<Category[]>('/store/categories'), [], 'store/categories');
+  const filterKey = FILTER_KEYS.map((k) => filters[k]).join('|');
   const products = useAsync(
-    () => api.get<Paged<Product>>('/store/products', { category, q, sort, page, pageSize: PAGE_SIZE }),
-    [category, q, sort, page],
-    `store/products?${category}|${q}|${sort}|${page}`,
+    () => api.get<Paged<Product>>('/store/products', { category, q, sort, page, pageSize: PAGE_SIZE, ...filters }),
+    [category, q, sort, page, filterKey],
+    `store/products?${category}|${q}|${sort}|${page}|${filterKey}`,
   );
+  const facets = useAsync(() => api.get<Facets>('/store/facets'), [], 'store/facets');
+  const sponsored = useAsync(() => (q ? api.get<{ id: string; product: Product }[]>('/market/ads/search') : Promise.resolve([])), [q]);
+  const activeFilters = FILTER_KEYS.filter((k) => filters[k]).length;
 
   const totalCount = cats.data?.reduce((s, c) => s + (c.productCount ?? 0), 0);
   // القسم الرئيسي النشط (سواء اختير هو أو أحد أقسامه الفرعية)
   const activeTop = cats.data?.find((c) => c.slug === category || c.children?.some((k) => k.slug === category));
   const activeCat = activeTop?.slug === category ? activeTop : activeTop?.children?.find((k) => k.slug === category);
-  const hasFilters = Boolean(category || q);
+  const hasFilters = Boolean(category || q || activeFilters);
 
   const pickCategory = (slug: string | null) => update({ category: slug });
 
   return (
     <>
       <PageHeader
-        eyebrow="السوق"
-        title="منتجات من ورشتنا ومن موردين معتمدين"
-        description="أقسام متنوعة من متاجر مختلفة في سلة واحدة. كل منتج تراجعه الإدارة قبل عرضه، وكل مورد يجهّز طلبه ويتابعه معك."
-      />
+        eyebrow="FARJAR Industrial Marketplace"
+        title={q ? `نتائج البحث عن «${q}»` : 'المنتجات والمعدات الصناعية'}
+        description="قطع غيار، ماكينات، معدات ومستلزمات صناعية من FARJAR وموردين معتمدين. لم تجد ما تحتاجه؟ اطلب عرض سعر ونوصلك بالموردين المناسبين."
+        crumbs={[{ to: '/store', label: 'السوق' }, { label: q ? 'نتائج البحث' : 'المنتجات' }]}
+      >
+        <ButtonLink to={`/rfq/new${q ? `?q=${encodeURIComponent(q)}` : ''}`}>
+          <Icon name="file" className="h-4 w-4" /> اطلب عرض سعر
+        </ButtonLink>
+      </PageHeader>
 
       <div className="container py-8 md:py-12">
         <div className="grid gap-8 lg:grid-cols-[15rem_1fr] lg:gap-12">
@@ -99,6 +123,9 @@ export default function Store() {
                   ))}
                 </ul>
               )}
+              <div className="mt-8 border-t border-line pt-6">
+                <FilterPanel filters={filters} facets={facets.data} onChange={(patch) => update(patch)} />
+              </div>
             </div>
           </aside>
 
@@ -161,12 +188,15 @@ export default function Store() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="ابحث باسم المنتج أو وصفه"
+                  placeholder="اسم المنتج، رقم القطعة، SKU، الماركة أو المورد"
                   className="input ps-11"
                   enterKeyHint="search"
                   maxLength={100}
                 />
               </form>
+              <Button variant="outline" className="lg:hidden" onClick={() => setFiltersOpen(true)}>
+                <Icon name="sliders" className="h-4 w-4" /> الفلاتر{activeFilters ? <span className="num rounded-full bg-primary px-1.5 text-xs text-primary-fg">{activeFilters}</span> : null}
+              </Button>
               <div className="flex items-center gap-2 sm:w-56">
                 <label htmlFor="store-sort" className="shrink-0 text-sm text-muted">
                   الترتيب
@@ -191,7 +221,23 @@ export default function Store() {
                 )}
                 {activeCat && <FilterChip label={activeCat.name} onClear={() => pickCategory(null)} />}
                 {q && <FilterChip label={`«${q}»`} onClear={() => { setSearch(''); update({ q: '' }); }} />}
+                {FILTER_KEYS.filter((k) => filters[k]).map((k) => (
+                  <FilterChip key={k} label={filterLabel(k, filters[k])} onClear={() => update({ [k]: null })} />
+                ))}
               </div>
+
+              {q && (sponsored.data?.length ?? 0) > 0 && (
+                <div className="mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+                  <p className="mb-3 text-xs font-semibold text-muted">منتجات مُموَّلة</p>
+                  <div className={STORE_GRID}>
+                    {sponsored.data!.slice(0, 3).map((a) => (
+                      <div key={a.id} onClickCapture={() => void api.post(`/market/ads/${a.id}/click`).catch(() => undefined)}>
+                        <ProductCard product={a.product} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {products.error ? (
                 <ErrorState message={products.error.message} onRetry={products.reload} />
@@ -217,13 +263,16 @@ export default function Store() {
                 <EmptyState
                   icon="bag"
                   title={hasFilters ? 'لا توجد منتجات تطابق بحثك' : 'لا توجد منتجات حاليًا'}
-                  description={hasFilters ? 'جرّب كلمة أخرى أو قسمًا مختلفًا.' : 'نضيف منتجات جديدة باستمرار. تابعنا قريبًا.'}
+                  description={hasFilters ? 'جرّب كلمة أخرى أو خفّف الفلاتر — أو أرسل طلب عرض سعر وسنوصله بالموردين المناسبين.' : 'نضيف منتجات جديدة باستمرار. تابعنا قريبًا.'}
                   action={
-                    hasFilters ? (
-                      <Button variant="outline" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
-                        عرض كل المنتجات
-                      </Button>
-                    ) : undefined
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <ButtonLink to={`/rfq/new${q ? `?q=${encodeURIComponent(q)}` : ''}`}>اطلب عرض سعر</ButtonLink>
+                      {hasFilters && (
+                        <Button variant="outline" onClick={() => setParams(new URLSearchParams({ view: 'all' }), { replace: true })}>
+                          عرض كل المنتجات
+                        </Button>
+                      )}
+                    </div>
                   }
                 />
               )}
@@ -231,7 +280,84 @@ export default function Store() {
           </div>
         </div>
       </div>
+      <Modal open={filtersOpen} onClose={() => setFiltersOpen(false)} title="الفلاتر" footer={<Button block onClick={() => setFiltersOpen(false)}>عرض النتائج{products.data ? ` (${products.data.total})` : ''}</Button>}>
+        <FilterPanel filters={filters} facets={facets.data} onChange={(patch) => update(patch)} />
+      </Modal>
     </>
+  );
+}
+
+function filterLabel(k: string, v: string) {
+  switch (k) {
+    case 'inStock':
+      return 'متوفر فقط';
+    case 'verified':
+      return 'مورد موثّق';
+    case 'house':
+      return 'منتجات FARJAR';
+    case 'plan':
+      return v.split(',').join(' / ');
+    case 'minPrice':
+      return `من ${v} د.أ`;
+    case 'maxPrice':
+      return `حتى ${v} د.أ`;
+    default:
+      return v;
+  }
+}
+
+/** لوحة الفلاتر: المدينة، الماركة، بلد المنشأ، السعر، التوفر، المورد الموثّق، باقة المورد */
+function FilterPanel({ filters, facets, onChange }: { filters: Record<string, string>; facets: Facets | null; onChange: (patch: Record<string, string | null>) => void }) {
+  const [minP, setMinP] = useState(filters.minPrice);
+  const [maxP, setMaxP] = useState(filters.maxPrice);
+  useEffect(() => {
+    setMinP(filters.minPrice);
+    setMaxP(filters.maxPrice);
+  }, [filters.minPrice, filters.maxPrice]);
+  const plans = filters.plan ? filters.plan.split(',') : [];
+  const togglePlan = (code: string) => {
+    const next = plans.includes(code) ? plans.filter((p) => p !== code) : [...plans, code];
+    onChange({ plan: next.join(',') || null });
+  };
+  const select = (key: string, label: string, list?: { value: string; count: number }[]) => (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold tracking-wide text-muted">{label}</span>
+      <select value={filters[key]} onChange={(e) => onChange({ [key]: e.target.value || null })} className="input cursor-pointer py-2.5">
+        <option value="">الكل</option>
+        {list?.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.value} ({o.count})
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  return (
+    <div className="space-y-5">
+      {select('city', 'المدينة', facets?.cities)}
+      {select('brand', 'الماركة', facets?.brands)}
+      {select('origin', 'بلد المنشأ', facets?.origins)}
+      <div>
+        <span className="mb-1.5 block text-xs font-semibold tracking-wide text-muted">السعر (د.أ)</span>
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onChange({ minPrice: minP || null, maxPrice: maxP || null });
+          }}
+        >
+          <input type="number" min={0} inputMode="decimal" placeholder="من" aria-label="أقل سعر" value={minP} onChange={(e) => setMinP(e.target.value)} onBlur={() => onChange({ minPrice: minP || null })} className="input ltr py-2.5 text-start" />
+          <input type="number" min={0} inputMode="decimal" placeholder="إلى" aria-label="أعلى سعر" value={maxP} onChange={(e) => setMaxP(e.target.value)} onBlur={() => onChange({ maxPrice: maxP || null })} className="input ltr py-2.5 text-start" />
+        </form>
+      </div>
+      <div className="space-y-2">
+        <Checkbox label="متوفر فقط" checked={filters.inStock === 'true'} onChange={(v) => onChange({ inStock: v ? 'true' : null })} />
+        <Checkbox label="مورد موثّق" checked={filters.verified === 'true'} onChange={(v) => onChange({ verified: v ? 'true' : null })} />
+        <Checkbox label="منتجات FARJAR" checked={filters.house === 'true'} onChange={(v) => onChange({ house: v ? 'true' : null })} />
+        <Checkbox label="مورد PRO" checked={plans.includes('PRO')} onChange={() => togglePlan('PRO')} />
+        <Checkbox label="مورد BUSINESS" checked={plans.includes('BUSINESS')} onChange={() => togglePlan('BUSINESS')} />
+      </div>
+    </div>
   );
 }
 

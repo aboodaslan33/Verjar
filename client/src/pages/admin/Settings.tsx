@@ -6,6 +6,7 @@ import { Alert, Button, Checkbox, ErrorState, Input, Select, Tag, Textarea } fro
 import { api } from '../../lib/api';
 import { WEEKDAYS, cx } from '../../lib/format';
 import type { AdminSettings } from '../../lib/types';
+import { REVENUE_MODE_LABEL } from '../../lib/market';
 import { useDocumentTitle } from '../../lib/useAsync';
 
 type Key = keyof AdminSettings;
@@ -22,10 +23,15 @@ const RANGES: Partial<Record<Key, [number, number, boolean?]>> = {
   contractReminderDays: [1, 180, true],
   tenderCommissionPercent: [0, 100],
   deliveryFeeDefault: [0, 1000],
+  leadFeeStandard: [0, 10_000],
+  leadFeeLarge: [0, 10_000],
+  leadLargeThreshold: [0, 100_000_000],
+  rfqSuppliersPerRequest: [1, 50, true],
+  subscriptionReminderDays: [1, 60, true],
 };
 
 /** مفاتيح نعم/لا (تُخزَّن في النموذج كنص 'true'/'false') */
-const BOOL: Key[] = ['deliveryOtpRequired', 'deliveryPhotoRequired'];
+const BOOL: Key[] = ['deliveryOtpRequired', 'deliveryPhotoRequired', 'leadFeesEnabled', 'rfqAutoDistribute', 'supplierApprovalRequired', 'hideContactsUntilAward'];
 
 const NUMERIC: Key[] = [
   'inspectionFeeNormal',
@@ -39,6 +45,11 @@ const NUMERIC: Key[] = [
   'contractReminderDays',
   'tenderCommissionPercent',
   'deliveryFeeDefault',
+  'leadFeeStandard',
+  'leadFeeLarge',
+  'leadLargeThreshold',
+  'rfqSuppliersPerRequest',
+  'subscriptionReminderDays',
 ];
 
 export default function Settings() {
@@ -282,6 +293,37 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
           />
         </div>
       </Section>
+
+      <div id="market">
+        <Section title="السوق الصناعي" description="نموذج الإيراد ورسوم الـ Leads وتوزيع طلبات عروض الأسعار. الباقات والعمولات والإعلانات تُدار من قسم السوق الصناعي.">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Select label="نموذج الإيراد" value={str('marketRevenueMode')} onChange={set('marketRevenueMode')} error={fe.marketRevenueMode}>
+              {Object.entries(REVENUE_MODE_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </Select>
+            {num('leadFeeStandard', 'رسوم الـ Lead العادي (د.أ)', { min: 0, max: 10000 })}
+            {num('leadFeeLarge', 'رسوم الـ Lead الكبير (د.أ)', { min: 0, max: 10000 })}
+            {num('leadLargeThreshold', 'حد الـ Lead الكبير (قيمة الصفقة د.أ)', { min: 0, max: 100000000 })}
+            {num('rfqSuppliersPerRequest', 'عدد الموردين لكل طلب', { min: 1, max: 50 })}
+            {num('subscriptionReminderDays', 'التذكير قبل انتهاء الاشتراك (أيام)', { min: 1, max: 60 })}
+          </div>
+          <div className="mt-4 space-y-3">
+            {(
+              [
+                ['leadFeesEnabled', 'تحصيل رسوم الـ Leads من الموردين (عند الإيقاف تُسجَّل القيمة فقط)'],
+                ['rfqAutoDistribute', 'إرسال طلبات عروض الأسعار تلقائيًا للموردين المقترحين'],
+                ['supplierApprovalRequired', 'المورد الجديد يحتاج موافقة الإدارة قبل الظهور'],
+                ['hideContactsUntilAward', 'إخفاء بيانات التواصل بين العميل والمورد حتى قبول العرض'],
+              ] as [Key, string][]
+            ).map(([k, label]) => (
+              <Checkbox key={k} label={label} checked={form[k] === 'true'} onChange={(v) => setForm((f) => ({ ...f, [k]: String(v) }))} />
+            ))}
+          </div>
+        </Section>
+      </div>
 
       <Section title="المحتوى والسياسات" description="نصوص الصفحة الرئيسية وصفحة نبذة عنا وسياسات الحجز والطلب">
         <div className="space-y-4">

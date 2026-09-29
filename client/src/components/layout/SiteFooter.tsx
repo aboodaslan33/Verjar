@@ -18,6 +18,9 @@ const SERVICES: { to: string; key: MessageKey }[] = [
 const COMPANY: { to: string; key: MessageKey }[] = [
   { to: '/work', key: 'nav.work' },
   { to: '/store', key: 'nav.store' },
+  { to: '/store/suppliers', key: 'footer.suppliers' },
+  { to: '/rfq/new', key: 'footer.rfq' },
+  { to: '/suppliers/join', key: 'footer.join' },
   { to: '/about', key: 'nav.about' },
   { to: '/contact', key: 'footer.contact' },
   { to: '/track', key: 'footer.track' },

@@ -26,6 +26,10 @@ const pages = {
   Unsubscribe: () => import('./pages/public/Unsubscribe'),
   Track: () => import('./pages/public/Track'),
   Policies: () => import('./pages/public/Policies'),
+  Suppliers: () => import('./pages/public/Suppliers'),
+  SupplierJoin: () => import('./pages/public/SupplierJoin'),
+  RfqNew: () => import('./pages/public/RfqNew'),
+  RfqDetail: () => import('./pages/account/RfqDetail'),
   ForgotPassword: () => import('./pages/auth/ForgotPassword'),
   ResetPassword: () => import('./pages/auth/ResetPassword'),
   Account: () => import('./pages/account/Account'),
@@ -53,6 +57,10 @@ const Register = lazy(pages.Register);
 const Unsubscribe = lazy(pages.Unsubscribe);
 const Track = lazy(pages.Track);
 const Policies = lazy(pages.Policies);
+const Suppliers = lazy(pages.Suppliers);
+const SupplierJoin = lazy(pages.SupplierJoin);
+const RfqNew = lazy(pages.RfqNew);
+const RfqDetail = lazy(pages.RfqDetail);
 const ForgotPassword = lazy(pages.ForgotPassword);
 const ResetPassword = lazy(pages.ResetPassword);
 const Account = lazy(pages.Account);
@@ -69,6 +77,10 @@ const DriverApp = lazy(pages.DriverApp);
 /** مسار ← صفحته: يُحمَّل كود الصفحة عند مرور المؤشر أو لمس الرابط، والصفحات الأساسية بعد أول تحميل */
 const ROUTE_PREFETCH: [RegExp, () => Promise<unknown>, boolean][] = [
   [/^\/store\/vendor\//, pages.VendorStore, false],
+  [/^\/store\/suppliers/, pages.Suppliers, true],
+  [/^\/suppliers\/join/, pages.SupplierJoin, false],
+  [/^\/rfq\/new/, pages.RfqNew, true],
+  [/^\/account\/rfq\//, pages.RfqDetail, false],
   [/^\/store\/[^/]+$/, pages.ProductPage, true],
   [/^\/store\/?$/, pages.Store, true],
   [/^\/bookings\/[^/]+$/, pages.BookingForm, true],
@@ -139,6 +151,8 @@ export default function App() {
           <Route path="unsubscribe" element={<Unsubscribe />} />
           <Route path="track" element={<Track />} />
           <Route path="policies" element={<Policies />} />
+          <Route path="store/suppliers" element={<Suppliers />} />
+          <Route path="suppliers/join" element={<SupplierJoin />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="account/login" element={<Navigate to="/login" replace />} />
@@ -148,6 +162,8 @@ export default function App() {
             <Route path="corporate/:type" element={<CorporateForm />} />
             <Route path="cart" element={<Cart />} />
             <Route path="checkout" element={<Checkout />} />
+            <Route path="rfq/new" element={<RfqNew />} />
+            <Route path="account/rfq/:id" element={<RfqDetail />} />
           </Route>
           {/* صفحة الحساب لها حماية خاصة: الأدمن يُحوَّل للوحة التحكم */}
           <Route path="account" element={<Account />} />

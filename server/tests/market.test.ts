@@ -139,6 +139,8 @@ describe('السوق الصناعي B2B', () => {
     expect(vd.body.data.contact.phone).not.toContain('2222222');
     expect(JSON.stringify(vd.body.data)).not.toContain('buyer@factory.jo');
     expect(vd.body.data.commissionAmount).toBeUndefined();
+    // الميزانية تبقى بين العميل وFARJAR
+    expect(vd.body.data.budget).toBeUndefined();
 
     // مورد آخر لا يرى الطلب، وعميل آخر لا يرى طلب غيره
     const other = await createCustomer({ name: 'مورد آخر', phone: '0783333333' });
@@ -294,5 +296,38 @@ describe('السوق الصناعي B2B', () => {
     const out = await runMarketJobs();
     expect(out.reminded).toBeGreaterThanOrEqual(1);
     expect(await prisma.notification.count({ where: { recipientId: s.id, title: { contains: 'سينتهي' } } })).toBe(1);
+  });
+
+  it('متجر FARJAR يقدّم عرض سعر من الإدارة، ويُقبل بدون فاتورة عمولة', async () => {
+    const { ensureHouseVendor, HOUSE_VENDOR_ID } = await import('../src/services/vendor.service');
+    await ensureHouseVendor();
+    const buyer = await createCustomer({ name: 'مصنع البلاستيك', phone: '0776666666' });
+    const rfq = await buyer.post('/api/v1/market/rfqs').send({
+      companyName: 'مصنع البلاستيك',
+      contactName: 'م. سامر',
+      phone: '0776666666',
+      items: [{ name: 'عربة ستانلس 3 رفوف', quantity: 5 }],
+    });
+    expect(rfq.status).toBe(201);
+    const id = rfq.body.data.id;
+    const detail = await admin.get(`/api/v1/admin/market/rfqs/${id}`);
+    expect(detail.body.data.houseVendorId).toBe(HOUSE_VENDOR_ID);
+
+    const hq = await admin.post(`/api/v1/admin/market/rfqs/${id}/house-quote`).send({ unitPrice: 120, quantity: 5, leadTimeDays: 7 });
+    expect(hq.status).toBe(201);
+    expect(Number(hq.body.data.total)).toBe(600);
+    // التعديل يحدّث نفس العرض
+    expect((await admin.post(`/api/v1/admin/market/rfqs/${id}/house-quote`).send({ unitPrice: 110, quantity: 5, notes: 'للتواصل 0791234567 أو sales@farjar.jo' })).status).toBe(201);
+
+    const mine = await buyer.get(`/api/v1/market/rfqs/${id}`);
+    const quote = mine.body.data.quotes.find((x: { vendor: { id: string } }) => x.vendor.id === HOUSE_VENDOR_ID);
+    expect(Number(quote.total)).toBe(550);
+    // بيانات التواصل في نص العرض مخفية قبل الترسية
+    expect(quote.notes).not.toContain('0791234567');
+    expect(quote.notes).not.toContain('sales@farjar.jo');
+    expect((await buyer.post(`/api/v1/market/rfqs/${id}/quotes/${quote.id}/accept`)).status).toBe(200);
+    expect(await prisma.marketInvoice.count({ where: { vendorId: HOUSE_VENDOR_ID } })).toBe(0);
+    // لا عرض جديد بعد الترسية
+    expect((await admin.post(`/api/v1/admin/market/rfqs/${id}/house-quote`).send({ unitPrice: 1, quantity: 1 })).status).toBe(409);
   });
 });

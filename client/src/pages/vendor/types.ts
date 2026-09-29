@@ -12,6 +12,20 @@ export type VendorProfile = {
   pickupAddress: string | null;
   pickupLat: number | null;
   pickupLng: number | null;
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  verified?: boolean;
+  contactName?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  businessField?: string | null;
+  productTypes?: string | null;
+  licenseNumber?: string | null;
+  catalogFiles?: { url: string; name: string; kind: string }[];
+  certificates?: { url: string; name: string; kind: string }[];
+  categoryIds?: string[];
+  isHouse?: boolean;
   createdAt: string;
 };
 

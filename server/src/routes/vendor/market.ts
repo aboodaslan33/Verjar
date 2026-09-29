@@ -7,7 +7,7 @@ import { round3, toNum } from '../../lib/money';
 import { normalizePhone } from '../../lib/phone';
 import { prisma } from '../../lib/prisma';
 import { ammanParts } from '../../lib/time';
-import { partialEmail, partialPhone } from '../../market/contacts';
+import { maskContacts, partialEmail, partialPhone } from '../../market/contacts';
 import { contactsRevealed, getThread, postMessage } from '../../market/messaging';
 import { activateSubscription, createInvoice, paymentProvider } from '../../market/payments';
 import { assertMemberQuota, effectivePlan, planFeatures, rfqQuotaLeft } from '../../market/plans';
@@ -174,9 +174,13 @@ vendorMarketRouter.get(
       await rfqEvent(prisma, rfq.id, { kind: 'vendor', id: v, name: req.vendor!.name }, 'viewed');
     }
     const reveal = await contactsRevealed(rfq, v);
-    const { phone, email, customerId: _c, expectedValue: _e, finalValue, commissionAmount: _ca, commissionRate: _cr, commissionRuleId: _cri, adminNote: _an, revenueModel: _rm, quotes, _count, ...rest } = rfq;
+    const { phone, email, customerId: _c, expectedValue: _e, budget: _b, finalValue, commissionAmount: _ca, commissionRate: _cr, commissionRuleId: _cri, adminNote: _an, revenueModel: _rm, quotes, _count, ...rest } = rfq;
+    const hide = (t: string | null) => (t && !reveal ? maskContacts(t).text : t);
     ok(res, {
       ...rest,
+      location: hide(rest.location),
+      notes: hide(rest.notes),
+      items: rest.items.map((it) => ({ ...it, specs: hide(it.specs), name: hide(it.name) ?? it.name })),
       contact: reveal ? { phone, email, contactName: rfq.contactName } : { phone: partialPhone(phone), email: partialEmail(email), contactName: rfq.contactName, hidden: true },
       myQuote: quotes[0] ? { ...quotes[0], filePublicId: undefined } : null,
       competitorCount: Math.max(0, _count.quotes - (quotes[0] && quotes[0].status !== 'WITHDRAWN' ? 1 : 0)),

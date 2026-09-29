@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { COMMISSION_GROUPS } from '../../lib/market';
 import { Link } from 'react-router-dom';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
@@ -45,7 +46,7 @@ export default function Categories() {
   };
 
   const row = (c: AdminCategory, child = false) => (
-    <li key={c.id} className={cx('flex items-center gap-3 px-4 py-3 ltr:max-sm:flex-wrap', child && 'bg-subtle/40 ps-10')}>
+    <li key={c.id} className={cx('flex items-center gap-3 px-4 py-3 max-sm:flex-wrap', child && 'bg-subtle/40 ps-10')}>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className={cx('truncate', child ? 'text-[15px]' : 'font-semibold')}>{c.name}</span>
@@ -171,6 +172,8 @@ function CategoryForm({
   const [name, setName] = useState(category?.name ?? '');
   const [parentId, setParentId] = useState(category ? category.parentId ?? '' : defaultParent ?? '');
   const [order, setOrder] = useState(String(category?.sortOrder ?? nextOrder));
+  const [group, setGroup] = useState(category?.commissionGroup ?? '');
+  const [description, setDescription] = useState(category?.description ?? '');
   const [fields, setFields] = useState<FieldDraft[]>(() => (category?.specFields ?? []).map((f) => ({ ...f, optionsText: f.options.join('، ') })));
   const parentFields = tops.find((t) => t.id === parentId)?.specFields ?? [];
   // القسم الذي له أقسام فرعية لا يصبح فرعيًا
@@ -186,6 +189,8 @@ function CategoryForm({
       name: name.trim(),
       parentId: parentId || null,
       sortOrder: Number(order) || 0,
+      commissionGroup: group || null,
+      description: description.trim() || null,
       specFields: fields.map(({ optionsText, ...f }) => ({
         ...f,
         key: f.key.trim(),
@@ -219,6 +224,21 @@ function CategoryForm({
           </Select>
         )}
         <Input label="الترتيب" type="number" className="ltr text-start" value={order} onChange={(e) => setOrder(e.target.value)} />
+        <Select
+          label="مجموعة العمولة"
+          value={group}
+          onChange={(e) => setGroup(e.target.value)}
+          error={fe.commissionGroup}
+          hint="تحدد نسبة العمولة على صفقات السوق الصناعي حسب قواعد محرك العمولات"
+        >
+          <option value="">— بدون —</option>
+          {COMMISSION_GROUPS.map((g) => (
+            <option key={g.value} value={g.value}>
+              {g.label}
+            </option>
+          ))}
+        </Select>
+        <Input label="وصف قصير" value={description} onChange={(e) => setDescription(e.target.value)} error={fe.description} maxLength={300} />
 
         <div>
           <p className="label">حقول المواصفات</p>

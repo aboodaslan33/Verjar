@@ -37,6 +37,16 @@ const P = {
   Users: () => import('./Users'),
   DeliveryOrderDetail: () => import('./DeliveryOrderDetail'),
   DeliveryOrderNew: () => import('./DeliveryOrderNew'),
+  MarketOverview: () => import('./market/MarketOverview'),
+  MarketSuppliers: () => import('./market/MarketSuppliers').then((m) => ({ default: m.MarketSuppliers })),
+  MarketSupplierDetail: () => import('./market/MarketSuppliers').then((m) => ({ default: m.MarketSupplierDetail })),
+  MarketRfqs: () => import('./market/MarketRfqs').then((m) => ({ default: m.MarketRfqs })),
+  MarketRfqDetail: () => import('./market/MarketRfqs').then((m) => ({ default: m.MarketRfqDetail })),
+  MarketPlans: () => import('./market/MarketConfig').then((m) => ({ default: m.MarketPlans })),
+  MarketCommissions: () => import('./market/MarketConfig').then((m) => ({ default: m.MarketCommissions })),
+  MarketAds: () => import('./market/MarketConfig').then((m) => ({ default: m.MarketAds })),
+  MarketInvoices: () => import('./market/MarketConfig').then((m) => ({ default: m.MarketInvoices })),
+  MarketReviews: () => import('./market/MarketConfig').then((m) => ({ default: m.MarketReviews })),
 };
 
 const Login = lazy(P.Login);
@@ -68,6 +78,16 @@ const Reports = lazy(P.Reports);
 const Users = lazy(P.Users);
 const DeliveryOrderDetail = lazy(P.DeliveryOrderDetail);
 const DeliveryOrderNew = lazy(P.DeliveryOrderNew);
+const MarketOverview = lazy(P.MarketOverview);
+const MarketSuppliers = lazy(P.MarketSuppliers);
+const MarketSupplierDetail = lazy(P.MarketSupplierDetail);
+const MarketRfqs = lazy(P.MarketRfqs);
+const MarketRfqDetail = lazy(P.MarketRfqDetail);
+const MarketPlans = lazy(P.MarketPlans);
+const MarketCommissions = lazy(P.MarketCommissions);
+const MarketAds = lazy(P.MarketAds);
+const MarketInvoices = lazy(P.MarketInvoices);
+const MarketReviews = lazy(P.MarketReviews);
 
 /** هيكل تحميل بشكل لوحة التحكم (أثناء التحقق من الجلسة) */
 function ShellSkeleton() {
@@ -172,6 +192,16 @@ const ADMIN_PREFETCH: [RegExp, () => Promise<unknown>, boolean][] = [
   [/^\/admin\/newsletter\/?$/, P.Newsletter, false],
   [/^\/admin\/vendors\/?$/, P.Vendors, true],
   [/^\/admin\/vendors\/[^/]+\/?$/, P.VendorDetail, false],
+  [/^\/admin\/market\/?$/, P.MarketOverview, true],
+  [/^\/admin\/market\/suppliers\/?$/, P.MarketSuppliers, true],
+  [/^\/admin\/market\/suppliers\/[^/]+\/?$/, P.MarketSupplierDetail, false],
+  [/^\/admin\/market\/rfqs\/?$/, P.MarketRfqs, true],
+  [/^\/admin\/market\/rfqs\/[^/]+\/?$/, P.MarketRfqDetail, false],
+  [/^\/admin\/market\/plans\/?$/, P.MarketPlans, true],
+  [/^\/admin\/market\/commissions\/?$/, P.MarketCommissions, true],
+  [/^\/admin\/market\/ads\/?$/, P.MarketAds, true],
+  [/^\/admin\/market\/invoices\/?$/, P.MarketInvoices, true],
+  [/^\/admin\/market\/reviews\/?$/, P.MarketReviews, true],
 ];
 
 export default function AdminApp() {
@@ -216,6 +246,16 @@ export default function AdminApp() {
           <Route path="newsletter" element={s(<Newsletter />)} />
           <Route path="vendors" element={s(<Vendors />)} />
           <Route path="vendors/:id" element={s(<VendorDetail />)} />
+          <Route path="market" element={s(<MarketOverview />)} />
+          <Route path="market/suppliers" element={s(<MarketSuppliers />)} />
+          <Route path="market/suppliers/:id" element={s(<MarketSupplierDetail />)} />
+          <Route path="market/rfqs" element={s(<MarketRfqs />)} />
+          <Route path="market/rfqs/:id" element={s(<MarketRfqDetail />)} />
+          <Route path="market/plans" element={s(<MarketPlans />)} />
+          <Route path="market/commissions" element={s(<MarketCommissions />)} />
+          <Route path="market/ads" element={s(<MarketAds />)} />
+          <Route path="market/invoices" element={s(<MarketInvoices />)} />
+          <Route path="market/reviews" element={s(<MarketReviews />)} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

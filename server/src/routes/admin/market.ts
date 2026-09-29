@@ -12,10 +12,12 @@ import { getThread, postMessage } from '../../market/messaging';
 import { marketNotify } from '../../market/notify';
 import { activateSubscription, cancelInvoice, createInvoice, markInvoicePaid } from '../../market/payments';
 import { FEATURE_KEYS } from '../../market/plans';
-import { OPEN_STATUSES, closeRfq, distribute, rfqEvent, suggestSuppliers } from '../../market/rfq';
+import { OPEN_STATUSES, closeRfq, distribute, rfqEvent, submitQuote, suggestSuppliers } from '../../market/rfq';
 import { requirePermission } from '../../middleware/auth';
+import { memoryUpload, uploadGuard } from '../../middleware/upload';
 import { createDeliveryOrder } from '../../services/delivery.service';
 import { getSettings } from '../../services/settings.service';
+import { POLICIES, validateAndStore } from '../../services/upload.service';
 import { optionalDate } from './shared';
 
 /**
@@ -275,7 +277,8 @@ marketAdminRouter.get(
     });
     if (!rfq) throw notFound('الطلب غير موجود');
     const rule = rfq.commissionRuleId ? await prisma.commissionRule.findUnique({ where: { id: rfq.commissionRuleId }, select: { name: true } }) : null;
-    ok(res, { ...rfq, commissionRule: rule, open: OPEN_STATUSES.includes(rfq.status) });
+    const house = await prisma.vendor.findFirst({ where: { isHouse: true }, select: { id: true } });
+    ok(res, { ...rfq, commissionRule: rule, open: OPEN_STATUSES.includes(rfq.status), houseVendorId: house?.id ?? null });
   }),
 );
 
@@ -293,6 +296,51 @@ marketAdminRouter.post(
     const added = await prisma.$transaction((tx) => distribute(tx, req.params.id, vendorIds, 'MANUAL', adminActor(req)));
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'rfq_distribute', entity: 'rfq', entityId: req.params.id, meta: { vendorIds: added } });
     ok(res, { added });
+  }),
+);
+
+/** عرض سعر من متجر FARJAR (المورد الأساسي للمنصة) — تقدّمه الإدارة باسم المتجر على أي طلب مفتوح */
+const houseQuoteInput = z.object({
+  unitPrice: z.coerce.number().min(0, 'سعر الوحدة لا يكون سالبًا').max(100_000_000),
+  quantity: z.coerce.number().positive('الكمية أكبر من صفر').max(100_000_000),
+  total: z.coerce.number().min(0).max(1_000_000_000).optional().nullable(),
+  leadTimeDays: z.coerce.number().int().min(0).max(730).optional().nullable(),
+  warranty: z.string().trim().max(200).optional().nullable(),
+  originCountry: z.string().trim().max(60).optional().nullable(),
+  brand: z.string().trim().max(80).optional().nullable(),
+  specs: z.string().trim().max(3000).optional().nullable(),
+  paymentTerms: z.string().trim().max(500).optional().nullable(),
+  validUntil: z.coerce.date().optional().nullable(),
+  notes: z.string().trim().max(3000).optional().nullable(),
+});
+
+marketAdminRouter.post(
+  '/rfqs/:id/house-quote',
+  uploadGuard(25),
+  memoryUpload(20, 1).single('file'),
+  asyncHandler(async (req, res) => {
+    const input = houseQuoteInput.parse(typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body);
+    if (input.validUntil && input.validUntil < new Date()) throw badRequest('تاريخ صلاحية العرض في الماضي', { fields: { validUntil: 'اختر تاريخًا قادمًا' } });
+    const house = await prisma.vendor.findFirst({ where: { isHouse: true }, select: { id: true, name: true } });
+    if (!house) throw notFound('متجر FARJAR غير موجود');
+    const rfq = await prisma.rfq.findFirst({ where: { id: req.params.id, deletedAt: null }, select: { id: true, status: true } });
+    if (!rfq) throw notFound('الطلب غير موجود');
+    if (!OPEN_STATUSES.includes(rfq.status)) throw conflict('الطلب لم يعد يستقبل عروضًا');
+    // المتجر يُضاف لموردي الطلب إن لم يكن منهم (بدون رسوم Lead)
+    await prisma.rfqRecipient.upsert({
+      where: { rfqId_vendorId: { rfqId: rfq.id, vendorId: house.id } },
+      create: { rfqId: rfq.id, vendorId: house.id, source: 'MANUAL', status: 'VIEWED', viewedAt: new Date() },
+      update: {},
+    });
+    const [file] = req.file ? await validateAndStore([req.file], POLICIES.technical, 'quotes') : [];
+    const q = await submitQuote(house, rfq.id, {
+      ...input,
+      total: input.total ?? round3(input.unitPrice * input.quantity),
+      fileUrl: file?.url ?? null,
+      filePublicId: file?.publicId ?? null,
+    });
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'house_quote', entity: 'rfq', entityId: rfq.id, meta: { total: toNum(q.total) } });
+    ok(res, q, 201);
   }),
 );
 

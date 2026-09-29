@@ -6,6 +6,7 @@ import { emitAdmin } from '../../lib/events';
 import { asyncHandler, badRequest, conflict, notFound, ok } from '../../lib/http';
 import { toNum } from '../../lib/money';
 import { prisma } from '../../lib/prisma';
+import { maskContacts } from '../../market/contacts';
 import { contactsRevealed, getThread, postMessage } from '../../market/messaging';
 import { marketNotify } from '../../market/notify';
 import { defaultPlan } from '../../market/plans';
@@ -323,8 +324,14 @@ marketRouter.get(
     const quotes = await Promise.all(
       rfq.quotes.map(async ({ vendor, filePublicId: _f, ...q }) => {
         const reveal = await contactsRevealed(rfq, vendor.id);
+        // نصوص العرض الحرة تُخفى منها الأرقام والبريد حتى الترسية (منع تجاوز المنصة)
+        const hide = (t: string | null) => (t && !reveal ? maskContacts(t).text : t);
         return {
           ...q,
+          notes: hide(q.notes),
+          specs: hide(q.specs),
+          paymentTerms: hide(q.paymentTerms),
+          warranty: hide(q.warranty),
           vendor: {
             id: vendor.id,
             name: vendor.name,
