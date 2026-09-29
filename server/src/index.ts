@@ -9,7 +9,7 @@ import { purgeOldEmailOtps } from './services/emailOtp.service';
 const app = createApp();
 
 const server = app.listen(env.PORT, () => {
-  console.log(`مجموعة فرجا API يعمل على المنفذ ${env.PORT} (${env.NODE_ENV})`);
+  console.log(`مجموعة فرجار API يعمل على المنفذ ${env.PORT} (${env.NODE_ENV})`);
   console.log(
     `واتساب: ${env.waCloudEnabled ? 'Cloud API' : 'روابط wa.me'} | الملفات: ${env.cloudinaryEnabled ? 'Cloudinary' : 'محلي'} | البريد: ${env.emailEnabled ? env.SMTP_USER : 'غير مفعّل'}`,
   );

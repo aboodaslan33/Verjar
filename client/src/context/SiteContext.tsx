@@ -21,7 +21,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   maxDaysAhead: 60,
   bookingPolicy: '',
   storePolicy: '',
-  aboutTitle: 'مجموعة فرجا للتصميم والمقاولات والصيانة',
+  aboutTitle: 'مجموعة فرجار للتصميم والمقاولات والصيانة',
   aboutContent: '',
   heroTitle: 'منتجات صناعية وصيانة ماكينات ومقاولات',
   heroSubtitle: 'نورّد المنتجات والتجهيزات الصناعية، ونصون الماكينات وخطوط الإنتاج بعقود سنوية أو عند العطل، ونكمل معك أعمال البناء والصيانة في عمّان وكل المحافظات.',

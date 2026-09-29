@@ -207,7 +207,7 @@ async function syncAdmin() {
     console.warn('! ADMIN_PASSWORD يطابق كلمة مرور منشورة في ملفات المثال — لم يُنشأ/يُحدَّث حساب الأدمن. اختر كلمة مرور خاصة.');
     return;
   }
-  const name = process.env.ADMIN_NAME || 'إدارة مجموعة فرجا';
+  const name = process.env.ADMIN_NAME || 'إدارة مجموعة فرجار';
   const existing = await prisma.user.findUnique({ where: { email } });
   if (!existing) {
     await prisma.user.create({ data: { email, name, passwordHash: await bcrypt.hash(password, 11), role: 'ADMIN' } });
@@ -232,9 +232,9 @@ async function syncAdmin() {
 async function migrateBrandSettings() {
   const updates: [string, string, string][] = [
     ['email', 'info@verjar.jo', 'farjarweb@gmail.com'],
-    ['aboutTitle', 'فيرجار للمقاولات والصيانة', 'مجموعة فرجا للتصميم والمقاولات والصيانة'],
-    ['aboutTitle', 'مجموعة فرجا للمقاولات والصيانة', 'مجموعة فرجا للتصميم والمقاولات والصيانة'],
-    ['aboutTitle', 'فرجار قروب للمقاولات والصيانة', 'مجموعة فرجا للتصميم والمقاولات والصيانة'],
+    ['aboutTitle', 'فيرجار للمقاولات والصيانة', 'مجموعة فرجار للتصميم والمقاولات والصيانة'],
+    ['aboutTitle', 'مجموعة فرجار للمقاولات والصيانة', 'مجموعة فرجار للتصميم والمقاولات والصيانة'],
+    ['aboutTitle', 'فرجار قروب للمقاولات والصيانة', 'مجموعة فرجار للتصميم والمقاولات والصيانة'],
   ];
   for (const [key, from, to] of updates) {
     const row = await prisma.setting.findUnique({ where: { key } });
@@ -277,9 +277,9 @@ async function main() {
     where: { id: 'house_vendor' },
     create: {
       id: 'house_vendor',
-      name: 'مجموعة فرجا',
+      name: 'مجموعة فرجار',
       slug: 'farja-group',
-      description: 'منتجات من ورشة مجموعة فرجا.',
+      description: 'منتجات من ورشة مجموعة فرجار.',
       commissionPercent: new Prisma.Decimal(100),
       isHouse: true,
     },

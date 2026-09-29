@@ -13,7 +13,7 @@ import { formatJOD, toNum } from '../lib/money';
 import { displayPhone } from '../lib/phone';
 import { formatAmman } from '../lib/time';
 
-export const BRAND = 'مجموعة فرجا';
+export const BRAND = 'مجموعة فرجار';
 
 function mapLink(lat?: number | null, lng?: number | null) {
   return lat != null && lng != null ? `https://maps.google.com/?q=${lat},${lng}` : null;

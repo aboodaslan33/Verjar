@@ -210,7 +210,7 @@ describe('الطلب متعدد الموردين', () => {
     expect(vo.order.address).toBe(buyer.address);
 
     const acc = (await shopper.get('/api/v1/account/overview')).body.data.orders[0];
-    expect(acc.vendorOrders.map((v: { vendor: { name: string } }) => v.vendor.name).sort()).toEqual(['متجر أ', 'متجر ب', 'مجموعة فرجا'].sort());
+    expect(acc.vendorOrders.map((v: { vendor: { name: string } }) => v.vendor.name).sort()).toEqual(['متجر أ', 'متجر ب', 'مجموعة فرجار'].sort());
   });
 
   it('إلغاء المورد لطلبه يُرجع المخزون، وحالة الطلب الرئيسي تُشتق من الطلبات الفرعية', async () => {

@@ -1,4 +1,4 @@
-/** صور من أعمال مجموعة فرجا (WebP مضغوطة في public/images/work) */
+/** صور من أعمال مجموعة فرجار (WebP مضغوطة في public/images/work) */
 export type Work = {
   src: string;
   width: number;

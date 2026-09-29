@@ -15,9 +15,9 @@ export async function ensureHouseVendor(db: Db = prisma) {
     where: { id: HOUSE_VENDOR_ID },
     create: {
       id: HOUSE_VENDOR_ID,
-      name: 'مجموعة فرجا',
+      name: 'مجموعة فرجار',
       slug: 'farja-group',
-      description: 'منتجات من ورشة مجموعة فرجا.',
+      description: 'منتجات من ورشة مجموعة فرجار.',
       commissionPercent: new Prisma.Decimal(100),
       isHouse: true,
       status: 'APPROVED',

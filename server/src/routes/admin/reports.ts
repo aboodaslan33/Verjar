@@ -506,7 +506,7 @@ function cellLabel(key: string, v: unknown, lang: 'ar' | 'en') {
 
 async function toXlsx(report: Report, lang: 'ar' | 'en', kind: string) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Farja Group';
+  wb.creator = 'Farjar Group';
   const ws = wb.addWorksheet(kind.slice(0, 31), { views: [{ rightToLeft: lang === 'ar', state: 'frozen', ySplit: 1 }] });
   ws.columns = report.columns.map((col) => ({ header: col[lang], key: col.key, width: Math.max(12, col[lang].length + 4), style: col.money ? { numFmt: '0.000' } : {} }));
   ws.getRow(1).font = { bold: true };
