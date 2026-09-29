@@ -743,7 +743,7 @@ marketAdminRouter.post(
     if (inv.vendorId) {
       await marketNotify(prisma, { vendorIds: [inv.vendorId] }, {
         title: `لم يُقبل إثبات دفع الفاتورة ${inv.number}`,
-        body: `السبب: ${reason}. ارفع إثبات دفع جديد من صفحة الاشتراك والفواتير.`,
+        body: `السبب: ${reason}. ارفع إيصالًا جديدًا لنفس الطلب، أو قدّم على نفس الباقة أو باقة أخرى من صفحة الاشتراك والفواتير.`,
         link: '/vendor/subscription',
         cta: 'رفع إثبات جديد',
       });

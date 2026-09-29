@@ -417,4 +417,45 @@ describe('السوق الصناعي B2B', () => {
     expect((await agent.post(`/api/v1/vendor/market/invoices/${again.body.data.invoice.id}/cancel`)).status).toBe(200);
     expect((await prisma.vendorSubscription.findFirstOrThrow({ where: { invoiceId: again.body.data.invoice.id } })).status).toBe('CANCELLED');
   });
+
+  it('بعد رفض الإيصال: المورد يعيد التقديم على نفس الباقة أو يختار باقة أخرى', async () => {
+    const agent = await createCustomer({ name: 'مورد المضخات', phone: '0782020202' });
+    const s = await joinSupplier(agent, 'مضخات الوادي', []);
+    const apply = (planId: string) =>
+      agent.post('/api/v1/vendor/market/subscription').field('data', JSON.stringify({ planId })).attach('file', PNG_1PX, { filename: 'r.png', contentType: 'image/png' });
+    const reject = (id: string) => admin.post(`/api/v1/admin/market/invoices/${id}/reject-proof`).send({ reason: 'الإيصال غير واضح' });
+
+    // 1) طلب PRO → رفض → إعادة التقديم على نفس الباقة بطلب جديد
+    const a = await apply('plan_pro');
+    expect(a.status).toBe(201);
+    expect((await reject(a.body.data.invoice.id)).status).toBe(200);
+    const b = await apply('plan_pro');
+    expect(b.status).toBe(201);
+    expect(b.body.data.invoice.id).not.toBe(a.body.data.invoice.id);
+    // الطلب المرفوض السابق أُلغي تلقائيًا — طلب واحد فقط مفتوح
+    expect((await prisma.marketInvoice.findUniqueOrThrow({ where: { id: a.body.data.invoice.id } })).status).toBe('CANCELLED');
+    expect(await prisma.vendorSubscription.count({ where: { vendorId: s.id, status: 'PENDING_PAYMENT' } })).toBe(1);
+
+    // 2) رفض مرة ثانية → التقديم على باقة أخرى (BUSINESS)
+    expect((await reject(b.body.data.invoice.id)).status).toBe(200);
+    const c = await apply('plan_business');
+    expect(c.status).toBe(201);
+    expect(Number(c.body.data.invoice.amount)).toBe(79);
+    expect(await prisma.vendorSubscription.count({ where: { vendorId: s.id, status: 'PENDING_PAYMENT' } })).toBe(1);
+
+    // 3) أثناء المراجعة لا يُقدَّم طلب آخر
+    expect((await apply('plan_pro')).status).toBe(409);
+
+    // 4) رفض ثم رفع إيصال جديد لنفس الطلب بدل طلب جديد، وتأكيد الإدارة يفعّل الباقة
+    expect((await reject(c.body.data.invoice.id)).status).toBe(200);
+    const re = await agent.post(`/api/v1/vendor/market/invoices/${c.body.data.invoice.id}/proof`).attach('file', PNG_1PX, { filename: 'r2.png', contentType: 'image/png' });
+    expect(re.status).toBe(201);
+    expect((await admin.post(`/api/v1/admin/market/invoices/${c.body.data.invoice.id}/paid`).send({})).status).toBe(200);
+    expect((await prisma.vendor.findUniqueOrThrow({ where: { id: s.id }, include: { plan: true } })).plan?.code).toBe('BUSINESS');
+
+    // 5) إلغاء الإدارة للطلب (بدل الرفض) يسمح أيضًا بطلب جديد
+    const d = await apply('plan_pro');
+    expect((await admin.post(`/api/v1/admin/market/invoices/${d.body.data.invoice.id}/cancel`)).status).toBe(200);
+    expect((await apply('plan_pro')).status).toBe(201);
+  });
 });

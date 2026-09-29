@@ -744,6 +744,7 @@ function PendingPayment({ invoice: i, owner, onPay, onCancel }: { invoice: Invoi
           </p>
           {review && i.proofSubmittedAt && <p className="mt-1 text-sm text-muted">أُرسل {formatDate(i.proofSubmittedAt)}. تُفعَّل الخدمة بعد تأكيد الإدارة.</p>}
           {rejected && i.reviewNote && <p className="mt-1 text-sm text-danger">السبب: {i.reviewNote}</p>}
+          {rejected && owner && <p className="mt-1 text-sm text-muted">ارفع إيصالًا جديدًا لنفس الطلب، أو اختر نفس الباقة أو باقة أخرى من الأسفل وأرسل طلبًا جديدًا (يُلغى هذا الطلب تلقائيًا).</p>}
         </div>
         {owner && !review && (
           <div className="flex flex-wrap gap-2">

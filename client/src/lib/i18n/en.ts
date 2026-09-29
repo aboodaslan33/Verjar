@@ -2111,6 +2111,7 @@ export const EN_TEXT: Record<string, string> = {
   "يمكن إلغاء الطلب قبل خروجه للتوصيل بالتواصل معنا.": "You can cancel the order before it goes out for delivery by contacting us.",
   "المنتجات المصنوعة حسب الطلب أو القياس لا تُسترجع بعد بدء تصنيعها إلا في حال وجود عيب.": "Made-to-order or custom-sized products can't be returned once production starts, unless defective.",
   // ── السوق الصناعي ──
+  "ارفع إيصالًا جديدًا لنفس الطلب، أو اختر نفس الباقة أو باقة أخرى من الأسفل وأرسل طلبًا جديدًا (يُلغى هذا الطلب تلقائيًا).": "Upload a new receipt for this request, or choose the same plan or another plan below and send a new request (this one is cancelled automatically).",
   "تم إرسال الطلب مع إيصال الدفع للإدارة": "Request sent to the admin with the payment receipt",
   "إرسال الطلب مع الإيصال": "Send request with receipt",
   "لا يُرسل الطلب للإدارة قبل إرفاق الإيصال. تراجع الإدارة الإيصال وتفعّل الخدمة بعد التأكد من وصول المبلغ، ويصلك إشعار وبريد بالنتيجة.": "The request isn't sent to the admin until the receipt is attached. The admin reviews the receipt and activates the service once the amount is confirmed; you'll get a notification and email with the result.",
@@ -3245,4 +3246,5 @@ export const EN_PATTERNS: [string, string][] = [
   ["متابعة للدفع — {0}", "Continue to payment — {0}"],
   ["طلب باقة {0} مع إيصال دفع — {1}", "{0} plan request with payment receipt — {1}"],
   ["طلب إعلان {0} مع إيصال دفع — {1}", "{0} ad request with payment receipt — {1}"],
+  ["السبب: {0}. ارفع إيصالًا جديدًا لنفس الطلب، أو قدّم على نفس الباقة أو باقة أخرى من صفحة الاشتراك والفواتير.", "Reason: {0}. Upload a new receipt for the same request, or apply for the same plan or another plan from the subscription & invoices page."],
 ];
