@@ -2111,6 +2111,13 @@ export const EN_TEXT: Record<string, string> = {
   "يمكن إلغاء الطلب قبل خروجه للتوصيل بالتواصل معنا.": "You can cancel the order before it goes out for delivery by contacting us.",
   "المنتجات المصنوعة حسب الطلب أو القياس لا تُسترجع بعد بدء تصنيعها إلا في حال وجود عيب.": "Made-to-order or custom-sized products can't be returned once production starts, unless defective.",
   // ── السوق الصناعي ──
+  "تم إرسال الطلب مع إيصال الدفع للإدارة": "Request sent to the admin with the payment receipt",
+  "إرسال الطلب مع الإيصال": "Send request with receipt",
+  "لا يُرسل الطلب للإدارة قبل إرفاق الإيصال. تراجع الإدارة الإيصال وتفعّل الخدمة بعد التأكد من وصول المبلغ، ويصلك إشعار وبريد بالنتيجة.": "The request isn't sent to the admin until the receipt is attached. The admin reviews the receipt and activates the service once the amount is confirmed; you'll get a notification and email with the result.",
+  "تم إرسال طلب الباقة مع إيصال الدفع. تراجع الإدارة الإيصال وتفعّل الباقة، ويصلك إشعار بالنتيجة.": "Plan request sent with the payment receipt. The admin reviews the receipt and activates the plan; you'll be notified of the result.",
+  "طلب اشتراكك قيد مراجعة الدفع — تستطيع اختيار باقة أخرى بعد رد الإدارة.": "Your subscription request is under payment review — you can choose another plan after the admin responds.",
+  "تم إرسال طلب الإعلان مع إيصال الدفع. يبدأ إعلانك بعد تأكيد الإدارة.": "Ad request sent with the payment receipt. Your ad starts after admin confirmation.",
+  "لديك طلب اشتراك قيد مراجعة الدفع. انتظر تأكيد الإدارة قبل طلب باقة أخرى.": "You have a subscription request under payment review. Wait for the admin's confirmation before requesting another plan.",
   "إثبات دفع جديد": "New payment proof",
   "قيد مراجعة الدفع": "Payment under review",
   "أعد رفع إثبات الدفع": "Re-upload payment proof",
@@ -3233,4 +3240,9 @@ export const EN_PATTERNS: [string, string][] = [
   ["لم يُقبل إثبات دفع الفاتورة {0}", "Payment proof for invoice {0} was not accepted"],
   ["السبب: {0}. ارفع إثبات دفع جديد من صفحة الاشتراك والفواتير.", "Reason: {0}. Upload a new payment proof from the subscription & invoices page."],
   ["إثبات دفع جديد للفاتورة {0} — {1}", "New payment proof for invoice {0} — {1}"],
+  ["باقة {0} — {1} يومًا", "{0} plan — {1} days"],
+  ["{0} — {1} يومًا", "{0} — {1} days"],
+  ["متابعة للدفع — {0}", "Continue to payment — {0}"],
+  ["طلب باقة {0} مع إيصال دفع — {1}", "{0} plan request with payment receipt — {1}"],
+  ["طلب إعلان {0} مع إيصال دفع — {1}", "{0} ad request with payment receipt — {1}"],
 ];

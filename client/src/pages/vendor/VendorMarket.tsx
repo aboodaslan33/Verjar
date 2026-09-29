@@ -23,7 +23,7 @@ import {
   type VendorStatus,
 } from '../../lib/market';
 import { useDocumentTitle } from '../../lib/useAsync';
-import { PaymentProofModal, ProofTag, type PayableInvoice, type PaymentAccount } from '../../components/market/PaymentProof';
+import { PayModal, PaymentProofModal, ProofTag, type PayableInvoice, type PaymentAccount, type ProofInput } from '../../components/market/PaymentProof';
 
 // ───────────── ملخص السوق ─────────────
 
@@ -563,29 +563,41 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
   const m = useMutation();
   const [info, setInfo] = useState<string | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
+  const [buying, setBuying] = useState<Plan | null>(null);
   const [cancelling, setCancelling] = useState<Invoice | null>(null);
-  // ?pay=<invoiceId>: فتح نافذة الدفع مباشرة (من صفحة الانضمام أو الإشعار)
+  // ?plan=<planId>: الباقة المختارة عند الانضمام تفتح شاشة دفعها مباشرة (مرة واحدة)
   const [params, setParams] = useSearchParams();
-  const payId = params.get('pay');
+  const planParam = params.get('plan');
   useEffect(() => {
-    if (!payId || !q.data) return;
-    const inv = q.data.invoices.find((i) => i.id === payId && i.status === 'PENDING' && i.proofStatus !== 'SUBMITTED');
-    if (inv) setPaying(inv);
-    setParams((p) => (p.delete('pay'), p), { replace: true });
-  }, [payId, q.data, setParams]);
-  if (q.loading) return <DetailSkeleton />;
+    if (!planParam || !q.data) return;
+    const plan = q.data.plans.find((p) => p.id === planParam && Number(p.price) > 0);
+    if (plan && owner) setBuying(plan);
+    setParams((p) => (p.delete('plan'), p), { replace: true });
+  }, [planParam, q.data, owner, setParams]);
+  if (q.loading && !q.data) return <DetailSkeleton />;
   if (q.error || !q.data) return <ErrorState message={q.error?.message ?? ''} onRetry={q.retry} />;
   const d = q.data;
   const open = d.invoices.filter((i) => i.status === 'PENDING');
   const pendingSub = open.find((i) => i.purpose === 'SUBSCRIPTION');
+  // الباقة المدفوعة: تفتح شاشة الدفع فقط — الطلب يُنشأ عند إرسال الإيصال
   const request = async (planId: string) => {
     setInfo(null);
-    const r = await m.run('plan', () => api.post<{ activated: boolean; invoice: Invoice | null }>('/vendor/market/subscription', { planId }), 'تم تسجيل الطلب');
-    if (r) {
-      if (r.activated) setInfo('تم تفعيل الباقة.');
-      else if (r.invoice) setPaying(r.invoice);
+    const plan = d.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    if (Number(plan.price) > 0) return setBuying(plan);
+    if (await m.run('plan', () => api.post('/vendor/market/subscription', { planId }), 'تم تفعيل الباقة')) {
+      setInfo('تم تفعيل الباقة.');
       q.retry();
     }
+  };
+  const buy = async ({ file, reference, note }: ProofInput) => {
+    if (!buying) return false;
+    await api.post('/vendor/market/subscription', toFormData({ planId: buying.id, reference, note }, { file }));
+    setBuying(null);
+    setInfo('تم إرسال طلب الباقة مع إيصال الدفع. تراجع الإدارة الإيصال وتفعّل الباقة، ويصلك إشعار بالنتيجة.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    q.retry();
+    return true;
   };
   const cancel = async () => {
     if (!cancelling) return;
@@ -640,7 +652,7 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
                   className="mt-4"
                   variant={current ? 'outline' : 'primary'}
                   loading={m.pending === 'plan'}
-                  disabled={(current && Number(p.price) === 0) || Boolean(pendingSub)}
+                  disabled={(current && Number(p.price) === 0) || pendingSub?.proofStatus === 'SUBMITTED'}
                   onClick={() => request(p.id)}
                 >
                   {current ? (Number(p.price) > 0 ? 'تجديد' : 'باقتك الحالية') : 'اختيار الباقة'}
@@ -650,7 +662,7 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
           );
         })}
       </ul>
-      {pendingSub && owner && <p className="-mt-5 mb-8 text-sm text-muted">لديك طلب اشتراك مفتوح — أكمل دفعه أو ألغه لاختيار باقة أخرى.</p>}
+      {pendingSub?.proofStatus === 'SUBMITTED' && owner && <p className="-mt-5 mb-8 text-sm text-muted">طلب اشتراكك قيد مراجعة الدفع — تستطيع اختيار باقة أخرى بعد رد الإدارة.</p>}
       <Panel title="الفواتير" bodyClassName="p-0 sm:p-0">
         {d.invoices.length === 0 ? (
           <p className="p-4 text-sm text-muted sm:p-5">لا توجد فواتير.</p>
@@ -685,6 +697,13 @@ export function VendorSubscription({ owner }: { owner: boolean }) {
           </ul>
         )}
       </Panel>
+      <PayModal
+        open={Boolean(buying)}
+        summary={buying ? { label: 'اشتراك', description: `باقة ${buying.name} — ${buying.durationDays} يومًا`, amount: Number(buying.price) } : null}
+        account={d.account}
+        submit={buy}
+        onClose={() => setBuying(null)}
+      />
       <PaymentProofModal invoice={paying} account={d.account} onClose={() => setPaying(null)} onDone={() => (setPaying(null), setInfo('تم إرسال إثبات الدفع. تراجع الإدارة الإيصال وتفعّل الباقة، ويصلك إشعار بالنتيجة.'), q.retry())} />
       <Modal
         open={Boolean(cancelling)}
@@ -758,14 +777,29 @@ export function VendorAds({ approved }: { approved: boolean }) {
   const [info, setInfo] = useState<string | null>(null);
   const pkg = q.data?.packages.find((p) => p.id === pkgId);
   const needsProduct = pkg ? ['FEATURED_PRODUCT', 'PRODUCT_OF_WEEK', 'INDUSTRIAL_DEAL'].includes(pkg.type) : false;
+  const [buyingAd, setBuyingAd] = useState<Pkg | null>(null);
+  // الإعلان المدفوع: شاشة الدفع أولًا، والطلب يُرسل مع الإيصال فقط
   const submit = async () => {
-    const r = await m.run('ad', () => api.post<{ invoice: PayableInvoice | null }>('/vendor/market/ads', { packageId: pkgId, productId: needsProduct ? productId : null }), 'تم طلب الإعلان');
-    if (r) {
+    if (!pkg) return;
+    if (Number(pkg.price) > 0) {
       setOpen(false);
-      if (r.invoice) setPaying(r.invoice);
-      else setInfo('بانتظار موافقة الإدارة.');
+      setBuyingAd(pkg);
+      return;
+    }
+    if (await m.run('ad', () => api.post('/vendor/market/ads', { packageId: pkgId, productId: needsProduct ? productId : null }), 'تم طلب الإعلان')) {
+      setOpen(false);
+      setInfo('بانتظار موافقة الإدارة.');
       q.retry();
     }
+  };
+  const buyAd = async ({ file, reference, note }: ProofInput) => {
+    if (!buyingAd) return false;
+    await api.post('/vendor/market/ads', toFormData({ packageId: buyingAd.id, productId: needsProduct ? productId : null, reference, payerNote: note }, { file }));
+    setBuyingAd(null);
+    setInfo('تم إرسال طلب الإعلان مع إيصال الدفع. يبدأ إعلانك بعد تأكيد الإدارة.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    q.retry();
+    return true;
   };
   return (
     <AdminPage
@@ -784,6 +818,13 @@ export function VendorAds({ approved }: { approved: boolean }) {
           {info}
         </Alert>
       )}
+      <PayModal
+        open={Boolean(buyingAd)}
+        summary={buyingAd ? { label: 'إعلان', description: `${buyingAd.name} — ${buyingAd.durationDays} يومًا`, amount: Number(buyingAd.price) } : null}
+        account={q.data?.account ?? null}
+        submit={buyAd}
+        onClose={() => setBuyingAd(null)}
+      />
       {q.data && (
         <PaymentProofModal
           invoice={paying}
@@ -840,7 +881,7 @@ export function VendorAds({ approved }: { approved: boolean }) {
               إلغاء
             </Button>
             <Button loading={m.pending === 'ad'} disabled={!pkgId || (needsProduct && !productId)} onClick={submit}>
-              طلب الإعلان{pkg ? ` — ${formatJOD(pkg.price)}` : ''}
+              {pkg && Number(pkg.price) > 0 ? `متابعة للدفع — ${formatJOD(pkg.price)}` : 'طلب الإعلان'}
             </Button>
           </>
         }

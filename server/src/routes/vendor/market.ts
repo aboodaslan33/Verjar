@@ -343,33 +343,68 @@ vendorMarketRouter.get(
   }),
 );
 
-/** طلب ترقية/تجديد: فاتورة بانتظار الدفع (أو تفعيل فوري للباقة المجانية) */
+// ───────────── الدفع اليدوي ─────────────
+
+const proofUpload = memoryUpload(10, 1).single('file');
+const proofMeta = z.object({ reference: z.string().trim().max(120).optional().nullable(), note: z.string().trim().max(500).optional().nullable() });
+const bodyData = (req: { body: Record<string, unknown> }) => (typeof req.body?.data === 'string' ? JSON.parse(req.body.data as string) : req.body ?? {});
+
+/**
+ * إيصال الدفع إلزامي لأي طلب مدفوع: لا تصل الإدارةَ طلباتٌ بدون دفع.
+ * يُتحقق من الملف (صورة أو PDF) ويُخزَّن قبل إنشاء الطلب والفاتورة.
+ */
+async function requireProof(req: { file?: Express.Multer.File }, meta: z.infer<typeof proofMeta>) {
+  if (!req.file) throw badRequest('أرفق صورة أو ملف PDF لإيصال الدفع', { fields: { file: 'أرفق إثبات الدفع' } });
+  const [file] = await validateAndStore([req.file], POLICIES.documents, 'payments');
+  return {
+    proofUrl: file.url,
+    proofPublicId: file.publicId,
+    proofName: file.originalName.slice(0, 120),
+    proofKind: file.kind,
+    proofStatus: 'SUBMITTED',
+    proofSubmittedAt: new Date(),
+    payerReference: meta.reference || null,
+    payerNote: meta.note || null,
+  };
+}
+
+/** طلب ترقية/تجديد: الباقة المدفوعة تُطلب مع إيصال الدفع (تُراجعه الإدارة)، والمجانية تُفعَّل فورًا */
 vendorMarketRouter.post(
   '/subscription',
   requireVendorOwner,
   formLimiter,
+  uploadGuard(15),
+  proofUpload,
   asyncHandler(async (req, res) => {
-    const { planId } = z.object({ planId: z.string().min(1) }).parse(req.body);
+    const raw = bodyData(req);
+    const { planId } = z.object({ planId: z.string().min(1) }).parse(raw);
+    const meta = proofMeta.parse(raw);
     const plan = await prisma.supplierPlan.findFirst({ where: { id: planId, active: true } });
     if (!plan) throw notFound('الباقة غير متاحة');
-    const pending = await prisma.vendorSubscription.findFirst({ where: { vendorId: vid(req), status: 'PENDING_PAYMENT' } });
-    if (pending) throw conflict('لديك طلب اشتراك بانتظار الدفع. ادفع الفاتورة الحالية أو تواصل مع الإدارة لإلغائها.');
+    const price = toNum(plan.price);
+    const pending = await prisma.vendorSubscription.findFirst({ where: { vendorId: vid(req), status: 'PENDING_PAYMENT' }, include: { invoice: true } });
+    if (pending?.invoice?.proofStatus === 'SUBMITTED') throw conflict('لديك طلب اشتراك قيد مراجعة الدفع. انتظر تأكيد الإدارة قبل طلب باقة أخرى.');
+    const proof = price > 0 ? await requireProof(req, meta) : null;
     const result = await prisma.$transaction(async (tx) => {
-      const price = toNum(plan.price);
-      const invoice = price > 0 ? await createInvoice(tx, { purpose: 'SUBSCRIPTION', description: `اشتراك باقة ${plan.name} (${plan.durationDays} يومًا)`, amount: price, vendorId: vid(req), refType: 'plan', refId: plan.id, dueDays: 7 }) : null;
+      // طلب سابق لم يُدفع (بدون إيصال أو رُفض إيصاله) يُستبدل بالطلب الجديد
+      if (pending?.invoiceId) await cancelInvoice(tx, pending.invoiceId);
+      else if (pending) await tx.vendorSubscription.update({ where: { id: pending.id }, data: { status: 'CANCELLED' } });
+      const invoice = proof
+        ? await createInvoice(tx, { purpose: 'SUBSCRIPTION', description: `اشتراك باقة ${plan.name} (${plan.durationDays} يومًا)`, amount: price, vendorId: vid(req), refType: 'plan', refId: plan.id, dueDays: 7 })
+        : null;
+      const withProof = invoice ? await tx.marketInvoice.update({ where: { id: invoice.id }, data: proof! }) : null;
       const sub = await tx.vendorSubscription.create({ data: { vendorId: vid(req), planId: plan.id, amount: plan.price, invoiceId: invoice?.id ?? null } });
       if (!invoice) await activateSubscription(tx, sub.id);
-      return { sub, invoice };
+      return { sub, invoice: withProof };
     });
-    const payment = result.invoice ? await paymentProvider().startPayment(result.invoice) : null;
-    await audit({ actorType: 'vendor', action: 'subscription_request', entity: 'vendor', entityId: vid(req), meta: { plan: plan.code } });
-    ok(res, { subscriptionId: result.sub.id, invoice: result.invoice, payment, activated: !result.invoice }, 201);
+    if (result.invoice) emitAdmin({ type: 'invoice.proof', id: result.invoice.id, title: `طلب باقة ${plan.name} مع إيصال دفع — ${req.vendor!.name}` });
+    await audit({ actorType: 'vendor', action: 'subscription_request', entity: 'vendor', entityId: vid(req), meta: { plan: plan.code, invoice: result.invoice?.number ?? null } });
+    const invoice = result.invoice ? (({ proofPublicId: _p, ...i }) => i)(result.invoice) : null;
+    ok(res, { subscriptionId: result.sub.id, invoice, activated: !result.invoice }, 201);
   }),
 );
 
 // ───────────── الدفع اليدوي: إثبات الدفع ─────────────
-
-const proofUpload = memoryUpload(10, 1).single('file');
 
 /** المورد يرفع صورة أو PDF لإيصال الحوالة مع رقم المرجع — تصل للإدارة للمراجعة */
 vendorMarketRouter.post(
@@ -444,8 +479,12 @@ vendorMarketRouter.post(
   '/ads',
   requireApprovedVendor,
   formLimiter,
+  uploadGuard(15),
+  proofUpload,
   asyncHandler(async (req, res) => {
-    const input = z.object({ packageId: z.string().min(1), productId: z.string().optional().nullable(), startsAt: z.coerce.date().optional().nullable(), note: z.string().trim().max(300).optional().nullable() }).parse(req.body);
+    const raw = bodyData(req);
+    const input = z.object({ packageId: z.string().min(1), productId: z.string().optional().nullable(), startsAt: z.coerce.date().optional().nullable(), note: z.string().trim().max(300).optional().nullable() }).parse(raw);
+    const meta = proofMeta.parse({ reference: raw.reference, note: raw.payerNote });
     const pkg = await prisma.adPackage.findFirst({ where: { id: input.packageId, active: true } });
     if (!pkg) throw notFound('باقة الإعلان غير متاحة');
     const needsProduct = ['FEATURED_PRODUCT', 'PRODUCT_OF_WEEK', 'INDUSTRIAL_DEAL'].includes(pkg.type);
@@ -454,9 +493,11 @@ vendorMarketRouter.post(
       throw badRequest('المنتج غير موجود أو لم يُعتمد بعد', { fields: { productId: 'اختر منتجًا معتمدًا' } });
     }
     const startsAt = input.startsAt && input.startsAt > new Date() ? input.startsAt : new Date();
+    const price = toNum(pkg.price);
+    const proof = price > 0 ? await requireProof(req, meta) : null;
     const out = await prisma.$transaction(async (tx) => {
-      const price = toNum(pkg.price);
-      const invoice = price > 0 ? await createInvoice(tx, { purpose: 'AD', description: `إعلان: ${pkg.name}`, amount: price, vendorId: vid(req), refType: 'adPackage', refId: pkg.id, dueDays: 3 }) : null;
+      const created = proof ? await createInvoice(tx, { purpose: 'AD', description: `إعلان: ${pkg.name}`, amount: price, vendorId: vid(req), refType: 'adPackage', refId: pkg.id, dueDays: 3 }) : null;
+      const invoice = created ? await tx.marketInvoice.update({ where: { id: created.id }, data: proof! }) : null;
       const ad = await tx.marketAd.create({
         data: {
           type: pkg.type,
@@ -474,8 +515,8 @@ vendorMarketRouter.post(
       });
       return { ad, invoice };
     });
-    const payment = out.invoice ? await paymentProvider().startPayment(out.invoice) : null;
-    ok(res, { ad: out.ad, invoice: out.invoice, payment }, 201);
+    if (out.invoice) emitAdmin({ type: 'invoice.proof', id: out.invoice.id, title: `طلب إعلان ${pkg.name} مع إيصال دفع — ${req.vendor!.name}` });
+    ok(res, { ad: out.ad, invoice: out.invoice ? (({ proofPublicId: _p, ...i }) => i)(out.invoice) : null }, 201);
   }),
 );
 

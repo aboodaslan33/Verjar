@@ -5,7 +5,6 @@ import { audit } from '../../lib/audit';
 import { emitAdmin } from '../../lib/events';
 import { asyncHandler, badRequest, conflict, notFound, ok } from '../../lib/http';
 import { toNum } from '../../lib/money';
-import { createInvoice } from '../../market/payments';
 import { prisma } from '../../lib/prisma';
 import { maskContacts } from '../../market/contacts';
 import { contactsRevealed, getThread, postMessage } from '../../market/messaging';
@@ -151,7 +150,7 @@ const joinInput = z.object({
   licenseNumber: z.string().trim().max(60).optional().nullable(),
   description: z.string().trim().max(3000).default(''),
   categoryIds: z.array(z.string()).max(20).default([]),
-  /** الباقة التي اختارها عند التسجيل — المدفوعة تصدر لها فاتورة يدفعها ويرفق إيصالها */
+  /** الباقة التي اختارها عند التسجيل — المدفوعة يدفعها بعد التسجيل ويرفق إيصالها */
   planId: z.string().max(40).optional().nullable(),
   acceptTerms: z.literal(true, { errorMap: () => ({ message: 'وافق على شروط الانضمام' }) }),
 });
@@ -212,27 +211,14 @@ marketRouter.post(
       });
       await tx.vendorMember.create({ data: { vendorId: v.id, customerId, role: 'OWNER' } });
       await tx.customer.update({ where: { id: customerId }, data: { companyName: input.companyName } });
-      // باقة مدفوعة: اشتراك بانتظار الدفع + فاتورة (تُفعَّل بعد تأكيد الإدارة لإيصال الدفع)
-      const chosen = input.planId ? await tx.supplierPlan.findFirst({ where: { id: input.planId, active: true } }) : null;
-      let invoiceId: string | null = null;
-      if (chosen && toNum(chosen.price) > 0 && chosen.id !== plan?.id) {
-        const invoice = await createInvoice(tx, {
-          purpose: 'SUBSCRIPTION',
-          description: `اشتراك باقة ${chosen.name} (${chosen.durationDays} يومًا)`,
-          amount: toNum(chosen.price),
-          vendorId: v.id,
-          refType: 'plan',
-          refId: chosen.id,
-          dueDays: 7,
-        });
-        await tx.vendorSubscription.create({ data: { vendorId: v.id, planId: chosen.id, amount: chosen.price, invoiceId: invoice.id } });
-        invoiceId = invoice.id;
-      }
-      return Object.assign(v, { invoiceId });
+      return v;
     });
     emitAdmin({ type: 'supplier.pending', id: vendor.id, title: `مورد جديد بانتظار المراجعة: ${vendor.name}` });
     await audit({ actorType: 'customer', actorId: customerId, action: 'supplier_join', entity: 'vendor', entityId: vendor.id });
-    ok(res, { id: vendor.id, slug: vendor.slug, status: vendor.status, invoiceId: vendor.invoiceId }, 201);
+    // الباقة المدفوعة المختارة: يدفعها المورد من لوحته ويرفق الإيصال (لا يُنشأ طلب قبل الدفع)
+    const chosen = input.planId ? await prisma.supplierPlan.findFirst({ where: { id: input.planId, active: true }, select: { id: true, price: true } }) : null;
+    const payPlanId = chosen && toNum(chosen.price) > 0 && chosen.id !== plan?.id ? chosen.id : null;
+    ok(res, { id: vendor.id, slug: vendor.slug, status: vendor.status, payPlanId }, 201);
   }),
 );
 

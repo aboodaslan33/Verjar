@@ -221,12 +221,17 @@ describe('السوق الصناعي B2B', () => {
     await admin.patch('/api/v1/admin/market/plans/plan_free').send({ maxProducts: 20 });
     await admin.post(`/api/v1/admin/store/products/${p1.body.data.id}/approve`);
 
-    // الترقية إلى PRO: فاتورة 29 د.أ تُفعّل الباقة عند تأكيد الدفع
-    const up = await agent.post('/api/v1/vendor/market/subscription').send({ planId: 'plan_pro' });
+    // الترقية إلى PRO: الطلب يُرسل مع إيصال الدفع فقط، وتأكيد الإدارة يفعّل الباقة
+    expect((await agent.post('/api/v1/vendor/market/subscription').send({ planId: 'plan_pro' })).status).toBe(400);
+    expect(await prisma.marketInvoice.count({ where: { vendorId: s.id } })).toBe(0);
+    const up = await agent
+      .post('/api/v1/vendor/market/subscription')
+      .field('data', JSON.stringify({ planId: 'plan_pro', reference: 'CLIQ-123' }))
+      .attach('file', PNG_1PX, { filename: 'receipt.png', contentType: 'image/png' });
     expect(up.status).toBe(201);
     expect(Number(up.body.data.invoice.amount)).toBe(29);
     expect(up.body.data.invoice.number).toMatch(/^INV-\d{6}$/);
-    expect(up.body.data.payment.instructions).toContain(up.body.data.invoice.number);
+    expect(up.body.data.invoice.proofStatus).toBe('SUBMITTED');
     await admin.post(`/api/v1/admin/market/invoices/${up.body.data.invoice.id}/paid`).send({ providerRef: 'CLIQ-123' });
     const v = await prisma.vendor.findUniqueOrThrow({ where: { id: s.id }, include: { plan: true } });
     expect(v.plan?.code).toBe('PRO');
@@ -251,8 +256,13 @@ describe('السوق الصناعي B2B', () => {
     expect(sugg.status).toBe(200);
 
     // الإعلان: طلب من المورد → فاتورة → دفع → يظهر في الصفحة الرئيسية للسوق
-    const ad = await agent.post('/api/v1/vendor/market/ads').send({ packageId: 'adp_fp_w', productId: p1.body.data.id });
+    expect((await agent.post('/api/v1/vendor/market/ads').send({ packageId: 'adp_fp_w', productId: p1.body.data.id })).status).toBe(400);
+    const ad = await agent
+      .post('/api/v1/vendor/market/ads')
+      .field('data', JSON.stringify({ packageId: 'adp_fp_w', productId: p1.body.data.id, reference: 'CLIQ-AD' }))
+      .attach('file', PNG_1PX, { filename: 'ad.png', contentType: 'image/png' });
     expect(ad.status).toBe(201);
+    expect(ad.body.data.invoice.proofStatus).toBe('SUBMITTED');
     expect(ad.body.data.ad.status).toBe('PENDING_PAYMENT');
     await admin.post(`/api/v1/admin/market/invoices/${ad.body.data.invoice.id}/paid`);
     const home = await request(app).get('/api/v1/market/home');
@@ -331,7 +341,7 @@ describe('السوق الصناعي B2B', () => {
     expect((await admin.post(`/api/v1/admin/market/rfqs/${id}/house-quote`).send({ unitPrice: 1, quantity: 1 })).status).toBe(409);
   });
 
-  it('الدفع اليدوي: اختيار باقة عند الانضمام → إيصال → رفض → إيصال جديد → تأكيد الإدارة يفعّل الباقة', async () => {
+  it('الدفع اليدوي: لا طلب بدون إيصال → رفض → إيصال جديد → تأكيد الإدارة يفعّل الباقة', async () => {
     const agent = await createCustomer({ name: 'مورد الكهرباء', phone: '0784444444' });
     const join = await agent.post('/api/v1/market/suppliers/join').send({
       companyName: 'كهرباء المصانع',
@@ -346,29 +356,36 @@ describe('السوق الصناعي B2B', () => {
       acceptTerms: true,
     });
     expect(join.status).toBe(201);
-    const invoiceId = join.body.data.invoiceId as string;
-    expect(invoiceId).toBeTruthy();
+    // لا فاتورة ولا طلب قبل الدفع — فقط الباقة المختارة لفتح شاشة الدفع
+    expect(join.body.data.payPlanId).toBe('plan_business');
+    const vendorId = join.body.data.id as string;
+    expect(await prisma.marketInvoice.count({ where: { vendorId } })).toBe(0);
 
     // بيانات الحساب من الإعدادات تظهر للمورد
     const sub = await agent.get('/api/v1/vendor/market/subscription');
     expect(sub.body.data.account).toMatchObject({ bankName: 'بنك الاتحاد', cliq: '0780192930' });
-    expect(sub.body.data.invoices[0]).toMatchObject({ id: invoiceId, status: 'PENDING', amount: 79 });
-    // طلب آخر ممنوع حتى يُدفع أو يُلغى هذا
-    expect((await agent.post('/api/v1/vendor/market/subscription').send({ planId: 'plan_pro' })).status).toBe(409);
+    expect(sub.body.data.invoices).toHaveLength(0);
 
-    // الإيصال مطلوب، والملف صورة أو PDF فقط
-    expect((await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).field('data', JSON.stringify({ reference: 'x' }))).status).toBe(400);
-    const bad = await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).attach('file', Buffer.from('not an image'), { filename: 'a.png', contentType: 'image/png' });
+    // الإيصال مطلوب، والملف صورة أو PDF فقط — ولا يُنشأ شيء عند الفشل
+    const noFile = await agent.post('/api/v1/vendor/market/subscription').field('data', JSON.stringify({ planId: 'plan_business', reference: 'x' }));
+    expect(noFile.status).toBe(400);
+    const bad = await agent
+      .post('/api/v1/vendor/market/subscription')
+      .field('data', JSON.stringify({ planId: 'plan_business' }))
+      .attach('file', Buffer.from('not an image'), { filename: 'a.png', contentType: 'image/png' });
     expect(bad.status).toBe(400);
+    expect(await prisma.marketInvoice.count({ where: { vendorId } })).toBe(0);
 
     const up = await agent
-      .post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`)
-      .field('data', JSON.stringify({ reference: 'CLIQ-778899', note: 'حوالة من حساب الشركة' }))
+      .post('/api/v1/vendor/market/subscription')
+      .field('data', JSON.stringify({ planId: 'plan_business', reference: 'CLIQ-778899', note: 'حوالة من حساب الشركة' }))
       .attach('file', PNG_1PX, { filename: 'receipt.png', contentType: 'image/png' });
     expect(up.status).toBe(201);
-    expect(up.body.data).toMatchObject({ proofStatus: 'SUBMITTED', payerReference: 'CLIQ-778899', proofKind: 'IMAGE' });
-    expect(up.body.data.proofPublicId).toBeUndefined();
-    // لا يُلغى بعد إرسال الإيصال
+    const invoiceId = up.body.data.invoice.id as string;
+    expect(up.body.data.invoice).toMatchObject({ amount: 79, proofStatus: 'SUBMITTED', payerReference: 'CLIQ-778899', proofKind: 'IMAGE' });
+    expect(up.body.data.invoice.proofPublicId).toBeUndefined();
+    // طلب آخر ممنوع أثناء المراجعة، ولا يُلغى بعد إرسال الإيصال
+    expect((await agent.post('/api/v1/vendor/market/subscription').field('data', JSON.stringify({ planId: 'plan_pro' })).attach('file', PNG_1PX, { filename: 'r.png', contentType: 'image/png' })).status).toBe(409);
     expect((await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/cancel`)).status).toBe(409);
 
     const list = await admin.get('/api/v1/admin/market/invoices?proof=SUBMITTED');
@@ -379,7 +396,6 @@ describe('السوق الصناعي B2B', () => {
     // رفض الإيصال بسبب → يُبلَّغ المورد ويبقى الطلب بانتظار الدفع
     expect((await admin.post(`/api/v1/admin/market/invoices/${invoiceId}/reject-proof`).send({ reason: '' })).status).toBe(400);
     expect((await admin.post(`/api/v1/admin/market/invoices/${invoiceId}/reject-proof`).send({ reason: 'المبلغ المحوّل 70 بدل 79' })).status).toBe(200);
-    const vendorId = join.body.data.id as string;
     expect(await prisma.notification.count({ where: { recipientId: vendorId, title: { contains: 'لم يُقبل إثبات دفع' } } })).toBe(1);
     const after = (await agent.get('/api/v1/vendor/market/subscription')).body.data.invoices[0];
     expect(after).toMatchObject({ status: 'PENDING', proofStatus: 'REJECTED', reviewNote: 'المبلغ المحوّل 70 بدل 79' });
@@ -394,8 +410,10 @@ describe('السوق الصناعي B2B', () => {
     // لا رفع إيصال على فاتورة مدفوعة
     expect((await agent.post(`/api/v1/vendor/market/invoices/${invoiceId}/proof`).attach('file', PNG_1PX, { filename: 'r.png', contentType: 'image/png' })).status).toBe(409);
 
-    // المورد يلغي طلب ترقية لم يدفعه
-    const again = await agent.post('/api/v1/vendor/market/subscription').send({ planId: 'plan_pro' });
+    // طلب رُفض إيصاله: يلغيه المورد، أو يستبدله طلب جديد
+    const again = await agent.post('/api/v1/vendor/market/subscription').field('data', JSON.stringify({ planId: 'plan_pro' })).attach('file', PNG_1PX, { filename: 'r.png', contentType: 'image/png' });
+    expect(again.status).toBe(201);
+    await admin.post(`/api/v1/admin/market/invoices/${again.body.data.invoice.id}/reject-proof`).send({ reason: 'إيصال غير واضح' });
     expect((await agent.post(`/api/v1/vendor/market/invoices/${again.body.data.invoice.id}/cancel`)).status).toBe(200);
     expect((await prisma.vendorSubscription.findFirstOrThrow({ where: { invoiceId: again.body.data.invoice.id } })).status).toBe('CANCELLED');
   });

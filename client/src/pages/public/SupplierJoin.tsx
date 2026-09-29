@@ -166,7 +166,7 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
   const [accept, setAccept] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [done, setDone] = useState<{ status: string; invoiceId: string | null } | null>(null);
+  const [done, setDone] = useState<{ status: string; payPlanId: string | null } | null>(null);
   const top = useRef<HTMLDivElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -175,7 +175,7 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
     setBusy(true);
     setErrors({});
     try {
-      const r = await api.post<{ status: string; invoiceId: string | null }>('/market/suppliers/join', toFormData({ ...f, categoryIds, planId: plan?.id ?? null, acceptTerms: accept }, { logo, catalog, certificates: certs }));
+      const r = await api.post<{ status: string; payPlanId: string | null }>('/market/suppliers/join', toFormData({ ...f, categoryIds, planId: plan?.id ?? null, acceptTerms: accept }, { logo, catalog, certificates: certs }));
       setDone(r);
       refresh();
     } catch (err) {
@@ -192,7 +192,7 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
         <SuccessMark />
         <h3 className="mt-4 text-xl">تم استلام طلب انضمامك</h3>
         <p className="mt-2 text-muted">{done.status === 'PENDING' ? 'تراجع إدارة FARJAR بيانات شركتك، ونرسل لك إشعارًا عند الاعتماد. يمكنك من الآن إضافة منتجاتك من لوحة المورد.' : 'حسابك مفعّل. أضف منتجاتك الآن.'}</p>
-        {done.invoiceId && plan && (
+        {done.payPlanId && plan && (
           <div className="mx-auto mt-5 max-w-md rounded-xl border border-primary bg-primary/10 p-4 text-start">
             <p className="font-bold">
               الخطوة التالية: دفع باقة {plan.name} — {formatJOD(plan.price)}
@@ -201,8 +201,8 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
           </div>
         )}
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {done.invoiceId && <ButtonLink to={`/vendor/subscription?pay=${done.invoiceId}`}>ادفع وأرفق الإيصال</ButtonLink>}
-          <ButtonLink to="/vendor" variant={done.invoiceId ? 'outline' : 'primary'}>
+          {done.payPlanId && <ButtonLink to={`/vendor/subscription?plan=${done.payPlanId}`}>ادفع وأرفق الإيصال</ButtonLink>}
+          <ButtonLink to="/vendor" variant={done.payPlanId ? 'outline' : 'primary'}>
             لوحة المورد
           </ButtonLink>
         </div>
