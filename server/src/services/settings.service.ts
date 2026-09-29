@@ -131,7 +131,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideContactsUntilAward: true,
   subscriptionReminderDays: 7,
   paymentBankName: 'بنك الاتحاد',
-  paymentAccountName: 'مجموعة فرجار',
+  paymentAccountName: 'طارق',
   paymentCliq: '0780192930',
   paymentIban: '',
   paymentInstructions: 'حوّل المبلغ عبر CliQ أو تحويل بنكي واكتب رقم الفاتورة في ملاحظة التحويل، ثم ارفع صورة أو PDF لإيصال الدفع. تُفعَّل الخدمة بعد تأكيد الإدارة.',

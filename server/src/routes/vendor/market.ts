@@ -11,6 +11,7 @@ import { maskContacts, partialEmail, partialPhone } from '../../market/contacts'
 import { contactsRevealed, getThread, postMessage } from '../../market/messaging';
 import { activateSubscription, cancelInvoice, createInvoice, paymentAccount, paymentProvider } from '../../market/payments';
 import { emitAdmin } from '../../lib/events';
+import { storePaymentProof } from '../../market/proof';
 import { assertMemberQuota, effectivePlan, planFeatures, rfqQuotaLeft } from '../../market/plans';
 import { OPEN_STATUSES, rfqEvent, submitQuote } from '../../market/rfq';
 import { requireApprovedVendor, requireVendorOwner } from '../../middleware/auth';
@@ -349,24 +350,7 @@ const proofUpload = memoryUpload(10, 1).single('file');
 const proofMeta = z.object({ reference: z.string().trim().max(120).optional().nullable(), note: z.string().trim().max(500).optional().nullable() });
 const bodyData = (req: { body: Record<string, unknown> }) => (typeof req.body?.data === 'string' ? JSON.parse(req.body.data as string) : req.body ?? {});
 
-/**
- * إيصال الدفع إلزامي لأي طلب مدفوع: لا تصل الإدارةَ طلباتٌ بدون دفع.
- * يُتحقق من الملف (صورة أو PDF) ويُخزَّن قبل إنشاء الطلب والفاتورة.
- */
-async function requireProof(req: { file?: Express.Multer.File }, meta: z.infer<typeof proofMeta>) {
-  if (!req.file) throw badRequest('أرفق صورة أو ملف PDF لإيصال الدفع', { fields: { file: 'أرفق إثبات الدفع' } });
-  const [file] = await validateAndStore([req.file], POLICIES.documents, 'payments');
-  return {
-    proofUrl: file.url,
-    proofPublicId: file.publicId,
-    proofName: file.originalName.slice(0, 120),
-    proofKind: file.kind,
-    proofStatus: 'SUBMITTED',
-    proofSubmittedAt: new Date(),
-    payerReference: meta.reference || null,
-    payerNote: meta.note || null,
-  };
-}
+const requireProof = (req: { file?: Express.Multer.File }, meta: z.infer<typeof proofMeta>) => storePaymentProof(req.file, meta);
 
 /** طلب ترقية/تجديد: الباقة المدفوعة تُطلب مع إيصال الدفع (تُراجعه الإدارة)، والمجانية تُفعَّل فورًا */
 vendorMarketRouter.post(

@@ -6,6 +6,7 @@ import { useAuth } from '../../context/Auth';
 import { ApiError, api, toFormData } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
 import { FEATURE_LABEL } from '../../lib/market';
+import { CopyRow, type PaymentAccount } from '../../components/market/PaymentProof';
 import type { Category } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
@@ -107,7 +108,7 @@ export default function SupplierJoin() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-sm text-muted">الباقات المدفوعة: بعد التسجيل تحوّل المبلغ عبر CliQ أو تحويل بنكي وترفق صورة الإيصال، وتُفعَّل الباقة بعد تأكيد الإدارة. يمكنك الترقية لاحقًا من لوحة المورد.</p>
+          <p className="mt-3 text-sm text-muted">الباقات المدفوعة: حوّل المبلغ عبر CliQ أو تحويل بنكي وأرفق صورة الإيصال ضمن نموذج التسجيل، وتُفعَّل الباقة عند اعتماد الإدارة. يمكنك الترقية لاحقًا من لوحة المورد.</p>
         </section>
 
         <section className="mt-14" aria-labelledby="join-title">
@@ -163,19 +164,42 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
   const [logo, setLogo] = useState<File | null>(null);
   const [catalog, setCatalog] = useState<File[]>([]);
   const [certs, setCerts] = useState<File[]>([]);
+  // الباقة المدفوعة: إيصال الدفع جزء من طلب الانضمام
+  const paid = Boolean(plan && Number(plan.price) > 0);
+  const account = useAsync(() => api.get<PaymentAccount>('/market/payment-account'), [], 'market/payment-account');
+  const [proof, setProof] = useState<File | null>(null);
+  const [paymentReference, setPaymentReference] = useState('');
+  const pickProof = (file: File | undefined) => {
+    if (!file) return;
+    if (!/^image\//.test(file.type) && file.type !== 'application/pdf') return setErrors((x) => ({ ...x, paymentProof: 'الملف يجب أن يكون صورة أو PDF' }));
+    if (file.size > 10 * 1024 * 1024) return setErrors((x) => ({ ...x, paymentProof: 'حجم الملف أكبر من 10MB' }));
+    setErrors(({ paymentProof: _p, ...x }) => x);
+    setProof(file);
+  };
   const [accept, setAccept] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [done, setDone] = useState<{ status: string; payPlanId: string | null } | null>(null);
+  const [done, setDone] = useState<{ status: string; plan: { name: string; price: number } | null } | null>(null);
   const top = useRef<HTMLDivElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (paid && !proof) {
+      setErrors({ paymentProof: 'أرفق صورة أو PDF لإيصال الدفع', _: `باقة ${plan?.name} مدفوعة — أرفق إيصال التحويل قبل الإرسال` });
+      document.getElementById('join-payment')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setBusy(true);
     setErrors({});
     try {
-      const r = await api.post<{ status: string; payPlanId: string | null }>('/market/suppliers/join', toFormData({ ...f, categoryIds, planId: plan?.id ?? null, acceptTerms: accept }, { logo, catalog, certificates: certs }));
+      const r = await api.post<{ status: string; plan: { name: string; price: number } | null }>(
+        '/market/suppliers/join',
+        toFormData(
+          { ...f, categoryIds, planId: plan?.id ?? null, paymentReference: paid ? paymentReference.trim() || null : null, acceptTerms: accept },
+          { logo, catalog, certificates: certs, paymentProof: paid ? proof : null },
+        ),
+      );
       setDone(r);
       refresh();
     } catch (err) {
@@ -192,20 +216,17 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
         <SuccessMark />
         <h3 className="mt-4 text-xl">تم استلام طلب انضمامك</h3>
         <p className="mt-2 text-muted">{done.status === 'PENDING' ? 'تراجع إدارة FARJAR بيانات شركتك، ونرسل لك إشعارًا عند الاعتماد. يمكنك من الآن إضافة منتجاتك من لوحة المورد.' : 'حسابك مفعّل. أضف منتجاتك الآن.'}</p>
-        {done.payPlanId && plan && (
+        {done.plan && (
           <div className="mx-auto mt-5 max-w-md rounded-xl border border-primary bg-primary/10 p-4 text-start">
             <p className="font-bold">
-              الخطوة التالية: دفع باقة {plan.name} — {formatJOD(plan.price)}
+              باقة {done.plan.name} — {formatJOD(done.plan.price)}
             </p>
-            <p className="mt-1 text-sm">حوّل المبلغ عبر CliQ أو تحويل بنكي، وأرفق صورة الإيصال لتفعيل الباقة.</p>
+            <p className="mt-1 text-sm">وصل إيصال الدفع مع طلبك. تراجعه الإدارة مع بيانات شركتك، وتُفعَّل الباقة عند الاعتماد.</p>
           </div>
         )}
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {done.payPlanId && <ButtonLink to={`/vendor/subscription?plan=${done.payPlanId}`}>ادفع وأرفق الإيصال</ButtonLink>}
-          <ButtonLink to="/vendor" variant={done.payPlanId ? 'outline' : 'primary'}>
-            لوحة المورد
-          </ButtonLink>
-        </div>
+        <ButtonLink to="/vendor" className="mt-5">
+          لوحة المورد
+        </ButtonLink>
       </div>
     );
   }
@@ -263,6 +284,40 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
             })}
           </ul>
         </section>
+        {paid && plan && (
+          <section id="join-payment" className="card space-y-4 border-primary p-4 sm:p-6">
+            <div>
+              <h3 className="text-lg">
+                دفع باقة {plan.name} — {formatJOD(plan.price)}
+              </h3>
+              <p className="mt-1 text-sm text-muted">حوّل المبلغ ثم أرفق صورة الإيصال — يصل مع طلب انضمامك، وتُفعَّل الباقة عند اعتماد الإدارة.</p>
+            </div>
+            {account.data && (
+              <div className="divide-y divide-line rounded-xl border border-line px-4">
+                {account.data.bankName && <CopyRow label="البنك" value={account.data.bankName} ltr={false} />}
+                {account.data.accountName && <CopyRow label="اسم الحساب" value={account.data.accountName} ltr={false} />}
+                {account.data.cliq && <CopyRow label="CliQ (رقم / Alias)" value={account.data.cliq} />}
+                {account.data.iban && <CopyRow label="رقم الحساب / IBAN" value={account.data.iban} />}
+                <CopyRow label="المبلغ (د.أ)" value={String(Number(plan.price))} />
+              </div>
+            )}
+            <label
+              className={cx('flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed p-5 text-center hover:border-ink', proof ? 'border-success bg-success/5' : fe.paymentProof ? 'border-danger' : 'border-line-strong')}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                pickProof(e.dataTransfer.files?.[0]);
+              }}
+            >
+              <Icon name={proof ? 'check' : 'upload'} className="h-6 w-6 text-muted" />
+              <span className="text-sm font-semibold">{proof ? proof.name : 'إيصال الدفع (إلزامي): صورة شاشة أو PDF'}</span>
+              <span className="text-xs text-muted">{proof ? 'اضغط لتغيير الملف' : 'JPG أو PNG أو PDF — حتى 10MB'}</span>
+              <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => pickProof(e.target.files?.[0])} />
+            </label>
+            {fe.paymentProof && <p className="text-sm text-danger">{fe.paymentProof}</p>}
+            <Input label="رقم الحوالة / المرجع" optional className="ltr text-start" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} error={fe.paymentReference} hint="يظهر في إيصال CliQ أو التحويل البنكي" />
+          </section>
+        )}
       </div>
       <aside className="space-y-4">
         <section className="card space-y-4 p-4 sm:p-6">
@@ -286,7 +341,9 @@ function JoinForm({ defaults, plan }: { defaults: { name: string; email: string;
               <p className="font-bold">
                 {plan.name} — {Number(plan.price) > 0 ? formatJOD(plan.price) : 'مجانًا'}
               </p>
-              {Number(plan.price) > 0 && <p className="mt-1 text-xs text-muted">بعد التسجيل تدفع وترفق الإيصال، وتبدأ على المجانية حتى تأكيد الدفع.</p>}
+              {Number(plan.price) > 0 && (
+                <p className={cx('mt-1 text-xs', proof ? 'text-success' : 'text-muted')}>{proof ? 'إيصال الدفع مرفق ✓' : 'أرفق إيصال الدفع في قسم الدفع قبل الإرسال.'}</p>
+              )}
               <a href="#plans-title" className="mt-1 inline-block text-xs font-semibold underline">
                 تغيير الباقة
               </a>

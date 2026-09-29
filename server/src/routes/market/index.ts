@@ -5,6 +5,8 @@ import { audit } from '../../lib/audit';
 import { emitAdmin } from '../../lib/events';
 import { asyncHandler, badRequest, conflict, notFound, ok } from '../../lib/http';
 import { toNum } from '../../lib/money';
+import { createInvoice, paymentAccount } from '../../market/payments';
+import { storePaymentProof } from '../../market/proof';
 import { prisma } from '../../lib/prisma';
 import { maskContacts } from '../../market/contacts';
 import { contactsRevealed, getThread, postMessage } from '../../market/messaging';
@@ -121,6 +123,14 @@ marketRouter.post(
 );
 
 /** الباقات المتاحة (صفحة الانضمام كمورد) */
+/** بيانات حساب التحويل (بنك / CliQ) لدفع الباقات — تظهر في نموذج الانضمام */
+marketRouter.get(
+  '/payment-account',
+  asyncHandler(async (_req, res) => {
+    ok(res, await paymentAccount());
+  }),
+);
+
 marketRouter.get(
   '/plans',
   asyncHandler(async (_req, res) => {
@@ -152,6 +162,8 @@ const joinInput = z.object({
   categoryIds: z.array(z.string()).max(20).default([]),
   /** الباقة التي اختارها عند التسجيل — المدفوعة يدفعها بعد التسجيل ويرفق إيصالها */
   planId: z.string().max(40).optional().nullable(),
+  /** رقم الحوالة (CliQ / تحويل) للباقة المدفوعة */
+  paymentReference: z.string().trim().max(120).optional().nullable(),
   acceptTerms: z.literal(true, { errorMap: () => ({ message: 'وافق على شروط الانضمام' }) }),
 });
 
@@ -159,6 +171,7 @@ const joinUpload = memoryUpload(20, 12).fields([
   { name: 'logo', maxCount: 1 },
   { name: 'catalog', maxCount: 3 },
   { name: 'certificates', maxCount: 8 },
+  { name: 'paymentProof', maxCount: 1 },
 ]);
 
 /** تسجيل مورد جديد: يدخل "بانتظار المراجعة" حتى تعتمده إدارة FARJAR */
@@ -182,6 +195,10 @@ marketRouter.post(
     const settings = await getSettings();
     const cats = await prisma.category.findMany({ where: { id: { in: input.categoryIds }, deletedAt: null }, select: { id: true } });
     const plan = await defaultPlan();
+    // الباقة المدفوعة: إيصال الدفع جزء من طلب الانضمام (يصل الإدارة مع البيانات)
+    const chosen = input.planId ? await prisma.supplierPlan.findFirst({ where: { id: input.planId, active: true } }) : null;
+    const paid = chosen && toNum(chosen.price) > 0 && chosen.id !== plan?.id ? chosen : null;
+    const proof = paid ? await storePaymentProof(files.paymentProof?.[0], { reference: input.paymentReference }) : null;
     const vendor = await prisma.$transaction(async (tx) => {
       const v = await tx.vendor.create({
         data: {
@@ -211,14 +228,24 @@ marketRouter.post(
       });
       await tx.vendorMember.create({ data: { vendorId: v.id, customerId, role: 'OWNER' } });
       await tx.customer.update({ where: { id: customerId }, data: { companyName: input.companyName } });
+      if (paid && proof) {
+        const created = await createInvoice(tx, {
+          purpose: 'SUBSCRIPTION',
+          description: `اشتراك باقة ${paid.name} (${paid.durationDays} يومًا)`,
+          amount: toNum(paid.price),
+          vendorId: v.id,
+          refType: 'plan',
+          refId: paid.id,
+          dueDays: 7,
+        });
+        await tx.marketInvoice.update({ where: { id: created.id }, data: proof });
+        await tx.vendorSubscription.create({ data: { vendorId: v.id, planId: paid.id, amount: paid.price, invoiceId: created.id } });
+      }
       return v;
     });
-    emitAdmin({ type: 'supplier.pending', id: vendor.id, title: `مورد جديد بانتظار المراجعة: ${vendor.name}` });
+    emitAdmin({ type: 'supplier.pending', id: vendor.id, title: paid ? `مورد جديد (باقة ${paid.name} مع إيصال دفع): ${vendor.name}` : `مورد جديد بانتظار المراجعة: ${vendor.name}` });
     await audit({ actorType: 'customer', actorId: customerId, action: 'supplier_join', entity: 'vendor', entityId: vendor.id });
-    // الباقة المدفوعة المختارة: يدفعها المورد من لوحته ويرفق الإيصال (لا يُنشأ طلب قبل الدفع)
-    const chosen = input.planId ? await prisma.supplierPlan.findFirst({ where: { id: input.planId, active: true }, select: { id: true, price: true } }) : null;
-    const payPlanId = chosen && toNum(chosen.price) > 0 && chosen.id !== plan?.id ? chosen.id : null;
-    ok(res, { id: vendor.id, slug: vendor.slug, status: vendor.status, payPlanId }, 201);
+    ok(res, { id: vendor.id, slug: vendor.slug, status: vendor.status, plan: paid ? { name: paid.name, price: toNum(paid.price) } : null }, 201);
   }),
 );
 

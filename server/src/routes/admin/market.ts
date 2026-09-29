@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
-import { asyncHandler, badRequest, conflict, notFound, ok } from '../../lib/http';
+import { asyncHandler, badRequest, conflict, forbidden, notFound, ok } from '../../lib/http';
 import { round3, toNum } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
@@ -66,13 +66,27 @@ marketAdminRouter.get(
           plan: { select: { code: true, name: true } },
           customer: { select: { name: true, phone: true } },
           _count: { select: { products: { where: { deletedAt: null } }, rfqRecipients: true, quotes: true } },
+          // الباقة التي طلبها (مدفوعة، بانتظار تأكيد الدفع)
+          subscriptions: {
+            where: { status: 'PENDING_PAYMENT' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { plan: { select: { code: true, name: true } }, invoice: { select: { id: true, amount: true, proofStatus: true } } },
+          },
         },
         ...pageArgs(q),
       }),
       prisma.vendor.count({ where }),
       prisma.vendor.groupBy({ by: ['status'], where: { active: true }, _count: { _all: true } }),
     ]);
-    ok(res, { ...paged(items, total, q), statusCounts: Object.fromEntries(statusCounts.map((s) => [s.status, s._count._all])) });
+    ok(res, {
+      ...paged(
+        items.map(({ subscriptions, ...v }) => ({ ...v, requestedPlan: subscriptions[0] ? { ...subscriptions[0].plan, invoice: subscriptions[0].invoice } : null })),
+        total,
+        q,
+      ),
+      statusCounts: Object.fromEntries(statusCounts.map((s) => [s.status, s._count._all])),
+    });
   }),
 );
 
@@ -91,6 +105,12 @@ marketAdminRouter.get(
       },
     });
     if (!v) throw notFound('المورد غير موجود');
+    // طلب الباقة المدفوعة مع إيصال الدفع (من نموذج الانضمام أو الترقية)
+    const pendingSub = await prisma.vendorSubscription.findFirst({
+      where: { vendorId: v.id, status: 'PENDING_PAYMENT' },
+      orderBy: { createdAt: 'desc' },
+      include: { plan: { select: { id: true, code: true, name: true, price: true, durationDays: true } }, invoice: true },
+    });
     const [products, rfqs, quotes, deals, rating, categories] = await Promise.all([
       prisma.product.groupBy({ by: ['approvalStatus'], where: { vendorId: v.id, deletedAt: null }, _count: { _all: true } }),
       prisma.rfqRecipient.count({ where: { vendorId: v.id } }),
@@ -102,6 +122,9 @@ marketAdminRouter.get(
     ok(res, {
       ...v,
       categories,
+      planRequest: pendingSub
+        ? { id: pendingSub.id, createdAt: pendingSub.createdAt, plan: pendingSub.plan, invoice: pendingSub.invoice ? (({ proofPublicId: _p, ...i }) => i)(pendingSub.invoice) : null }
+        : null,
       stats: {
         products: Object.fromEntries(products.map((p) => [p.approvalStatus, p._count._all])),
         rfqs,
@@ -124,17 +147,32 @@ const STATUS_MSG: Record<string, { title: string; body: string }> = {
 marketAdminRouter.post(
   '/suppliers/:id/status',
   asyncHandler(async (req, res) => {
-    const { status, reason } = z.object({ status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED']), reason: z.string().trim().max(500).optional().nullable() }).parse(req.body);
+    const { status, reason, confirmPayment } = z
+      .object({ status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED']), reason: z.string().trim().max(500).optional().nullable(), confirmPayment: z.boolean().optional() })
+      .parse(req.body);
     if ((status === 'REJECTED' || status === 'SUSPENDED') && !reason) throw badRequest('اكتب السبب ليعرفه المورد', { fields: { reason: 'السبب مطلوب' } });
     const v = await prisma.vendor.findUnique({ where: { id: req.params.id } });
     if (!v) throw notFound('المورد غير موجود');
     if (v.isHouse && status !== 'APPROVED') throw badRequest('لا يمكن تعليق متجر FARJAR');
+    // الاعتماد مع تأكيد دفع الباقة المطلوبة في نفس الخطوة (يفعّلها فورًا) — يحتاج صلاحية المالية
+    if (confirmPayment && !req.auth!.perms.includes('market.finance')) throw forbidden('تأكيد الدفع يحتاج صلاحية المالية');
+    const pendingInvoice =
+      status === 'APPROVED' && confirmPayment
+        ? (await prisma.vendorSubscription.findFirst({ where: { vendorId: v.id, status: 'PENDING_PAYMENT', invoice: { status: 'PENDING' } }, orderBy: { createdAt: 'desc' }, select: { invoiceId: true, plan: { select: { name: true } } } })) ?? null
+        : null;
     await prisma.$transaction(async (tx) => {
       await tx.vendor.update({ where: { id: v.id }, data: { status, rejectionReason: status === 'APPROVED' ? null : reason ?? null } });
-      await marketNotify(tx, { vendorIds: [v.id] }, { title: STATUS_MSG[status].title, body: reason ? `${STATUS_MSG[status].body} الملاحظة: ${reason}` : STATUS_MSG[status].body, link: '/vendor', cta: 'لوحة المورد' });
+      if (pendingInvoice?.invoiceId) await markInvoicePaid(tx, pendingInvoice.invoiceId);
+      const planNote = pendingInvoice ? ` تم تأكيد دفعتك وتفعيل باقة ${pendingInvoice.plan.name}.` : '';
+      await marketNotify(tx, { vendorIds: [v.id] }, {
+        title: STATUS_MSG[status].title,
+        body: (reason ? `${STATUS_MSG[status].body} الملاحظة: ${reason}` : STATUS_MSG[status].body) + planNote,
+        link: '/vendor',
+        cta: 'لوحة المورد',
+      });
     });
-    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: `supplier_${status.toLowerCase()}`, entity: 'vendor', entityId: v.id, meta: { reason } });
-    ok(res, { id: v.id, status });
+    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: `supplier_${status.toLowerCase()}`, entity: 'vendor', entityId: v.id, meta: { reason, paymentConfirmed: Boolean(pendingInvoice) } });
+    ok(res, { id: v.id, status, paymentConfirmed: Boolean(pendingInvoice) });
   }),
 );
 

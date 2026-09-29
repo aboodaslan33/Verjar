@@ -10,6 +10,7 @@ import { formatDate, formatJOD } from '../../../lib/format';
 import { AD_STATUS_LABEL, AD_TYPE_LABEL, INVOICE_PURPOSE_LABEL, INVOICE_STATUS_LABEL, VENDOR_STATUS_LABEL, vendorStatusTone, type MarketFile, type VendorStatus } from '../../../lib/market';
 import type { Paged } from '../../../lib/types';
 import { useDocumentTitle } from '../../../lib/useAsync';
+import { ReviewPayment, type Inv } from './MarketConfig';
 
 type Row = {
   id: string;
@@ -26,6 +27,8 @@ type Row = {
   plan: { code: string; name: string } | null;
   customer: { name: string; phone: string } | null;
   _count: { products: number; rfqRecipients: number; quotes: number };
+  /** باقة مدفوعة طلبها (مع إيصال) بانتظار تأكيد الدفع */
+  requestedPlan?: { code: string; name: string; invoice: { id: string; amount: number; proofStatus: string | null } | null } | null;
 };
 
 /** الموردون في السوق: المراجعة والاعتماد والتوثيق والباقات */
@@ -44,6 +47,23 @@ export function MarketSuppliers() {
           <PlanBadge plan={v.plan ? { code: v.plan.code, badge: v.plan.code === 'FREE' ? null : v.plan.code } : null} />
         </span>
       ),
+    },
+    {
+      key: 'req',
+      header: 'الباقة المطلوبة',
+      cell: (v) =>
+        v.requestedPlan ? (
+          <span className="flex flex-col items-start gap-1">
+            <Tag tone="brand">
+              {v.requestedPlan.name}
+              {v.requestedPlan.invoice && <> — {formatJOD(v.requestedPlan.invoice.amount)}</>}
+            </Tag>
+            {v.requestedPlan.invoice?.proofStatus === 'SUBMITTED' && <span className="text-xs font-semibold text-warn">إيصال بانتظار المراجعة</span>}
+            {v.requestedPlan.invoice?.proofStatus === 'REJECTED' && <span className="text-xs font-semibold text-danger">إيصال مرفوض</span>}
+          </span>
+        ) : (
+          <span className="text-sm text-muted">{v.plan?.name ?? 'مجانية'}</span>
+        ),
     },
     { key: 'city', header: 'المدينة', cell: (v) => v.city ?? '—', hideOnMobile: true },
     { key: 'field', header: 'المجال', cell: (v) => <span className="line-clamp-1 max-w-[14rem]">{v.businessField ?? '—'}</span>, hideOnMobile: true },
@@ -116,6 +136,7 @@ type Detail = Row & {
   invoices: { id: string; number: string; purpose: string; amount: number; status: string; createdAt: string }[];
   ads: { id: string; type: string; status: string; startsAt: string; endsAt: string; product: { name: string } | null }[];
   stats: { products: Record<string, number>; rfqs: number; quotes: number; deals: { count: number; value: number }; rating: { average: number; count: number } | null };
+  planRequest: { id: string; createdAt: string; plan: { id: string; code: string; name: string; price: number; durationDays: number }; invoice: Omit<Inv, 'vendor'> | null } | null;
 };
 
 export function MarketSupplierDetail() {
@@ -129,13 +150,15 @@ export function MarketSupplierDetail() {
   const [planId, setPlanId] = useState('');
   const [charge, setCharge] = useState(false);
   const [days, setDays] = useState('');
+  const [confirmPay, setConfirmPay] = useState(true);
+  const [reviewing, setReviewing] = useState(false);
   useDocumentTitle(q.data?.name ?? 'المورد');
   if (q.loading) return <DetailSkeleton />;
   if (q.error || !q.data) return <ErrorState message={q.error?.message ?? ''} onRetry={q.retry} />;
   const v = q.data;
   const setStatus = async () => {
     if (!statusDlg) return;
-    const r = await m.run('status', () => api.post(`/admin/market/suppliers/${v.id}/status`, { status: statusDlg, reason: reason.trim() || null }), 'تم تحديث الحالة');
+    const r = await m.run('status', () => api.post(`/admin/market/suppliers/${v.id}/status`, { status: statusDlg, reason: reason.trim() || null, confirmPayment: statusDlg === 'APPROVED' && payable && confirmPay }), 'تم تحديث الحالة');
     if (r) {
       setStatusDlg(null);
       setReason('');
@@ -143,6 +166,10 @@ export function MarketSupplierDetail() {
     }
   };
   const files = [...v.catalogFiles.map((f) => ({ ...f, g: 'كتالوج' })), ...v.certificates.map((f) => ({ ...f, g: 'شهادة' }))];
+  const req = v.planRequest;
+  const reqInv = req?.invoice ?? null;
+  // يمكن تأكيد الدفع مع الاعتماد إذا وصل إيصال بانتظار المراجعة
+  const payable = Boolean(reqInv && reqInv.status === 'PENDING' && reqInv.proofStatus === 'SUBMITTED');
 
   return (
     <AdminPage
@@ -152,7 +179,13 @@ export function MarketSupplierDetail() {
         <>
           <Tag tone={vendorStatusTone(v.status)}>{VENDOR_STATUS_LABEL[v.status]}</Tag>
           {v.verified && <VerifiedMark label />}
-          {v.plan && <Tag tone="dark">{v.plan.name}</Tag>}
+          {v.planRequest ? (
+            <Tag tone="brand">
+              طلب باقة {v.planRequest.plan.name} — {formatJOD(v.planRequest.plan.price)}
+            </Tag>
+          ) : (
+            v.plan && <Tag tone="dark">{v.plan.name}</Tag>
+          )}
         </>
       }
       actions={
@@ -191,6 +224,49 @@ export function MarketSupplierDetail() {
       )}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {req && (
+            <Panel title={`الباقة المطلوبة: ${req.plan.name} — ${formatJOD(req.plan.price)}`}>
+              <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+                <div className="space-y-1.5 text-sm">
+                  <p>
+                    {reqInv?.proofStatus === 'SUBMITTED' ? (
+                      <Tag tone="sand">إيصال بانتظار المراجعة</Tag>
+                    ) : reqInv?.proofStatus === 'REJECTED' ? (
+                      <Tag tone="danger">إيصال مرفوض — بانتظار إيصال جديد</Tag>
+                    ) : (
+                      <Tag tone="brand">بانتظار الدفع</Tag>
+                    )}
+                  </p>
+                  <p className="text-muted">
+                    {req.plan.durationDays} يومًا · طُلبت {formatDate(req.createdAt)}
+                    {reqInv && <> · فاتورة <span className="ltr">{reqInv.number}</span></>}
+                  </p>
+                  {reqInv?.payerReference && (
+                    <p>
+                      رقم الحوالة: <b className="ltr">{reqInv.payerReference}</b>
+                    </p>
+                  )}
+                  {reqInv?.payerNote && <p className="text-muted">ملاحظة المورد: {reqInv.payerNote}</p>}
+                  {reqInv?.reviewNote && reqInv.proofStatus === 'REJECTED' && <p className="text-danger">سبب الرفض: {reqInv.reviewNote}</p>}
+                  {reqInv?.status === 'PENDING' && (
+                    <Button size="sm" className="mt-2" variant={payable ? 'primary' : 'outline'} onClick={() => setReviewing(true)}>
+                      {payable ? 'مراجعة الإيصال وتأكيد الدفع' : 'تأكيد الدفع'}
+                    </Button>
+                  )}
+                </div>
+                {reqInv?.proofUrl &&
+                  (reqInv.proofKind === 'IMAGE' ? (
+                    <a href={reqInv.proofUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-line bg-subtle sm:w-56">
+                      <img src={reqInv.proofUrl} alt={`إيصال الدفع ${reqInv.number}`} className="max-h-72 w-full object-contain" />
+                    </a>
+                  ) : (
+                    <a href={reqInv.proofUrl} target="_blank" rel="noreferrer" className="flex h-fit items-center gap-2 rounded-xl border border-line p-3 text-sm font-semibold hover:border-ink">
+                      <Icon name="file" className="h-5 w-5" /> {reqInv.proofName ?? 'إيصال الدفع (PDF)'}
+                    </a>
+                  ))}
+              </div>
+            </Panel>
+          )}
           <Panel title="بيانات الشركة">
             <DefList
               items={[
@@ -311,10 +387,21 @@ export function MarketSupplierDetail() {
         }
       >
         {statusDlg === 'APPROVED' ? (
-          <p>يظهر المورد ومنتجاته المعتمدة في السوق، ويبدأ باستقبال طلبات عروض الأسعار. يصله إشعار وبريد.</p>
+          <div className="space-y-3">
+            <p>يظهر المورد ومنتجاته المعتمدة في السوق، ويبدأ باستقبال طلبات عروض الأسعار. يصله إشعار وبريد.</p>
+            {payable && req && (
+              <div className="rounded-xl border border-line bg-subtle p-3">
+                <Checkbox label={`تأكيد دفع باقة ${req.plan.name} (${formatJOD(req.plan.price)}) وتفعيلها الآن`} checked={confirmPay} onChange={setConfirmPay} />
+                <p className="mt-1 text-xs text-muted">{confirmPay ? 'تأكدت من وصول المبلغ في الإيصال المرفق.' : 'يُعتمد المورد على الباقة المجانية، وتبقى الباقة المطلوبة بانتظار مراجعة الإيصال.'}</p>
+              </div>
+            )}
+          </div>
         ) : (
           <Textarea label="السبب (يظهر للمورد)" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} error={m.fieldErrors.reason} />
         )}
+      </Modal>
+      <Modal open={reviewing && Boolean(reqInv)} onClose={() => setReviewing(false)} title={payable ? `مراجعة إيصال ${reqInv?.number ?? ''}` : `تأكيد دفع ${reqInv?.number ?? ''}`} size="lg">
+        {reqInv && <ReviewPayment inv={{ ...reqInv, vendor: { id: v.id, name: v.name, phone: v.phone } }} onClose={() => setReviewing(false)} onDone={() => (setReviewing(false), q.retry())} />}
       </Modal>
       <Modal
         open={planDlg}

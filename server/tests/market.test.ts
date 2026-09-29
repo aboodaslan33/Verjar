@@ -352,12 +352,11 @@ describe('السوق الصناعي B2B', () => {
       city: 'سحاب',
       businessField: 'كهرباء صناعية',
       productTypes: 'لوحات تحكم',
-      planId: 'plan_business',
       acceptTerms: true,
     });
     expect(join.status).toBe(201);
-    // لا فاتورة ولا طلب قبل الدفع — فقط الباقة المختارة لفتح شاشة الدفع
-    expect(join.body.data.payPlanId).toBe('plan_business');
+    // الانضمام على المجانية: لا فاتورة ولا طلب باقة
+    expect(join.body.data.plan).toBeNull();
     const vendorId = join.body.data.id as string;
     expect(await prisma.marketInvoice.count({ where: { vendorId } })).toBe(0);
 
@@ -457,5 +456,60 @@ describe('السوق الصناعي B2B', () => {
     const d = await apply('plan_pro');
     expect((await admin.post(`/api/v1/admin/market/invoices/${d.body.data.invoice.id}/cancel`)).status).toBe(200);
     expect((await apply('plan_pro')).status).toBe(201);
+  });
+
+  it('الانضمام بباقة مدفوعة: الإيصال ضمن نموذج التسجيل، والإدارة تعتمد وتؤكد الدفع معًا', async () => {
+    const acc = await request(app).get('/api/v1/market/payment-account');
+    expect(acc.body.data).toMatchObject({ bankName: 'بنك الاتحاد', accountName: 'طارق', cliq: '0780192930' });
+
+    const agent = await createCustomer({ name: 'مورد السيور', phone: '0781212121' });
+    const data = {
+      companyName: 'سيور الأردن',
+      contactName: 'م. باسل',
+      phone: '0781212121',
+      email: 'basel@belts.jo',
+      address: 'سحاب',
+      city: 'سحاب',
+      businessField: 'سيور ناقلة',
+      productTypes: 'سيور مطاطية',
+      planId: 'plan_pro',
+      paymentReference: 'CLIQ-5050',
+      acceptTerms: true,
+    };
+    // باقة مدفوعة بدون إيصال: يُرفض الطلب ولا يُنشأ مورد
+    const noProof = await agent.post('/api/v1/market/suppliers/join').field('data', JSON.stringify(data));
+    expect(noProof.status).toBe(400);
+    expect(await prisma.vendor.count({ where: { name: 'سيور الأردن' } })).toBe(0);
+
+    const join = await agent.post('/api/v1/market/suppliers/join').field('data', JSON.stringify(data)).attach('paymentProof', PNG_1PX, { filename: 'receipt.png', contentType: 'image/png' });
+    expect(join.status).toBe(201);
+    expect(join.body.data).toMatchObject({ status: 'PENDING', plan: { name: 'PRO', price: 29 } });
+    const vid = join.body.data.id as string;
+
+    // قائمة الموردين: الطلب يظهر بالباقة المطلوبة (وليس مجانيًا)
+    const list = await admin.get('/api/v1/admin/market/suppliers?status=PENDING');
+    const row = list.body.data.items.find((x: { id: string }) => x.id === vid);
+    expect(row.requestedPlan).toMatchObject({ code: 'PRO', invoice: { proofStatus: 'SUBMITTED' } });
+    // تفاصيل الطلب: الإيصال ورقم الحوالة
+    const det = await admin.get(`/api/v1/admin/market/suppliers/${vid}`);
+    expect(det.body.data.planRequest).toMatchObject({ plan: { code: 'PRO' }, invoice: { proofStatus: 'SUBMITTED', payerReference: 'CLIQ-5050', proofKind: 'IMAGE' } });
+    expect(det.body.data.planRequest.invoice.proofUrl).toBeTruthy();
+    expect(det.body.data.planRequest.invoice.proofPublicId).toBeUndefined();
+
+    // الاعتماد مع تأكيد الدفع: الباقة PRO فعّالة فورًا
+    const ok = await admin.post(`/api/v1/admin/market/suppliers/${vid}/status`).send({ status: 'APPROVED', confirmPayment: true });
+    expect(ok.body.data).toMatchObject({ status: 'APPROVED', paymentConfirmed: true });
+    const v = await prisma.vendor.findUniqueOrThrow({ where: { id: vid }, include: { plan: true } });
+    expect(v.plan?.code).toBe('PRO');
+    expect((await admin.get(`/api/v1/admin/market/suppliers/${vid}`)).body.data.planRequest).toBeNull();
+
+    // الانضمام المجاني يصل مجانيًا بدون طلب باقة
+    const free = await createCustomer({ name: 'مورد مجاني', phone: '0781313131' });
+    const fj = await free.post('/api/v1/market/suppliers/join').send({ ...data, companyName: 'ورشة مجانية', email: 'free@ws.jo', phone: '0781313131', planId: 'plan_free' });
+    expect(fj.status).toBe(201);
+    expect(fj.body.data.plan).toBeNull();
+    const frow = (await admin.get('/api/v1/admin/market/suppliers?status=PENDING')).body.data.items.find((x: { id: string }) => x.id === fj.body.data.id);
+    expect(frow.requestedPlan).toBeNull();
+    expect(frow.plan.code).toBe('FREE');
   });
 });

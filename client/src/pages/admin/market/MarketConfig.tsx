@@ -542,7 +542,7 @@ function CreateAdDialog({ suppliers, onClose, onSaved }: { suppliers: { id: stri
 
 // ═════════ الفواتير ═════════
 
-type Inv = {
+export type Inv = {
   id: string;
   number: string;
   purpose: string;
@@ -662,7 +662,7 @@ export function MarketInvoices() {
 }
 
 /** مراجعة إثبات الدفع: عرض الإيصال والمرجع، ثم تأكيد الدفع (يفعّل الخدمة) أو الرفض مع السبب */
-function ReviewPayment({ inv, onClose, onDone }: { inv: Inv; onClose: () => void; onDone: () => void }) {
+export function ReviewPayment({ inv, onClose, onDone }: { inv: Inv; onClose: () => void; onDone: () => void }) {
   const m = useMutation();
   const [ref, setRef] = useState(inv.payerReference ?? '');
   const [rejecting, setRejecting] = useState(false);

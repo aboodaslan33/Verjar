@@ -33,7 +33,7 @@ export function paymentState(i: PayableInvoice): { label: string; tone: 'success
   return { label: 'بانتظار الدفع', tone: 'brand' };
 }
 
-function CopyRow({ label, value, ltr = true }: { label: string; value: string; ltr?: boolean }) {
+export function CopyRow({ label, value, ltr = true }: { label: string; value: string; ltr?: boolean }) {
   const [done, setDone] = useState(false);
   const copy = async () => {
     try {
