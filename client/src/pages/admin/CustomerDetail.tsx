@@ -1,5 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAdmin } from '../../context/AdminAuth';
+import { hasPerm } from '../../context/Auth';
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
 import { FileUploadForm } from '../../components/admin/FileUploadForm';
 import { useAdminQuery, useMutation } from '../../components/admin/hooks';
@@ -21,6 +23,11 @@ export default function CustomerDetail() {
   const q = useAdminQuery(() => api.get<Customer>(`/admin/customers/${id}`), [id]);
   const [tab, setTab] = useState<Tab>('bookings');
   const [addPay, setAddPay] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const del = useMutation();
+  const navigate = useNavigate();
+  const { admin } = useAdmin();
+  const canDelete = hasPerm(admin, 'customers.manage');
   const c = q.data;
   useDocumentTitle(c?.name ?? 'عميل');
 
@@ -32,6 +39,21 @@ export default function CustomerDetail() {
       </AdminPage>
     );
 
+  const RECORD_LABEL: Record<string, string> = {
+    bookings: 'حجوزات',
+    orders: 'طلبات متجر',
+    corporateRequests: 'طلبات شركات',
+    contracts: 'عقود',
+    tenders: 'عطاءات',
+    quoteFiles: 'ملفات',
+    payments: 'دفعات',
+    rfqs: 'طلبات عروض أسعار',
+    reviews: 'تقييمات',
+  };
+  const recordText = Object.entries(c.recordCounts ?? {})
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${RECORD_LABEL[k] ?? k}: ${n}`)
+    .join('، ');
   const tabs: [Tab, string, number][] = [
     ['bookings', 'الحجوزات', c.bookings.length],
     ['orders', 'طلبات المتجر', c.orders.length],
@@ -63,9 +85,37 @@ export default function CustomerDetail() {
           <ButtonA href={`https://wa.me/${c.phone}`} target="_blank" rel="noopener noreferrer" variant="whatsapp" size="sm">
             <Icon name="whatsapp" className="h-4 w-4" /> واتساب
           </ButtonA>
+          {canDelete && (
+            <Button variant="ghost" size="sm" className="text-danger" onClick={() => setDeleting(true)}>
+              <Icon name="trash" className="h-4 w-4" /> حذف الحساب
+            </Button>
+          )}
         </>
       }
     >
+      <ConfirmDialog
+        open={deleting}
+        title="حذف حساب العميل نهائيًا؟"
+        confirmLabel="حذف الحساب"
+        loading={del.pending === 'delete'}
+        onClose={() => setDeleting(false)}
+        onConfirm={async () => {
+          const r = await del.run('delete', () => api.del(`/admin/customers/${c.id}`), 'تم حذف حساب العميل');
+          if (r) navigate('/admin/customers', { replace: true });
+          else setDeleting(false);
+        }}
+      >
+        <p>
+          يُحذف حساب <b className="text-ink">{c.name}</b> وبيانات دخوله، ويستطيع التسجيل من جديد بنفس الهاتف والبريد كحساب جديد.
+        </p>
+        {recordText ? (
+          <p className="mt-2">له سجلات ({recordText}) — تبقى للحسابات والتقارير باسم «عميل محذوف» بدون بياناته.</p>
+        ) : (
+          <p className="mt-2">لا توجد له سجلات، فيُحذف بالكامل.</p>
+        )}
+        {c.vendor && <p className="mt-2 text-danger">هذا العميل مالك المتجر «{c.vendor.name}» — سيُعلَّق المتجر وتختفي منتجاته من السوق.</p>}
+        <p className="mt-2 font-semibold text-danger">لا يمكن التراجع عن هذه العملية.</p>
+      </ConfirmDialog>
       <div className="mb-6 grid grid-cols-3 gap-3">
         {(
           [

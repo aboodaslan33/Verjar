@@ -2111,6 +2111,15 @@ export const EN_TEXT: Record<string, string> = {
   "يمكن إلغاء الطلب قبل خروجه للتوصيل بالتواصل معنا.": "You can cancel the order before it goes out for delivery by contacting us.",
   "المنتجات المصنوعة حسب الطلب أو القياس لا تُسترجع بعد بدء تصنيعها إلا في حال وجود عيب.": "Made-to-order or custom-sized products can't be returned once production starts, unless defective.",
   // ── السوق الصناعي ──
+  "حذف الحساب": "Delete account",
+  "حذف حساب العميل نهائيًا؟": "Permanently delete the customer account?",
+  "تم حذف حساب العميل": "Customer account deleted",
+  "يُحذف حساب": "This deletes the account of",
+  "وبيانات دخوله، ويستطيع التسجيل من جديد بنفس الهاتف والبريد كحساب جديد.": "and its login details; they can register again with the same phone and email as a new account.",
+  "لا توجد له سجلات، فيُحذف بالكامل.": "They have no records, so the account is removed completely.",
+  "لا يمكن التراجع عن هذه العملية.": "This can't be undone.",
+  "عميل محذوف": "Deleted customer",
+  "حُذف حساب مالك المتجر": "The store owner's account was deleted",
   "ارفع إيصالًا جديدًا لنفس الطلب، أو اختر نفس الباقة أو باقة أخرى من الأسفل وأرسل طلبًا جديدًا (يُلغى هذا الطلب تلقائيًا).": "Upload a new receipt for this request, or choose the same plan or another plan below and send a new request (this one is cancelled automatically).",
   "تم إرسال الطلب مع إيصال الدفع للإدارة": "Request sent to the admin with the payment receipt",
   "إرسال الطلب مع الإيصال": "Send request with receipt",
@@ -3247,4 +3256,6 @@ export const EN_PATTERNS: [string, string][] = [
   ["طلب باقة {0} مع إيصال دفع — {1}", "{0} plan request with payment receipt — {1}"],
   ["طلب إعلان {0} مع إيصال دفع — {1}", "{0} ad request with payment receipt — {1}"],
   ["السبب: {0}. ارفع إيصالًا جديدًا لنفس الطلب، أو قدّم على نفس الباقة أو باقة أخرى من صفحة الاشتراك والفواتير.", "Reason: {0}. Upload a new receipt for the same request, or apply for the same plan or another plan from the subscription & invoices page."],
+  ["له سجلات ({0}) — تبقى للحسابات والتقارير باسم «عميل محذوف» بدون بياناته.", "They have records ({0}) — these stay for accounting and reports under “Deleted customer”, without their personal details."],
+  ["هذا العميل مالك المتجر «{0}» — سيُعلَّق المتجر وتختفي منتجاته من السوق.", "This customer owns the store “{0}” — the store will be suspended and its products removed from the marketplace."],
 ];

@@ -70,11 +70,13 @@ customersRouter.get(
         contracts: { where: { deletedAt: null }, orderBy: { startDate: 'desc' } },
         quoteFiles: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
         payments: { where: { deletedAt: null }, orderBy: { paidAt: 'desc' } },
+        _count: { select: { bookings: true, orders: true, tenders: true, corporateRequests: true, contracts: true, quoteFiles: true, payments: true, rfqs: true, reviews: true } },
       },
     });
     if (!c) throw notFound('العميل غير موجود');
-    const { passwordHash: _p, otpHash: _o, otpExpiresAt: _e, otpAttempts: _a, ...safe } = c;
-    ok(res, { ...safe, hasPassword: Boolean(c.passwordHash), finance: await customerFinance(c.id) });
+    const { passwordHash: _p, otpHash: _o, otpExpiresAt: _e, otpAttempts: _a, _count, ...safe } = c;
+    // كل سجلات العميل (بما فيها المحذوفة من القوائم) — تحدد طريقة حذف الحساب
+    ok(res, { ...safe, recordCounts: _count, hasPassword: Boolean(c.passwordHash), finance: await customerFinance(c.id) });
   }),
 );
 
@@ -112,5 +114,69 @@ customersRouter.patch(
     });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'update', entity: 'customer', entityId: c.id });
     ok(res, c);
+  }),
+);
+
+/**
+ * حذف حساب العميل نهائيًا من النظام — يستطيع بعدها التسجيل من جديد بنفس الهاتف والبريد.
+ * - بدون أي سجلات (حجوزات، طلبات، عقود، دفعات، طلبات عروض أسعار…): يُحذف السجل بالكامل.
+ * - له سجلات: تُمسح بياناته الشخصية وبيانات الدخول (الاسم، الهاتف، البريد، كلمة المرور…)
+ *   وتبقى الطلبات والحجوزات والدفعات مرتبطة بـ"عميل محذوف" للحسابات والتقارير.
+ * في الحالتين: تنتهي جلساته فورًا، وتُحذف إشعاراته وعضويته في فرق الموردين، ويُعلَّق متجره إن كان موردًا.
+ */
+customersRouter.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const c = await prisma.customer.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        _count: { select: { bookings: true, orders: true, tenders: true, corporateRequests: true, contracts: true, quoteFiles: true, payments: true, rfqs: true, reviews: true } },
+      },
+    });
+    if (!c) throw notFound('العميل غير موجود');
+    const records = Object.values(c._count).reduce((a, b) => a + b, 0);
+    const mode = await prisma.$transaction(async (tx) => {
+      await tx.notification.deleteMany({ where: { recipientType: 'CUSTOMER', recipientId: c.id } });
+      await tx.emailOtp.deleteMany({ where: { subjectType: 'customer', subjectId: c.id } });
+      await tx.loginLock.deleteMany({ where: { key: { in: [c.phone, c.email ?? ''].filter(Boolean) } } });
+      await tx.vendorMember.deleteMany({ where: { customerId: c.id } });
+      // متجر المورد المملوك: يُفصل ويُعلَّق (منتجاته تختفي من السوق وتبقى طلباته للحسابات)
+      if (c.vendor) {
+        await tx.vendor.update({ where: { id: c.vendor.id }, data: { customerId: null, active: false, status: 'SUSPENDED', rejectionReason: 'حُذف حساب مالك المتجر' } });
+      }
+      if (records === 0) {
+        await tx.customer.delete({ where: { id: c.id } });
+        return 'deleted' as const;
+      }
+      await tx.customer.update({
+        where: { id: c.id },
+        data: {
+          name: 'عميل محذوف',
+          // الهاتف فريد: قيمة بديلة تحرر الرقم الحقيقي للتسجيل من جديد
+          phone: `deleted:${c.id}`,
+          email: null,
+          companyName: null,
+          passwordHash: null,
+          otpHash: null,
+          otpExpiresAt: null,
+          otpAttempts: 0,
+          notes: null,
+          emailOptIn: false,
+          emailVerifiedAt: null,
+          deletedAt: new Date(),
+        },
+      });
+      return 'anonymized' as const;
+    });
+    await audit({
+      actorId: req.auth!.sub,
+      actorType: 'admin',
+      action: 'delete',
+      entity: 'customer',
+      entityId: c.id,
+      meta: { mode, records, vendor: c.vendor?.name ?? null },
+    });
+    ok(res, { deleted: true, mode, records, vendorSuspended: Boolean(c.vendor) });
   }),
 );

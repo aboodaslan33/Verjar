@@ -410,6 +410,7 @@ export type CustomerDetail = {
   quoteFiles: QuoteFile[];
   payments: Payment[];
   finance: FinanceSummary;
+  recordCounts?: Record<string, number>;
 };
 
 type OpsPeriod = { orders: number; delivered: number; failed: number; cancelled: number; sales: number; codCollected: number; codPending: number; onlinePayments: number; deliveryFees: number };
