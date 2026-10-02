@@ -21,8 +21,61 @@ function getTransporter(): Transporter {
         port: env.SMTP_PORT,
         secure: env.SMTP_PORT === 465,
         auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+        // فشل سريع بدل انتظار دقيقتين إذا كانت الاستضافة تحجب منافذ SMTP
+        connectionTimeout: 15_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 20_000,
       });
   return transporter;
+}
+
+type OutMail = { to: string; subject: string; html: string; text: string; headers?: Record<string, string> };
+
+/**
+ * إرسال رسالة عبر المزود المضبوط:
+ * - Brevo / Resend عبر HTTPS (منفذ 443) — يعمل على Render المجاني الذي يحجب منافذ SMTP.
+ * - SMTP (مثل Gmail) — للاستضافات التي تسمح به.
+ */
+async function deliver(m: OutMail) {
+  if (env.isTest || env.mailProvider === 'smtp' || env.mailProvider === 'none') {
+    await getTransporter().sendMail({ from: { name: env.MAIL_FROM_NAME, address: env.mailFrom }, ...m });
+    return;
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  try {
+    const res =
+      env.mailProvider === 'brevo'
+        ? await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            signal: ctrl.signal,
+            headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({
+              sender: { name: env.MAIL_FROM_NAME, email: env.mailFrom },
+              to: [{ email: m.to }],
+              subject: m.subject,
+              htmlContent: m.html,
+              textContent: m.text,
+              ...(m.headers ? { headers: m.headers } : {}),
+            }),
+          })
+        : await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            signal: ctrl.signal,
+            headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              from: `${env.MAIL_FROM_NAME} <${env.mailFrom}>`,
+              to: [m.to],
+              subject: m.subject,
+              html: m.html,
+              text: m.text,
+              ...(m.headers ? { headers: m.headers } : {}),
+            }),
+          });
+    if (!res.ok) throw new Error(`${env.mailProvider} ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const emailReady = () => env.emailEnabled || env.isTest;
@@ -143,14 +196,7 @@ export async function sendTransactional(to: string, m: { subject: string; html: 
     testOutbox.push({ to, ...m });
     if (testOutbox.length > 50) testOutbox.shift();
   }
-  await getTransporter().sendMail({
-    from: { name: env.MAIL_FROM_NAME, address: env.SMTP_USER || 'no-reply@example.com' },
-    to,
-    subject: m.subject,
-    html: m.html,
-    text: m.text,
-    headers: { 'X-Entity-Ref-ID': `${Date.now()}` },
-  });
+  await deliver({ to, subject: m.subject, html: m.html, text: m.text, headers: { 'X-Entity-Ref-ID': `${Date.now()}` } });
 }
 
 /** رابط إعادة تعيين كلمة المرور */
@@ -162,8 +208,7 @@ export async function sendPasswordReset(to: string, name: string, url: string) {
 
 export async function sendOne(to: string, c: CampaignContent, recipient: { name: string; id: string }) {
   const { html, text, unsub } = renderCampaign(c, recipient);
-  await getTransporter().sendMail({
-    from: { name: env.MAIL_FROM_NAME, address: env.SMTP_USER || 'no-reply@example.com' },
+  await deliver({
     to,
     subject: c.subject,
     html,

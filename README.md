@@ -94,7 +94,8 @@ npm run dev
 | `CLOUDINARY_FOLDER` | | المجلد في Cloudinary (افتراضي `verjar`) |
 | `WA_MODE` | | `link` (افتراضي): بعد إرسال الحجز أو الطلب يفتح الموقع واتساب برسالة جاهزة لرقم الإدارة. `cloud`: إرسال تلقائي عبر Cloud API |
 | `WA_TOKEN` / `WA_PHONE_ID` | اختياري | مفاتيح WhatsApp Cloud API — تُستخدم فقط مع `WA_MODE=cloud` |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM_NAME` | للبريد | النشرة البريدية واستعادة كلمة المرور (راجع قسم النشرة البريدية) |
+| `BREVO_API_KEY` (أو `RESEND_API_KEY`) + `MAIL_FROM_EMAIL` | للبريد على Render | إرسال البريد عبر HTTPS — **ضروري على Render المجاني لأنه يحجب منافذ SMTP** (يظهر الخطأ `ETIMEDOUT` / `Connection timeout`) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM_NAME` | للبريد | SMTP (مثل Gmail) للاستضافات التي تسمح به — يُستخدم فقط إذا لم يُضبط مفتاح Brevo/Resend |
 | `WA_API_VERSION` | | إصدار Graph API (افتراضي `v21.0`) |
 | `TEST_DATABASE_URL` | اختبارات | قاعدة بيانات الاختبار، ويجب أن يحتوي اسمها على `test` |
 

@@ -61,7 +61,13 @@ services:
       # link: الموقع يفتح واتساب برسالة جاهزة بعد الإرسال. cloud: إرسال تلقائي عبر Cloud API
       - key: WA_MODE
         value: link
-      # البريد للنشرة البريدية واستعادة كلمة المرور (Gmail + App Password)
+      # البريد (رموز OTP، استعادة كلمة المرور، النشرة): Render المجاني يحجب منافذ SMTP،
+      # فاستخدم Brevo عبر HTTPS — BREVO_API_KEY من brevo.com (SMTP & API ← API Keys)،
+      # وMAIL_FROM_EMAIL = بريد مرسل موثّق في Brevo (مثل farjarweb@gmail.com)
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

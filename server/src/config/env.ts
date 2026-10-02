@@ -24,6 +24,15 @@ const schema = z.object({
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
   MAIL_FROM_NAME: z.string().default('مجموعة فرجار'),
+  /**
+   * الإرسال عبر HTTPS بدل SMTP — ضروري على Render المجاني (يحجب منافذ SMTP 25/465/587).
+   * BREVO_API_KEY: مجاني 300 رسالة يوميًا، يرسل من بريد Gmail بعد تأكيده كمرسل في Brevo.
+   * RESEND_API_KEY: يتطلب نطاقًا موثّقًا للإرسال لأي عنوان.
+   */
+  BREVO_API_KEY: z.string().optional().default(''),
+  RESEND_API_KEY: z.string().optional().default(''),
+  /** عنوان المرسل (افتراضيًا SMTP_USER) — يجب أن يكون مرسلًا موثّقًا لدى المزود */
+  MAIL_FROM_EMAIL: z.string().optional().default(''),
   CLOUDINARY_FOLDER: z.string().default('verjar'),
 });
 
@@ -47,7 +56,10 @@ export const env = {
   clientOrigins: parsed.data.CLIENT_URL.split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean),
   waCloudEnabled: parsed.data.WA_MODE === 'cloud' && Boolean(parsed.data.WA_TOKEN && parsed.data.WA_PHONE_ID),
   cloudinaryEnabled: Boolean(parsed.data.CLOUDINARY_URL),
-  emailEnabled: Boolean(parsed.data.SMTP_HOST && parsed.data.SMTP_USER && parsed.data.SMTP_PASS),
+  emailEnabled: Boolean(parsed.data.BREVO_API_KEY || parsed.data.RESEND_API_KEY || (parsed.data.SMTP_HOST && parsed.data.SMTP_USER && parsed.data.SMTP_PASS)),
+  /** مزود البريد الفعلي: HTTPS أولًا (يعمل على أي استضافة)، ثم SMTP */
+  mailProvider: (parsed.data.BREVO_API_KEY ? 'brevo' : parsed.data.RESEND_API_KEY ? 'resend' : parsed.data.SMTP_HOST ? 'smtp' : 'none') as 'brevo' | 'resend' | 'smtp' | 'none',
+  mailFrom: parsed.data.MAIL_FROM_EMAIL || parsed.data.SMTP_USER || 'no-reply@example.com',
   /** رابط الواجهة العام (أول قيمة في CLIENT_URL) — لروابط البريد */
   siteUrl: parsed.data.CLIENT_URL.split(',')[0].trim().replace(/\/$/, ''),
 };
