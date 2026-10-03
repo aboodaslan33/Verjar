@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { audit } from '../../lib/audit';
 import { asyncHandler, badRequest, notFound, ok } from '../../lib/http';
 import { randomSuffix, slugify } from '../../lib/ids';
-import { applyDiscount } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
 import { memoryUpload } from '../../middleware/upload';
@@ -13,6 +12,7 @@ import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.
 import { HOUSE_VENDOR_ID, ensureHouseVendor } from '../../services/vendor.service';
 import { checkPrice, industrialFields, priceField } from '../../validators/product';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
+import { FEE_MAX, pricingData, productPricing, resolveFeePercent } from '../../market/fees';
 
 export const productsRouter = Router();
 
@@ -27,6 +27,8 @@ const categoryInput = z.object({
   /** مجموعة العمولة (قطع غيار، ماكينات…) تُستخدم في محرك العمولات */
   commissionGroup: z.string().trim().max(40).nullable().optional().transform((v) => v || null),
   description: z.string().trim().max(300).nullable().optional().transform((v) => v || null),
+  /** نسبة فرجار الافتراضية لمنتجات القسم الجديدة (فارغ = الافتراضي العام) */
+  platformFeePercent: z.coerce.number().min(0).max(FEE_MAX).nullable().optional(),
 });
 
 productsRouter.get(
@@ -102,7 +104,11 @@ productsRouter.delete(
 const productInput = z.object({
   name: z.string().trim().min(2, 'اسم المنتج مطلوب').max(150),
   description: z.string().trim().min(1, 'الشرح مطلوب').max(5000),
-  price: priceField,
+  /** سعر المورد (price مقبول للتوافق) — سعر العميل يُحسب من النسبة */
+  supplierPrice: priceField.optional(),
+  price: priceField.optional(),
+  /** نسبة فرجار لهذا المنتج — الإدارة فقط */
+  platformFeePercent: z.coerce.number().min(0, 'النسبة لا تكون سالبة').max(FEE_MAX, `النسبة القصوى ${FEE_MAX}%`).optional(),
   ...industrialFields,
   discountPercent: z.coerce.number().int().min(0).max(90, 'الخصم الأقصى 90%').default(0),
   stock: z.coerce.number().int().min(0, 'المخزون لا يكون سالبًا').default(0),
@@ -134,10 +140,17 @@ productsRouter.get(
         lowStock: z.enum(['true']).optional(),
         approval: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
         vendorId: z.string().optional(),
+        feeMin: z.coerce.number().min(0).max(100).optional(),
+        feeMax: z.coerce.number().min(0).max(100).optional(),
+        feeRequest: z.enum(['true']).optional(),
       })
       .parse(req.query);
     const where: Prisma.ProductWhereInput = {
       deletedAt: null,
+      ...(q.feeMin !== undefined || q.feeMax !== undefined
+        ? { platformFeePercent: { ...(q.feeMin !== undefined ? { gte: q.feeMin } : {}), ...(q.feeMax !== undefined ? { lte: q.feeMax } : {}) } }
+        : {}),
+      ...(q.feeRequest ? { feeRequestPercent: { not: null } } : {}),
       ...(q.categoryId ? { OR: [{ categoryId: q.categoryId }, { category: { parentId: q.categoryId } }] } : {}),
       ...(q.approval ? { approvalStatus: q.approval } : {}),
       ...(q.vendorId ? { vendorId: q.vendorId } : {}),
@@ -158,7 +171,30 @@ productsRouter.get(
       }),
       prisma.product.count({ where }),
     ]);
-    ok(res, paged(items, total, q));
+    const sold = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: { productId: { in: items.map((p) => p.id) }, vendorOrder: { status: { not: 'CANCELLED' } }, order: { deletedAt: null } },
+      _sum: { quantity: true, lineTotal: true, platformFeeAmount: true },
+    });
+    const soldBy = new Map(sold.map((r) => [r.productId, r._sum]));
+    ok(
+      res,
+      paged(
+        items.map((p) => {
+          const r = productPricing(p.supplierPrice, p.platformFeePercent, p.discountPercent);
+          const s = soldBy.get(p.id);
+          return {
+            ...p,
+            pricing: { supplierPrice: r.supplierPrice, feePercent: r.feePercent, feeAmount: r.feeAmount, customerPrice: r.price, finalPrice: r.finalPrice },
+            soldUnits: s?.quantity ?? 0,
+            soldSales: Number(s?.lineTotal ?? 0),
+            soldFees: Number(s?.platformFeeAmount ?? 0),
+          };
+        }),
+        total,
+        q,
+      ),
+    );
   }),
 );
 
@@ -177,24 +213,29 @@ productsRouter.get(
 productsRouter.post(
   '/products',
   asyncHandler(async (req, res) => {
-    const { vendorId, specs, ...input } = productInput.parse(req.body);
-    const pe = checkPrice(input);
-    if (pe) throw badRequest(pe, { fields: { price: pe } });
+    const { vendorId, specs, supplierPrice: sp, price: legacyPrice, platformFeePercent, ...input } = productInput.parse(req.body);
+    const supplierPrice = sp ?? legacyPrice;
+    if (supplierPrice === undefined) throw badRequest('السعر مطلوب', { fields: { supplierPrice: 'اكتب السعر' } });
+    const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest });
+    if (pe) throw badRequest(pe, { fields: { supplierPrice: pe } });
     const { fields } = await categoryForProduct(prisma, input.categoryId);
     if (vendorId && vendorId !== HOUSE_VENDOR_ID && !(await prisma.vendor.findUnique({ where: { id: vendorId } }))) {
       throw badRequest('المورد غير موجود');
     }
     if (!vendorId || vendorId === HOUSE_VENDOR_ID) await ensureHouseVendor();
+    const vId = vendorId ?? HOUSE_VENDOR_ID;
+    const isHouse = vId === HOUSE_VENDOR_ID || !!(await prisma.vendor.findUnique({ where: { id: vId }, select: { isHouse: true } }))?.isHouse;
+    // منتجات فرجار نفسها بلا نسبة؛ وإلا النسبة المحددة أو حسب الأولوية (المورد ← القسم ← الافتراضي)
+    const fee = isHouse ? 0 : platformFeePercent ?? (await resolveFeePercent(prisma, { vendorId: vId, categoryId: input.categoryId }));
     const p = await prisma.product.create({
       data: {
         ...input,
-        vendorId: vendorId ?? HOUSE_VENDOR_ID,
+        vendorId: vId,
         // ما يضيفه الأدمن معتمد مباشرة
         approvalStatus: 'APPROVED',
         specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
-        price: new Prisma.Decimal(input.price),
-        finalPrice: new Prisma.Decimal(applyDiscount(input.price, input.discountPercent)),
+        ...pricingData(supplierPrice, fee, input.discountPercent),
       },
       include: { category: true, media: true },
     });
@@ -206,12 +247,16 @@ productsRouter.post(
 productsRouter.patch(
   '/products/:id',
   asyncHandler(async (req, res) => {
-    const { vendorId: _v, specs, ...input } = productInput.partial().parse(req.body);
-    const current = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    const { vendorId: _v, specs, supplierPrice: sp, price: legacyPrice, platformFeePercent, ...input } = productInput.partial().parse(req.body);
+    const current = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { vendor: { select: { isHouse: true } } } });
     if (!current) throw notFound('المنتج غير موجود');
-    const price = input.price ?? Number(current.price);
-    const pe = checkPrice({ price, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
-    if (pe) throw badRequest(pe, { fields: { price: pe } });
+    const { vendor: currentVendor, ...currentProduct } = current;
+    const supplierPrice = sp ?? legacyPrice ?? Number(current.supplierPrice);
+    const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
+    if (pe) throw badRequest(pe, { fields: { supplierPrice: pe } });
+    // تغيير النسبة يؤثر على الطلبات الجديدة فقط — الطلبات السابقة محفوظة بلقطتها
+    const fee = currentVendor.isHouse ? 0 : platformFeePercent ?? current.platformFeePercent;
+    const feeChanged = Number(fee) !== Number(currentProduct.platformFeePercent);
     const discount = input.discountPercent ?? current.discountPercent;
     // المواصفات تُتحقق من جديد عند تغيير القسم أو المواصفات
     const specsData =
@@ -224,12 +269,20 @@ productsRouter.patch(
         ...input,
         ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
-        price: new Prisma.Decimal(price),
-        finalPrice: new Prisma.Decimal(applyDiscount(price, discount)),
+        ...pricingData(supplierPrice, fee, discount),
+        // تعديل الإدارة للنسبة يُغلق أي طلب تغيير معلّق
+        ...(platformFeePercent !== undefined ? { feeRequestPercent: null, feeRequestNote: null, feeRequestAt: null } : {}),
       },
       include: { category: true, media: { orderBy: { sortOrder: 'asc' } } },
     });
-    await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'update', entity: 'product', entityId: p.id, meta: input });
+    await audit({
+      actorId: req.auth!.sub,
+      actorType: 'admin',
+      action: feeChanged ? 'fee_change' : 'update',
+      entity: 'product',
+      entityId: p.id,
+      meta: { ...input, ...(feeChanged ? { feeFrom: Number(currentProduct.platformFeePercent), feeTo: Number(fee) } : {}) },
+    });
     ok(res, p);
   }),
 );
@@ -240,6 +293,31 @@ productsRouter.delete(
     await prisma.product.update({ where: { id: req.params.id }, data: { deletedAt: new Date(), visible: false } });
     await audit({ actorId: req.auth!.sub, actorType: 'admin', action: 'delete', entity: 'product', entityId: req.params.id });
     ok(res, { deleted: true });
+  }),
+);
+
+/** طلب المورد تغيير نسبة فرجار: الموافقة تطبّق النسبة المطلوبة وتعيد حساب سعر العميل */
+productsRouter.post(
+  '/products/:id/fee-request/:decision',
+  asyncHandler(async (req, res) => {
+    const decision = z.enum(['approve', 'reject']).parse(req.params.decision);
+    const current = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!current) throw notFound('المنتج غير موجود');
+    if (current.feeRequestPercent == null) throw badRequest('لا يوجد طلب تغيير نسبة على هذا المنتج');
+    const clear = { feeRequestPercent: null, feeRequestNote: null, feeRequestAt: null };
+    const p = await prisma.product.update({
+      where: { id: current.id },
+      data: decision === 'approve' ? { ...clear, ...pricingData(current.supplierPrice, current.feeRequestPercent, current.discountPercent) } : clear,
+    });
+    await audit({
+      actorId: req.auth!.sub,
+      actorType: 'admin',
+      action: `fee_request_${decision}`,
+      entity: 'product',
+      entityId: p.id,
+      meta: { feeFrom: Number(current.platformFeePercent), requested: Number(current.feeRequestPercent) },
+    });
+    ok(res, p);
   }),
 );
 

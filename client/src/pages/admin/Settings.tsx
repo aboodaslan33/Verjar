@@ -28,6 +28,7 @@ const RANGES: Partial<Record<Key, [number, number, boolean?]>> = {
   leadLargeThreshold: [0, 100_000_000],
   rfqSuppliersPerRequest: [1, 50, true],
   subscriptionReminderDays: [1, 60, true],
+  platformFeeDefault: [0, 50],
 };
 
 /** مفاتيح نعم/لا (تُخزَّن في النموذج كنص 'true'/'false') */
@@ -50,6 +51,7 @@ const NUMERIC: Key[] = [
   'leadLargeThreshold',
   'rfqSuppliersPerRequest',
   'subscriptionReminderDays',
+  'platformFeeDefault',
 ];
 
 export default function Settings() {
@@ -321,6 +323,21 @@ function SettingsForm({ initial, onSaved }: { initial: AdminSettings; onSaved: (
             ).map(([k, label]) => (
               <Checkbox key={k} label={label} checked={form[k] === 'true'} onChange={(v) => setForm((f) => ({ ...f, [k]: String(v) }))} />
             ))}
+          </div>
+        </Section>
+      </div>
+
+      <div id="fees">
+        <Section
+          title="نسبة فرجار على المنتجات"
+          description="سعر العميل = سعر المورد × (1 + النسبة). لكل منتج نسبته، والنسبة تُثبَّت مع كل طلب ولا تتغير بتعديلها لاحقًا. أولوية النسبة للمنتج الجديد: المورد ← القسم ← الافتراضي هنا."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            {num('platformFeeDefault', 'النسبة الافتراضية للمنتج الجديد (%)', { min: 0, max: 50, hint: 'الافتراضي 2%' })}
+            <Select label="تعديل النسبة" value={str('platformFeeEditPolicy')} onChange={set('platformFeeEditPolicy')} error={fe.platformFeeEditPolicy}>
+              <option value="ADMIN_ONLY">الإدارة فقط</option>
+              <option value="SUPPLIER_REQUEST">يحق للمورد طلب تغيير النسبة</option>
+            </Select>
           </div>
         </Section>
       </div>

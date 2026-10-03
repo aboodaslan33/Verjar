@@ -50,3 +50,40 @@ async function sendMarketEmail(to: string, name: string, msg: { title: string; b
   const html = await emailLayout({ title: msg.title, preheader: msg.body.slice(0, 120), body, reason: 'إشعار تلقائي من سوق FARJAR الصناعي.' });
   await sendTransactional(to, { subject: `${msg.title} — FARJAR`, html, text: `${msg.title}\n\n${msg.body}\n\n${url}` });
 }
+
+/**
+ * بريد تلقائي لكل مورد عند بيع منتجاته: المنتجات والكميات وسعره ومستحقه بعد نسبة فرجار.
+ * يُستدعى بعد حفظ الطلب (خارج المعاملة)، وفشل البريد لا يؤثر على الطلب.
+ */
+export async function emailSuppliersOfSale(orderId: string) {
+  if (!emailReady()) return;
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      code: true,
+      number: true,
+      vendorOrders: {
+        where: { vendor: { isHouse: false } },
+        select: {
+          id: true,
+          vendorNet: true,
+          vendor: { select: { name: true, email: true, customer: { select: { email: true } } } },
+          items: { select: { name: true, quantity: true, supplierUnitPrice: true, vendorNet: true } },
+        },
+      },
+    },
+  });
+  if (!order) return;
+  const code = order.code ?? `#${order.number}`;
+  for (const vo of order.vendorOrders) {
+    const to = vo.vendor.email ?? vo.vendor.customer?.email;
+    if (!to) continue;
+    const lines = vo.items.map((i) => `${i.name} × ${i.quantity}`).join('، ');
+    void sendMarketEmail(to, vo.vendor.name, {
+      title: `تم بيع منتجاتك — طلب ${code}`,
+      body: `اشترى عميل من متجرك: ${lines}. مستحقك من هذا الطلب ${Number(vo.vendorNet)} د.أ (بعد نسبة فرجار). جهّز الطلب وحدّث حالته من لوحة المورد.`,
+      link: `/vendor/orders/${vo.id}`,
+      cta: 'عرض الطلب',
+    }).catch((e) => console.error('sale email failed', e));
+  }
+}

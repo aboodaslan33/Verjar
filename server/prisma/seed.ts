@@ -296,6 +296,9 @@ async function main() {
         name: p.name,
         description: p.description,
         price: new Prisma.Decimal(p.price),
+        // منتجات فرجار نفسها: بلا نسبة، سعر المورد = سعر العميل
+        supplierPrice: new Prisma.Decimal(p.price),
+        platformFeePercent: new Prisma.Decimal(0),
         discountPercent: p.discount,
         finalPrice: new Prisma.Decimal(round3(p.price * (1 - p.discount / 100))),
         stock: p.stock,

@@ -59,5 +59,9 @@ export type VendorOrder = {
     commissionPercent: number;
     commissionAmount: number;
     vendorNet: number;
+    /** لقطة وقت البيع: سعر المورد للوحدة بعد الخصم ونسبة فرجار ومبلغها */
+    supplierUnitPrice: number | null;
+    platformFeePercent: number | null;
+    platformFeeAmount: number | null;
   }[];
 };

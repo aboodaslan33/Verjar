@@ -490,8 +490,20 @@ export async function initStoreOrder(tx: Tx, orderId: string) {
   const code = await nextOrderCode(tx);
   await tx.order.update({ where: { id: orderId }, data: { code, source: 'STORE' } });
   await recordEvent(tx, orderId, null, 'NEW', { kind: 'system', name: 'المتجر' });
-  const o = await refreshFinance(tx, orderId);
-  await notify(tx, await suppliersOf(tx, o), { title: `طلب جديد ${code}`, body: `وصل طلب جديد ${code} يتضمن منتجاتك.`, orderId });
+  await refreshFinance(tx, orderId);
+  // إشعار لكل مورد بما بيع من منتجاته (داخل الموقع؛ البريد يُرسل بعد حفظ الطلب — notifySuppliersOfSale)
+  const vos = await tx.vendorOrder.findMany({
+    where: { orderId, vendor: { isHouse: false } },
+    select: { id: true, vendorId: true, items: { select: { name: true, quantity: true } } },
+  });
+  for (const vo of vos) {
+    await notify(tx, [{ type: 'VENDOR', vendorId: vo.vendorId }], {
+      title: `تم بيع منتجاتك — طلب ${code}`,
+      body: `طلب جديد ${code}: ${vo.items.map((i) => `${i.name} × ${i.quantity}`).join('، ')}.`,
+      orderId,
+      link: `/vendor/orders/${vo.id}`,
+    });
+  }
   return code;
 }
 

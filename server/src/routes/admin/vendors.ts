@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
+import { FEE_MAX, pricingData } from '../../market/fees';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
 import { asyncHandler, badRequest, conflict, notFound, ok } from '../../lib/http';
@@ -20,6 +21,7 @@ const vendorSelect = {
   description: true,
   logoUrl: true,
   commissionPercent: true,
+  platformFeePercent: true,
   active: true,
   isHouse: true,
   createdAt: true,
@@ -153,6 +155,10 @@ vendorsAdminRouter.patch(
     const input = z
       .object({
         commissionPercent: commissionInput.optional(),
+        /** نسبة فرجار الافتراضية لمنتجات المورد الجديدة (null = حسب القسم/الافتراضي) */
+        platformFeePercent: z.coerce.number().min(0).max(FEE_MAX).nullable().optional(),
+        /** تطبيق النسبة على كل منتجات المورد الحالية أيضًا */
+        applyFeeToProducts: z.boolean().optional(),
         name: z.string().trim().min(2).max(60).optional(),
         active: z.boolean().optional(),
       })
@@ -166,9 +172,18 @@ vendorsAdminRouter.patch(
         ...(input.name ? { name: input.name } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
         ...(input.commissionPercent !== undefined ? { commissionPercent: new Prisma.Decimal(input.commissionPercent) } : {}),
+        ...(input.platformFeePercent !== undefined
+          ? { platformFeePercent: input.platformFeePercent === null ? null : new Prisma.Decimal(input.platformFeePercent) }
+          : {}),
       },
       select: vendorSelect,
     });
+    if (input.applyFeeToProducts && input.platformFeePercent != null && !current.isHouse) {
+      const products = await prisma.product.findMany({ where: { vendorId: current.id, deletedAt: null }, select: { id: true, supplierPrice: true, discountPercent: true } });
+      await prisma.$transaction(
+        products.map((p) => prisma.product.update({ where: { id: p.id }, data: pricingData(p.supplierPrice, input.platformFeePercent, p.discountPercent) })),
+      );
+    }
     await audit({
       actorId: req.auth!.sub,
       actorType: 'admin',

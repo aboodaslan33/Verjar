@@ -53,6 +53,8 @@ export type AdminSettings = Omit<SiteSettings, 'whatsappMode'> & {
   supplierApprovalRequired: boolean;
   hideContactsUntilAward: boolean;
   subscriptionReminderDays: number;
+  platformFeeDefault: number;
+  platformFeeEditPolicy: 'ADMIN_ONLY' | 'SUPPLIER_REQUEST';
   paymentBankName: string;
   paymentAccountName: string;
   paymentCliq: string;

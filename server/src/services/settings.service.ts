@@ -70,6 +70,11 @@ export const settingsSchema = z.object({
   hideContactsUntilAward: z.boolean(),
   /** التذكير قبل انتهاء الاشتراك (أيام) */
   subscriptionReminderDays: z.number().int().min(1).max(60),
+  // ── نسبة فرجار على المنتجات ──
+  /** النسبة الافتراضية للمنتج الجديد (ما لم يكن للمورد أو القسم نسبة خاصة) */
+  platformFeeDefault: z.number().min(0).max(50),
+  /** من يعدّل النسبة: الإدارة فقط، أو يحق للمورد طلب تغييرها (والإدارة توافق) */
+  platformFeeEditPolicy: z.enum(['ADMIN_ONLY', 'SUPPLIER_REQUEST']),
   // ── الدفع اليدوي (اشتراكات وإعلانات الموردين) ──
   /** اسم البنك الذي يُحوَّل إليه */
   paymentBankName: z.string().trim().max(80),
@@ -130,6 +135,8 @@ export const DEFAULT_SETTINGS: Settings = {
   supplierApprovalRequired: true,
   hideContactsUntilAward: true,
   subscriptionReminderDays: 7,
+  platformFeeDefault: 2,
+  platformFeeEditPolicy: 'ADMIN_ONLY',
   paymentBankName: 'بنك الاتحاد',
   paymentAccountName: 'طارق',
   paymentCliq: '0781400353',

@@ -37,7 +37,7 @@ async function vendorProduct(agent: Agent, data: Partial<{ name: string; price: 
     specs: data.specs ?? { size: 'M', color: 'أزرق' },
   });
   if (res.status !== 201) throw new Error(JSON.stringify(res.body));
-  return res.body.data as { id: string; slug: string; approvalStatus: string };
+  return res.body.data as { id: string; slug: string; approvalStatus: string; price: number; platformFeePercent: number };
 }
 
 describe('الأقسام الديناميكية', () => {
@@ -170,6 +170,11 @@ describe('الطلب متعدد الموردين', () => {
     const pa = await vendorProduct(a.agent, { name: 'قميص', price: 20, stock: 5 });
     const pb = await vendorProduct(b.agent, { name: 'بنطال', price: 40, stock: 5 });
     for (const p of [pa, pb]) await admin.post(`/api/v1/admin/store/products/${p.id}/approve`);
+    // النسبة لكل منتج: قميص بالافتراضي 2%، والإدارة ترفع البنطال إلى 5% → سعر العميل 42
+    expect(pa.platformFeePercent).toBe(2);
+    expect(pa.price).toBe(20.4);
+    const setFee = await admin.patch(`/api/v1/admin/store/products/${pb.id}`).send({ platformFeePercent: 5 });
+    expect(setFee.body.data.price).toBe(42);
     const house = await createProduct({ name: 'كرسي حديقة', price: 50, discountPercent: 10, stock: 5 });
 
     const shopper = await createCustomer({ name: buyer.name, phone: buyer.phone });
@@ -183,30 +188,37 @@ describe('الطلب متعدد الموردين', () => {
     });
     expect(res.status).toBe(201);
     const d = res.body.data;
-    expect(d.total).toBe(125);
+    // 2 × 20.4 + 42 + 45
+    expect(d.total).toBe(127.8);
     expect(d.vendorOrders).toHaveLength(3);
     expect(d.message).toContain('[متجر أ — طلب فرعي #');
     expect(d.items[0].commissionAmount).toBeUndefined();
 
     const items = await prisma.orderItem.findMany({ where: { orderId: d.id } });
     const byName = Object.fromEntries(items.map((i) => [i.name, i]));
-    expect(byName['قميص'].commissionPercent.toNumber()).toBe(10);
-    expect(byName['قميص'].commissionAmount.toNumber()).toBe(4);
-    expect(byName['قميص'].vendorNet.toNumber()).toBe(36);
-    expect(byName['بنطال'].commissionAmount.toNumber()).toBe(6);
-    expect(byName['بنطال'].vendorNet.toNumber()).toBe(34);
+    // لكل منتج نسبته: 2 × 20 × 2% = 0.8، و40 × 5% = 2
+    expect(byName['قميص'].platformFeePercent!.toNumber()).toBe(2);
+    expect(byName['قميص'].platformFeeAmount!.toNumber()).toBe(0.8);
+    expect(byName['قميص'].supplierUnitPrice!.toNumber()).toBe(20);
+    expect(byName['قميص'].commissionAmount.toNumber()).toBe(0.8);
+    expect(byName['قميص'].vendorNet.toNumber()).toBe(40);
+    expect(byName['بنطال'].platformFeePercent!.toNumber()).toBe(5);
+    expect(byName['بنطال'].platformFeeAmount!.toNumber()).toBe(2);
+    expect(byName['بنطال'].vendorNet.toNumber()).toBe(40);
     // المورد الافتراضي: كل الإيراد للشركة
     expect(byName['كرسي حديقة'].vendorNet.toNumber()).toBe(0);
 
     expect((await prisma.product.findUniqueOrThrow({ where: { id: pa.id } })).stock).toBe(3);
 
-    // تغيير العمولة لاحقًا لا يغيّر الطلبات السابقة
-    await admin.patch(`/api/v1/admin/vendors/${a.vendor.id}`).send({ commissionPercent: 50 });
-    expect((await prisma.orderItem.findUniqueOrThrow({ where: { id: byName['قميص'].id } })).commissionAmount.toNumber()).toBe(4);
+    // تغيير النسبة لاحقًا (2% → 7%) لا يغيّر الطلبات السابقة
+    await admin.patch(`/api/v1/admin/store/products/${pa.id}`).send({ platformFeePercent: 7 });
+    const kept = await prisma.orderItem.findUniqueOrThrow({ where: { id: byName['قميص'].id } });
+    expect(kept.platformFeeAmount!.toNumber()).toBe(0.8);
+    expect(kept.platformFeePercent!.toNumber()).toBe(2);
 
     const vo = (await a.agent.get('/api/v1/vendor/orders')).body.data.items[0];
     expect(vo.items).toHaveLength(1);
-    expect(vo.vendorNet).toBe(36);
+    expect(vo.vendorNet).toBe(40);
     expect(vo.order.address).toBe(buyer.address);
 
     const acc = (await shopper.get('/api/v1/account/overview')).body.data.orders[0];
@@ -255,22 +267,23 @@ describe('التقرير المالي والتسوية', () => {
 
     const report = (await admin.get('/api/v1/admin/vendors/report')).body.data;
     const row = report.rows.find((r: { vendor: { id: string } }) => r.vendor.id === a.vendor.id);
-    expect(row.salesTotal).toBe(60);
-    expect(row.commissionTotal).toBe(6);
-    expect(row.vendorNetTotal).toBe(54);
-    expect(row.due).toBe(36);
-    expect(row.pending).toBe(18);
+    // 3 وحدات × 20.4 (سعر المورد 20 + فرجار 2%)
+    expect(row.salesTotal).toBe(61.2);
+    expect(row.commissionTotal).toBe(1.2);
+    expect(row.vendorNetTotal).toBe(60);
+    expect(row.due).toBe(40);
+    expect(row.pending).toBe(20);
 
     expect((await admin.post(`/api/v1/admin/vendors/${a.vendor.id}/payouts`).send({ expectedAmount: 50 })).status).toBe(409);
-    const payout = await admin.post(`/api/v1/admin/vendors/${a.vendor.id}/payouts`).send({ expectedAmount: 36, reference: 'TRX-1' });
+    const payout = await admin.post(`/api/v1/admin/vendors/${a.vendor.id}/payouts`).send({ expectedAmount: 40, reference: 'TRX-1' });
     expect(payout.status).toBe(201);
-    expect(payout.body.data.amount).toBe(36);
-    expect(payout.body.data.commissionTotal).toBe(4);
+    expect(payout.body.data.amount).toBe(40);
+    expect(payout.body.data.commissionTotal).toBe(0.8);
     expect((await admin.post(`/api/v1/admin/vendors/${a.vendor.id}/payouts`).send({})).status).toBe(400);
 
     const earnings = (await a.agent.get('/api/v1/vendor/earnings')).body.data;
     expect(earnings.totals.due).toBe(0);
-    expect(earnings.totals.paid).toBe(36);
+    expect(earnings.totals.paid).toBe(40);
     expect(earnings.payouts).toHaveLength(1);
 
     // الطلب المسوّى لا تتغير حالته

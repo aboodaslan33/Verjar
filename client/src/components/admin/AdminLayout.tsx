@@ -62,6 +62,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     group: 'الحسابات',
     items: [
       { to: '/admin/finance', label: 'المالية', perm: ['payments.view'] },
+      { to: '/admin/fees', label: 'نسبة فرجار', perm: ['reports.view'] },
       { to: '/admin/reports', label: 'التقارير', k: 'admin.reports', perm: ['reports.view'] },
       { to: '/admin/customers', label: 'العملاء', perm: ['customers.view'] },
       { to: '/admin/newsletter', label: 'النشرة البريدية', perm: ['newsletter.manage'] },

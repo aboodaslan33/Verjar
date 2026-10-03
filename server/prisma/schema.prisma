@@ -338,9 +338,11 @@ model Category {
   deletedAt  DateTime?
 
   /// مجموعة العمولة الافتراضية للقسم (قطع غيار، معدات…) — تُستخدم في قواعد العمولات
-  commissionGroup String?
+  commissionGroup    String?
   /// وصف قصير يظهر في صفحة السوق
-  description     String?
+  description        String?
+  /// نسبة فرجار الافتراضية لمنتجات هذا القسم (فارغ = الافتراضي العام). تُطبّق عند إنشاء المنتج
+  platformFeePercent Decimal? @db.Decimal(5, 2)
 
   parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id])
   children        Category[]       @relation("CategoryTree")
@@ -361,8 +363,10 @@ model Vendor {
   description               String       @default("")
   logoUrl                   String?
   logoPublicId              String?
-  /// نسبة عمولة المنصة من كل بيع (0–100)
+  /// نسبة عمولة المنصة من كل بيع (0–100) — نظام قديم، حلّت محله نسبة فرجار لكل منتج
   commissionPercent         Decimal      @default(10) @db.Decimal(5, 2)
+  /// نسبة فرجار الافتراضية لمنتجات هذا المورد (فارغ = حسب القسم أو الافتراضي العام). تُطبّق عند إنشاء المنتج
+  platformFeePercent        Decimal?     @db.Decimal(5, 2)
   /// سحب صلاحية المورد: لا يدخل اللوحة ولا تظهر منتجاته
   active                    Boolean      @default(true)
   isHouse                   Boolean      @default(false)
@@ -441,49 +445,57 @@ model Vendor {
 }
 
 model Product {
-  id              String          @id @default(cuid())
-  name            String
-  slug            String          @unique
-  description     String
-  /// السعر الأصلي بالدينار (3 خانات عشرية = فلس)
-  price           Decimal         @db.Decimal(10, 3)
+  id                 String          @id @default(cuid())
+  name               String
+  slug               String          @unique
+  description        String
+  /// سعر المورد قبل نسبة فرجار — يدخله المورد
+  supplierPrice      Decimal         @default(0) @db.Decimal(10, 3)
+  /// نسبة فرجار لهذا المنتج (تحددها الإدارة، الافتراضي 2%)
+  platformFeePercent Decimal         @default(2) @db.Decimal(5, 2)
+  /// طلب المورد تغيير النسبة (عند السماح بذلك في الإعدادات)
+  feeRequestPercent  Decimal?        @db.Decimal(5, 2)
+  feeRequestNote     String?
+  feeRequestAt       DateTime?
+  /// سعر العميل الأصلي بالدينار = سعر المورد × (1 + نسبة فرجار) — يُحسب في الخادم فقط (3 خانات عشرية = فلس)
+  price              Decimal         @db.Decimal(10, 3)
   /// نسبة الخصم 0–90
-  discountPercent Int             @default(0)
+  discountPercent    Int             @default(0)
   /// السعر النهائي بعد الخصم — يُحسب تلقائيًا عند الحفظ
-  finalPrice      Decimal         @db.Decimal(10, 3)
-  stock           Int             @default(0)
-  visible         Boolean         @default(true)
-  featured        Boolean         @default(false)
-  categoryId      String
-  vendorId        String
+  finalPrice         Decimal         @db.Decimal(10, 3)
+  stock              Int             @default(0)
+  visible            Boolean         @default(true)
+  featured           Boolean         @default(false)
+  categoryId         String
+  vendorId           String
   /// منتجات الموردين تظهر بعد موافقة الإدارة
-  approvalStatus  ProductApproval @default(PENDING)
-  rejectionReason String?
+  approvalStatus     ProductApproval @default(PENDING)
+  rejectionReason    String?
   /// المواصفات حسب حقول القسم، مثل { "size": "L", "color": "أسود" }
-  specs           Json            @default("{}")
+  specs              Json            @default("{}")
   // ── بيانات صناعية (B2B) ──
-  sku             String?
+  sku                String?
   /// رقم القطعة لدى الشركة المصنعة
-  partNumber      String?
-  manufacturer    String?
-  brand           String?
-  originCountry   String?
+  partNumber         String?
+  manufacturer       String?
+  brand              String?
+  originCountry      String?
   /// السعر عند الطلب: لا يظهر السعر ويُطلب عرض سعر
-  priceOnRequest  Boolean         @default(false)
-  minOrderQty     Int             @default(1)
-  availability    Availability    @default(IN_STOCK)
+  priceOnRequest     Boolean         @default(false)
+  minOrderQty        Int             @default(1)
+  availability       Availability    @default(IN_STOCK)
   /// مدة التوريد بالأيام (تقريبية)
-  leadTimeDays    Int?
-  warranty        String?
-  videoUrl        String?
+  leadTimeDays       Int?
+  warranty           String?
+  videoUrl           String?
   /// كلمات مفتاحية للبحث (مفصولة بفواصل)
-  keywords        String?
+  keywords           String?
   /// الملفات الفنية والكتالوج: [{ url, name, kind }]
-  documents       Json            @default("[]")
-  views           Int             @default(0)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  deletedAt       DateTime?
+  documents          Json            @default("[]")
+  views              Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  deletedAt          DateTime?
 
   category   Category       @relation(fields: [categoryId], references: [id])
   vendor     Vendor         @relation(fields: [vendorId], references: [id])
@@ -637,23 +649,27 @@ model VendorOrder {
 }
 
 model OrderItem {
-  id                String  @id @default(cuid())
-  orderId           String
-  vendorOrderId     String
-  vendorId          String
+  id                 String   @id @default(cuid())
+  orderId            String
+  vendorOrderId      String
+  vendorId           String
   /// فارغ لبنود طلبات التوصيل التي يكتبها المورد (بدون منتج من المتجر)
-  productId         String?
+  productId          String?
   /// نسخة من اسم المنتج وقت الطلب
-  name              String
-  unitPrice         Decimal @db.Decimal(10, 3)
-  discountPercent   Int     @default(0)
-  unitFinalPrice    Decimal @db.Decimal(10, 3)
-  quantity          Int
-  lineTotal         Decimal @db.Decimal(10, 3)
+  name               String
+  unitPrice          Decimal  @db.Decimal(10, 3)
+  discountPercent    Int      @default(0)
+  unitFinalPrice     Decimal  @db.Decimal(10, 3)
+  quantity           Int
+  lineTotal          Decimal  @db.Decimal(10, 3)
   /// نسبة العمولة وقت البيع والمبالغ المحسوبة منها — تُحفظ ولا يُعاد حسابها
-  commissionPercent Decimal @db.Decimal(5, 2)
-  commissionAmount  Decimal @db.Decimal(10, 3)
-  vendorNet         Decimal @db.Decimal(10, 3)
+  commissionPercent  Decimal  @db.Decimal(5, 2)
+  commissionAmount   Decimal  @db.Decimal(10, 3)
+  vendorNet          Decimal  @db.Decimal(10, 3)
+  /// لقطة نسبة فرجار وقت الطلب: سعر المورد للوحدة بعد الخصم، النسبة، ومبلغ فرجار للبند كاملًا — لا تتغير بتغيير نسبة المنتج لاحقًا
+  supplierUnitPrice  Decimal? @db.Decimal(10, 3)
+  platformFeePercent Decimal? @db.Decimal(5, 2)
+  platformFeeAmount  Decimal? @db.Decimal(10, 3)
 
   order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vendorOrder VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)

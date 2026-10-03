@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConfirmDialog } from '../admin/ConfirmDialog';
 import { useMutation } from '../admin/hooks';
-import type { AdminProduct, ProductMedia } from '../admin/types';
+import type { AdminProduct, FeeEditPolicy, ProductMedia } from '../admin/types';
 import { AdminPage, FieldError, Panel } from '../admin/ui';
 import { Alert, Button, ButtonLink, Checkbox, Icon, Input, Select, Tag, Textarea } from '../ui';
 import { api } from '../../lib/api';
@@ -94,7 +94,11 @@ export function ProductEditorForm({
   const [name, setName] = useState(product?.name ?? '');
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
-  const [price, setPrice] = useState(product ? String(product.price) : '');
+  // المورد يدخل سعره فقط؛ سعر العميل = سعر المورد × (1 + نسبة فرجار) ويُحسب في الخادم (هنا للعرض فقط)
+  const [price, setPrice] = useState(product ? String(product.supplierPrice ?? product.price) : '');
+  const isHouse = isAdmin && (!product || !product.vendor || product.vendor.isHouse);
+  const [fee, setFee] = useState(product ? String(product.platformFeePercent ?? 0) : '');
+  const [preview, setPreview] = useState<{ feePercent: number; policy: FeeEditPolicy } | null>(null);
   const [discount, setDiscount] = useState(product ? String(product.discountPercent) : '0');
   const [stock, setStock] = useState(product ? String(product.stock) : '0');
   const [visible, setVisible] = useState(product?.visible ?? true);
@@ -120,10 +124,27 @@ export function ProductEditorForm({
   const [reason, setReason] = useState('');
   const fields = categories.find((c) => c.id === categoryId)?.fields ?? [];
 
+  // منتج جديد للمورد: النسبة المتوقعة حسب القسم (المورد ← القسم ← الافتراضي)
+  useEffect(() => {
+    if (isAdmin || product) return;
+    let live = true;
+    api
+      .get<{ feePercent: number; policy: FeeEditPolicy }>(`/vendor/fee-preview${categoryId ? `?categoryId=${categoryId}` : ''}`)
+      .then((r) => live && setPreview(r))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [isAdmin, product, categoryId]);
+
   const priceN = Number(price) || 0;
+  const feeN = isHouse ? 0 : isAdmin ? Number(fee) || 0 : product ? product.platformFeePercent : preview?.feePercent ?? 0;
+  const customerN = Math.round(priceN * (1 + feeN / 100) * 1000) / 1000;
   const discN = Math.round(Number(discount) || 0);
-  const finalN = applyDiscount(priceN, discN);
+  const finalN = applyDiscount(customerN, discN);
   const discountInvalid = discN < 0 || discN > 90;
+  const feeInvalid = isAdmin && !isHouse && (feeN < 0 || feeN > 50);
+  const feePolicy = product?.feePolicy ?? preview?.policy ?? 'ADMIN_ONLY';
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -131,7 +152,8 @@ export function ProductEditorForm({
       name: name.trim(),
       categoryId,
       description: description.trim(),
-      price: priceN,
+      supplierPrice: priceN,
+      ...(isAdmin && !isHouse ? { platformFeePercent: feeN } : {}),
       discountPercent: discN,
       stock: Math.round(Number(stock) || 0),
       visible,
@@ -186,6 +208,16 @@ export function ProductEditorForm({
     }
   };
 
+  const decideFee = async (decision: 'approve' | 'reject') => {
+    if (!product) return;
+    const r = await m.run(
+      `fee-${decision}`,
+      () => api.post(`/admin/store/products/${product.id}/fee-request/${decision}`),
+      decision === 'approve' ? 'تم اعتماد النسبة الجديدة' : 'تم رفض طلب تغيير النسبة',
+    );
+    if (r) onReload();
+  };
+
   const fe = m.fieldErrors;
 
   return (
@@ -227,6 +259,22 @@ export function ProductEditorForm({
         <Alert tone="info" className="mb-6">
           المنتج بانتظار موافقة الإدارة ولن يظهر في المتجر قبلها. تعديل الاسم أو الوصف أو القسم أو المواصفات أو الصور يعيده للمراجعة.
         </Alert>
+      )}
+      {isAdmin && product && product.feeRequestPercent != null && (
+        <Panel title="طلب تغيير نسبة فرجار" className="mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="me-auto text-sm">
+              يطلب المورد تغيير النسبة من <b dir="ltr">{product.platformFeePercent}%</b> إلى <b dir="ltr">{product.feeRequestPercent}%</b>
+              {product.feeRequestNote ? ` — ${product.feeRequestNote}` : ''}
+            </p>
+            <Button size="sm" loading={m.pending === 'fee-approve'} onClick={() => decideFee('approve')}>
+              <Icon name="check" className="h-4 w-4" /> اعتماد النسبة
+            </Button>
+            <Button size="sm" variant="outline" loading={m.pending === 'fee-reject'} onClick={() => decideFee('reject')}>
+              رفض
+            </Button>
+          </div>
+        </Panel>
       )}
       {isAdmin && product && product.approvalStatus !== 'APPROVED' && (
         <Panel title="مراجعة المنتج" className="mb-6">
@@ -325,7 +373,7 @@ export function ProductEditorForm({
               {!priceOnRequest && (
               <>
               <Input
-                label="السعر (د.أ)"
+                label={isHouse ? 'السعر (د.أ)' : isAdmin ? 'سعر المورد (د.أ)' : 'سعرك — سعر المورد (د.أ)'}
                 type="number"
                 inputMode="decimal"
                 min={0}
@@ -333,8 +381,24 @@ export function ProductEditorForm({
                 className="ltr text-start"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                error={fe.price}
+                error={fe.supplierPrice ?? fe.price}
+                hint={isHouse ? undefined : 'يُضاف إليه نسبة فرجار تلقائيًا ليصبح سعر العميل'}
               />
+              {isAdmin && !isHouse && (
+                <Input
+                  label="نسبة فرجار %"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={50}
+                  step="0.01"
+                  className="ltr text-start"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                  error={fe.platformFeePercent ?? (feeInvalid ? 'النسبة بين 0 و 50%' : undefined)}
+                  hint="تؤثر على الطلبات الجديدة فقط — الطلبات السابقة محفوظة بنسبتها"
+                />
+              )}
               <Input
                 label="نسبة الخصم %"
                 type="number"
@@ -347,19 +411,43 @@ export function ProductEditorForm({
                 onChange={(e) => setDiscount(e.target.value)}
                 error={fe.discountPercent ?? (discountInvalid ? 'الخصم بين 0 و 90%' : undefined)}
               />
+              {!isHouse && (
+                <dl className="space-y-1.5 rounded-xl border border-line p-3 text-sm" aria-live="polite">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">سعر المورد</dt>
+                    <dd className="tabular-nums">{formatJOD(priceN)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">
+                      نسبة فرجار <span dir="ltr">({feeN}%)</span>
+                    </dt>
+                    <dd className="tabular-nums">{formatJOD(customerN - priceN)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t border-line pt-1.5 font-semibold">
+                    <dt>سعر العميل</dt>
+                    <dd className="tabular-nums">{formatJOD(customerN)}</dd>
+                  </div>
+                  {!isAdmin && (
+                    <p className="pt-1 text-xs text-muted">
+                      {feePolicy === 'SUPPLIER_REQUEST' ? 'النسبة تحددها الإدارة، ويمكنك طلب تغييرها من صفحة المنتج.' : 'النسبة تحددها إدارة فرجار ولا يمكن تعديلها من حسابك.'}
+                    </p>
+                  )}
+                </dl>
+              )}
+              {!isAdmin && product && feePolicy === 'SUPPLIER_REQUEST' && <FeeRequest product={product} onDone={onReload} />}
               <div className="rounded-xl border border-line bg-subtle/50 p-3" aria-live="polite">
                 <p className="text-xs text-muted">السعر للعميل</p>
                 <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
                   <span className="text-2xl font-bold tabular-nums">{formatJOD(finalN)}</span>
                   {discN > 0 && priceN > 0 && !discountInvalid && (
                     <>
-                      <s className="text-sm text-muted">{formatJOD(priceN)}</s>
+                      <s className="text-sm text-muted">{formatJOD(customerN)}</s>
                       <span className="rounded-md bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-fg">خصم {discN}%</span>
                     </>
                   )}
                 </div>
                 {discN > 0 && priceN > 0 && !discountInvalid && (
-                  <p className="mt-1 text-xs text-muted">يوفر العميل {formatJOD(priceN - finalN)}</p>
+                  <p className="mt-1 text-xs text-muted">يوفر العميل {formatJOD(customerN - finalN)}</p>
                 )}
               </div>
               </>
@@ -627,5 +715,48 @@ function DocumentsManager({ product, apiBase }: { product: AdminProduct; apiBase
       </label>
       {m.error && <p className="mt-2 text-sm text-danger">{m.error}</p>}
     </Panel>
+  );
+}
+
+/** طلب المورد تغيير نسبة فرجار (عند سماح الإدارة بذلك) */
+function FeeRequest({ product, onDone }: { product: AdminProduct; onDone: () => void }) {
+  const m = useMutation();
+  const [open, setOpen] = useState(false);
+  const [percent, setPercent] = useState('');
+  const [note, setNote] = useState('');
+  if (product.feeRequestPercent != null) {
+    return (
+      <Alert tone="info">
+        طلبت تغيير النسبة إلى <span dir="ltr">{product.feeRequestPercent}%</span> — بانتظار رد الإدارة.
+      </Alert>
+    );
+  }
+  if (!open) {
+    return (
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
+        طلب تغيير النسبة
+      </Button>
+    );
+  }
+  const send = async () => {
+    const r = await m.run('fee', () => api.post(`/vendor/products/${product.id}/fee-request`, { percent: Number(percent), note: note.trim() || null }), 'تم إرسال الطلب للإدارة');
+    if (r) {
+      setOpen(false);
+      onDone();
+    }
+  };
+  return (
+    <div className="space-y-3 rounded-xl border border-line p-3">
+      <Input label="النسبة المطلوبة %" type="number" inputMode="decimal" min={0} max={50} step="0.01" className="ltr text-start" value={percent} onChange={(e) => setPercent(e.target.value)} error={m.fieldErrors.percent} />
+      <Input label="السبب" optional value={note} onChange={(e) => setNote(e.target.value)} />
+      <div className="flex gap-2">
+        <Button type="button" size="sm" loading={m.pending === 'fee'} disabled={percent.trim() === ''} onClick={send}>
+          إرسال الطلب
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
   );
 }

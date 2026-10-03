@@ -25,7 +25,8 @@ describe('إحصائيات المنصة والتميز والمكافآت', () =
     vendorId = v.vendor.id;
     vendorAgent = v.agent;
     await prisma.vendor.update({ where: { id: vendorId }, data: { status: 'APPROVED' } });
-    productId = (await createProduct({ name: 'مضخة مياه', price: 100, discountPercent: 0, stock: 50, vendorId })).id;
+    // سعر المورد 90 وسعر العميل 100 → فرجار 10 على كل وحدة
+    productId = (await createProduct({ name: 'مضخة مياه', price: 100, supplierPrice: 90, platformFeePercent: 11.11, discountPercent: 0, stock: 50, vendorId })).id;
     buyer = await createCustomer({ name: 'مصنع الأغذية', phone: '0771234000', email: 'food@factory.jo' });
     buyerId = (await buyer.get('/api/v1/auth/me')).body.data.id;
   });
@@ -49,7 +50,7 @@ describe('إحصائيات المنصة والتميز والمكافآت', () =
     expect(res.status).toBe(200);
     const m = res.body.data.metrics;
     expect(m).toMatchObject({ storeOrders: 2, storeSales: 400, productsSold: 4, avgOrderValue: 200, activeCustomers: 2, returningCustomers: 1, activeSuppliers: 1 });
-    // عمولة 10% على مبيعات المورد = 40 → من إيرادات FARJAR
+    // نسبة فرجار 10 لكل وحدة × 4 = 40 → من إيرادات FARJAR
     expect(m.farjarCommissions).toBe(40);
     expect(res.body.data.breakdown.topProducts[0]).toMatchObject({ name: 'مضخة مياه', quantity: 4 });
     expect(res.body.data.breakdown.topSuppliers[0]).toMatchObject({ id: vendorId, sales: 400 });

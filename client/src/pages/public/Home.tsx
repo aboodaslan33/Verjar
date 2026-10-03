@@ -52,13 +52,30 @@ const SERVICES: Service[] = [
 export default function Home() {
   useDocumentTitle('');
   const { settings } = useSite();
-  const featured = useAsync(() => api.get<Paged<Product>>('/store/products', { featured: true, pageSize: 4 }), [], 'home/featured');
+  // المميزة أولًا ثم الأحدث (ترتيب المتجر الافتراضي)
+  const featured = useAsync(() => api.get<Paged<Product>>('/store/products', { pageSize: 8 }), [], 'home/products');
   const featuredItems = featured.data?.items ?? [];
   const showFeatured = featured.loading || featuredItems.length > 0;
 
   return (
     <>
       <Hero />
+      {/* ——— المنتجات أولًا: أول ما يراه العميل بعد الواجهة ——— */}
+      {showFeatured && !featured.error && (
+        <section className="section" aria-labelledby="store-title">
+          <div className="container">
+            <SectionHeading id="store-title" eyebrow="السوق" title="منتجات السوق" link={{ to: '/store', label: 'تصفح السوق' }} />
+            <div className="mt-10">
+              {featured.loading ? (
+                <ProductGridSkeleton count={8} className={PRODUCT_GRID} />
+              ) : (
+                <div className={PRODUCT_GRID} data-reveal-group>
+                  {featuredItems.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              )}
+
 
       {/* ——— للمصانع: الصيانة الصناعية أساس النشاط ——— */}
       <section className="section border-b border-line" aria-labelledby="corp-title">
@@ -105,22 +122,6 @@ export default function Home() {
           </ul>
         </div>
       </section>
-
-      {/* ——— من السوق ——— */}
-      {showFeatured && !featured.error && (
-        <section className="section" aria-labelledby="store-title">
-          <div className="container">
-            <SectionHeading id="store-title" eyebrow="السوق" title="منتجات مختارة من السوق" link={{ to: '/store', label: 'تصفح السوق' }} />
-            <div className="mt-10">
-              {featured.loading ? (
-                <ProductGridSkeleton count={4} className={PRODUCT_GRID} />
-              ) : (
-                <div className={PRODUCT_GRID} data-reveal-group>
-                  {featuredItems.map((p) => (
-                    <ProductCard key={p.id} product={p} />
-                  ))}
-                </div>
-              )}
 
       {/* ——— كيف نعمل: شريط خطوات أفقي على خط قياس ——— */}
       <section className="border-b border-line bg-bg" aria-labelledby="process-title">

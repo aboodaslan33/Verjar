@@ -11,6 +11,7 @@ import ExcelJS from 'exceljs';
 import type { DeliveryStatus } from '@prisma/client';
 import { DELIVERED_SET, FAILURES, STATUS_AR } from '../../services/delivery.service';
 import { driverPerformance, orderFilters, orderWhere } from './delivery';
+import { type FeeFilters, feeReport } from '../../market/feeReport';
 
 /**
  * التقارير: كل تقرير يعيد أعمدة (بالعربية والإنجليزية) وصفوفًا وإجماليات،
@@ -22,7 +23,7 @@ type Col = { key: string; ar: string; en: string; money?: boolean };
 type Report = { columns: Col[]; rows: Record<string, unknown>[]; totals: Record<string, number> };
 
 const KINDS = [
-  'sales', 'orders', 'delivery', 'cod', 'settlements', 'contracts', 'annual', 'pest', 'tenders', 'commissions',
+  'sales', 'orders', 'delivery', 'cod', 'settlements', 'contracts', 'annual', 'pest', 'tenders', 'commissions', 'platform_fees',
   // نظام إدارة التوصيل
   'dm_orders', 'dm_delivered', 'dm_failed', 'dm_collections', 'dm_drivers', 'dm_suppliers', 'dm_customers', 'dm_fees',
 ] as const;
@@ -37,7 +38,42 @@ function range(from?: string, to?: string) {
   return { ...(from ? { gte: ammanToUtc(from, '00:00') } : {}), ...(to ? { lte: ammanToUtc(to, '23:59') } : {}) };
 }
 
-type Query = { from?: string; to?: string; status?: string; supplierId?: string; driverId?: string; area?: string; paymentMethod?: string; customer?: string };
+type Query = {
+  from?: string;
+  to?: string;
+  status?: string;
+  supplierId?: string;
+  driverId?: string;
+  area?: string;
+  paymentMethod?: string;
+  customer?: string;
+  productId?: string;
+  categoryId?: string;
+  feeMin?: number;
+  feeMax?: number;
+  financialStatus?: string;
+  settled?: 'true' | 'false';
+};
+
+const STATUSES = ['NEW', 'UNDER_REVIEW', 'PRICED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
+const FIN = ['PAID', 'COD', 'PARTIAL_PAYMENT', 'PAYMENT_PENDING', 'COLLECTED', 'NOT_COLLECTED'] as const;
+
+/** فلاتر تقرير نسبة فرجار من الاستعلام (قيم غير معروفة تُتجاهل) */
+function feeFilters(q: Query): FeeFilters {
+  const r = range(q.from, q.to);
+  return {
+    vendorId: q.supplierId || undefined,
+    productId: q.productId || undefined,
+    categoryId: q.categoryId || undefined,
+    feeMin: q.feeMin,
+    feeMax: q.feeMax,
+    status: (STATUSES as readonly string[]).includes(q.status ?? '') ? (q.status as FeeFilters['status']) : undefined,
+    financialStatus: (FIN as readonly string[]).includes(q.financialStatus ?? '') ? (q.financialStatus as FeeFilters['financialStatus']) : undefined,
+    settled: q.settled === undefined ? undefined : q.settled === 'true',
+    from: r?.gte,
+    to: r?.lte,
+  };
+}
 
 async function build(kind: Kind, q: Query): Promise<Report> {
   if (kind.startsWith('dm_')) return buildDelivery(kind, q);
@@ -223,6 +259,35 @@ async function build(kind: Kind, q: Query): Promise<Report> {
         totals: { count: rows.length, awarded: rows.filter((x) => x.status === 'AWARDED').length, awardedAmount: sum(rows, 'awardedAmount'), commissionAmount: sum(rows, 'commissionAmount') },
       };
     }
+    case 'platform_fees': {
+      const rep = await feeReport(feeFilters(q), { lines: 0 });
+      const rows = rep.byProduct.map((p) => ({
+        product: p.name,
+        supplier: p.vendor?.name ?? '',
+        category: p.category ?? '',
+        percent: p.currentFeePercent ?? '',
+        units: p.units,
+        remaining: p.remaining,
+        sales: p.sales,
+        supplierNet: p.supplierNet,
+        fees: p.fees,
+      }));
+      return {
+        columns: [
+          c('product', 'المنتج', 'Product'),
+          c('supplier', 'المورد', 'Supplier'),
+          c('category', 'القسم', 'Category'),
+          c('percent', 'نسبة فرجار الحالية %', 'Current Farjar %'),
+          c('units', 'المباع', 'Units sold'),
+          c('remaining', 'المتبقي', 'Remaining'),
+          c('sales', 'المبيعات', 'Sales', true),
+          c('supplierNet', 'مستحق المورد', 'Supplier net', true),
+          c('fees', 'إيراد فرجار', 'Farjar revenue', true),
+        ],
+        rows,
+        totals: { sales: rep.totals.sales, fees: rep.totals.fees, feesSettled: rep.totals.feesSettled, feesOutstanding: rep.totals.feesOutstanding, units: rep.totals.units },
+      };
+    }
     case 'commissions': {
       const [tenders, vendorOrders] = await Promise.all([
         prisma.tender.findMany({ where: { deletedAt: null, status: 'AWARDED', ...(r ? { awardedAt: r } : {}) }, select: { ref: true, title: true, awardedAt: true, awardedAmount: true, commissionPercent: true, commissionAmount: true, providerAmount: true } }),
@@ -246,6 +311,26 @@ async function build(kind: Kind, q: Query): Promise<Report> {
   throw new Error(`unknown report ${kind}`);
 }
 
+const feeQuery = {
+  productId: z.string().max(40).optional(),
+  categoryId: z.string().max(40).optional(),
+  feeMin: z.coerce.number().min(0).max(100).optional(),
+  feeMax: z.coerce.number().min(0).max(100).optional(),
+  financialStatus: z.string().max(30).optional(),
+  settled: z.enum(['true', 'false']).optional(),
+};
+
+/** نسبة فرجار: الإجماليات، حسب المنتج، حسب المورد، وآخر البنود — مع الفلاتر */
+reportsRouter.get(
+  '/fees/overview',
+  asyncHandler(async (req, res) => {
+    const q = z
+      .object({ from: optionalDate, to: optionalDate, status: z.string().max(30).optional(), supplierId: z.string().max(40).optional(), ...feeQuery })
+      .parse(req.query);
+    ok(res, await feeReport(feeFilters(q), { lines: 100 }));
+  }),
+);
+
 reportsRouter.get(
   '/:kind',
   asyncHandler(async (req, res) => {
@@ -260,6 +345,7 @@ reportsRouter.get(
         area: z.string().trim().max(100).optional(),
         paymentMethod: z.string().max(20).optional(),
         customer: z.string().trim().max(100).optional(),
+        ...feeQuery,
         format: z.enum(['json', 'csv', 'xlsx']).default('json'),
         lang: z.enum(['ar', 'en']).default('ar'),
       })

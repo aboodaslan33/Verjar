@@ -76,6 +76,8 @@ export async function createProduct(
     visible: boolean;
     vendorId: string;
     approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+    platformFeePercent: number;
+    supplierPrice: number;
   }> = {},
 ) {
   if (!overrides.vendorId) await ensureHouseVendor();
@@ -86,12 +88,16 @@ export async function createProduct(
   });
   const price = overrides.price ?? 50;
   const discount = overrides.discountPercent ?? 10;
+  // price = سعر العميل؛ سعر المورد يُستخرج من نسبة فرجار (منتجات الشركة بلا نسبة)
+  const fee = overrides.platformFeePercent ?? (!overrides.vendorId || overrides.vendorId === HOUSE_VENDOR_ID ? 0 : 2);
   return prisma.product.create({
     data: {
       name: overrides.name ?? 'كرسي حديقة',
       slug: `p-${Math.random().toString(36).slice(2, 8)}`,
       description: 'وصف',
       price: new Prisma.Decimal(price),
+      supplierPrice: new Prisma.Decimal(overrides.supplierPrice ?? Math.round((price / (1 + fee / 100)) * 1000) / 1000),
+      platformFeePercent: new Prisma.Decimal(fee),
       discountPercent: discount,
       finalPrice: new Prisma.Decimal(Math.round(price * (1 - discount / 100) * 1000) / 1000),
       stock: overrides.stock ?? 10,

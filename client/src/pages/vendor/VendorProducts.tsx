@@ -5,7 +5,7 @@ import { AdminPage, FilterBar, FilterSelect, SearchInput } from '../../component
 import { ApprovalTag } from '../../components/store/ProductEditorForm';
 import { ButtonLink, Icon, Price } from '../../components/ui';
 import { api } from '../../lib/api';
-import { cx } from '../../lib/format';
+import { cx, formatJOD } from '../../lib/format';
 import type { Paged } from '../../lib/types';
 import { useDocumentTitle } from '../../lib/useAsync';
 
@@ -33,11 +33,18 @@ export default function VendorProducts() {
     },
     { key: 'approval', header: 'المراجعة', cell: (p) => <ApprovalTag status={p.approvalStatus} /> },
     { key: 'cat', header: 'القسم', cell: (p) => p.category?.name, hideOnMobile: true },
-    { key: 'price', header: 'السعر', cell: (p) => <Price price={p.price} finalPrice={p.finalPrice} discountPercent={p.discountPercent} size="sm" /> },
+    { key: 'sp', header: 'سعر المورد', cell: (p) => <span className="tabular-nums">{formatJOD(p.pricing?.supplierPrice ?? p.supplierPrice)}</span> },
+    { key: 'fee', header: 'نسبة فرجار', cell: (p) => <span dir="ltr" className="tabular-nums">{p.pricing?.feePercent ?? p.platformFeePercent}%</span> },
+    { key: 'feeAmt', header: 'مبلغ فرجار', cell: (p) => <span className="tabular-nums">{formatJOD(p.pricing?.feeAmount ?? 0)}</span>, hideOnMobile: true },
+    { key: 'price', header: 'سعر العميل', cell: (p) => <Price price={p.price} finalPrice={p.finalPrice} discountPercent={p.discountPercent} size="sm" /> },
     {
-      key: 'stock',
-      header: 'المخزون',
-      cell: (p) => <span className={cx('tabular-nums', p.stock <= 3 && 'font-bold text-danger')}>{p.stock}</span>,
+      key: 'sold',
+      header: 'المباع / المتبقي',
+      cell: (p) => (
+        <span className="tabular-nums">
+          بيع {p.soldUnits ?? 0} · باقي <span className={cx(p.stock <= 3 && 'font-bold text-danger')}>{p.stock}</span>
+        </span>
+      ),
     },
     { key: 'visible', header: 'الظهور', cell: (p) => (p.visible ? 'ظاهر' : <span className="text-muted">مخفي</span>), hideOnMobile: true },
   ];
@@ -45,7 +52,7 @@ export default function VendorProducts() {
   return (
     <AdminPage
       title="منتجاتي"
-      description="المنتجات الجديدة والتعديلات على المحتوى تظهر في المتجر بعد موافقة الإدارة"
+      description="سعر العميل = سعرك + نسبة فرجار، ويُحسب تلقائيًا. المنتجات الجديدة والتعديلات على المحتوى تظهر بعد موافقة الإدارة"
       actions={
         <ButtonLink to="/vendor/products/new" size="sm">
           <Icon name="plus" className="h-4 w-4" /> منتج جديد

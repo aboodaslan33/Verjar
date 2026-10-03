@@ -33,7 +33,11 @@ export default function Vendors() {
             {r.vendor.isHouse && <Tag>الشركة</Tag>}
             {!r.vendor.active && <Tag tone="danger">موقوف</Tag>}
           </span>
-          <span className="block text-xs text-muted">عمولة {r.vendor.commissionPercent}%</span>
+          {!r.vendor.isHouse && (
+            <span className="block text-xs text-muted">
+              نسبة فرجار {r.vendor.platformFeePercent != null ? <span dir="ltr">{r.vendor.platformFeePercent}%</span> : 'حسب المنتج'}
+            </span>
+          )}
         </span>
       ),
     },
@@ -109,7 +113,6 @@ export function GrantDialog({
   const m = useMutation();
   const [search, setSearch] = useState('');
   const [picked, setPicked] = useState<CustomerRow | null>(fixed ?? null);
-  const [commission, setCommission] = useState('10');
   const q = useDebounced(search.trim());
   const results = useAdminQuery(
     () => (q.length >= 2 && !fixed ? api.get<Paged<CustomerRow>>('/admin/customers', { q, pageSize: 6 }) : Promise.resolve(null)),
@@ -122,7 +125,7 @@ export function GrantDialog({
     if (!customer) return;
     const r = await m.run(
       'grant',
-      () => api.post('/admin/vendors', { customerId: customer.id, commissionPercent: Number(commission) }),
+      () => api.post('/admin/vendors', { customerId: customer.id }),
       `أصبح ${customer.name} موردًا`,
     );
     if (r) {
@@ -178,18 +181,7 @@ export function GrantDialog({
             <p className="mt-2 text-xs text-muted">يجب أن يكون العميل مسجّلًا في الموقع بكلمة مرور.</p>
           </div>
         )}
-        <Input
-          label="نسبة العمولة %"
-          type="number"
-          min={0}
-          max={100}
-          step="0.5"
-          className="ltr text-start"
-          value={commission}
-          onChange={(e) => setCommission(e.target.value)}
-          error={m.fieldErrors.commissionPercent}
-          hint="تُطبَّق على الطلبات الجديدة فقط"
-        />
+        <p className="text-sm text-muted">نسبة فرجار على منتجاته تُحدد لكل منتج (الافتراضي من الإعدادات)، ويمكن ضبط نسبة خاصة للمورد من صفحته.</p>
       </div>
     </Modal>
   );

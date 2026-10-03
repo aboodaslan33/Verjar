@@ -1,5 +1,6 @@
 import { useAdminQuery } from '../../components/admin/hooks';
-import type { DueVendorOrder, VendorPayout, VendorTotals } from '../../components/admin/types';
+import type { DueVendorOrder, FeeLine, FeeProductRow, FeeTotals, VendorPayout, VendorTotals } from '../../components/admin/types';
+import { FeeByOrder, FeeByProduct, FeeTiles } from '../../components/admin/FeeTables';
 import { AdminPage, Ltr, Panel, StatTile } from '../../components/admin/ui';
 import { ErrorState } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -7,18 +8,33 @@ import { PAYMENT_METHOD_LABEL, formatDate, formatJOD } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
 
 type Earnings = { totals: VendorTotals; payouts: VendorPayout[]; dueOrders: DueVendorOrder[] };
+type Fees = { totals: FeeTotals; byProduct: FeeProductRow[]; byOrder: FeeLine[] };
 
 export default function VendorEarnings() {
   useDocumentTitle('الأرباح');
   const q = useAdminQuery(() => api.get<Earnings>('/vendor/earnings'), []);
+  const fees = useAdminQuery(() => api.get<Fees>('/vendor/fees'), []);
   if (q.error) return <ErrorState message={q.error.message} onRetry={q.retry} />;
   const t = q.data?.totals;
 
   return (
-    <AdminPage title="الأرباح" description="المبالغ محسوبة بنسبة العمولة وقت كل بيع">
+    <AdminPage title="الأرباح" description="كل بند محسوب بسعرك ونسبة فرجار وقت البيع — تغيير النسبة لاحقًا لا يغيّر الطلبات السابقة">
+      <h2 className="mb-3 text-lg font-bold">نسبة فرجار</h2>
+      {fees.error ? (
+        <ErrorState message={fees.error.message} onRetry={fees.retry} />
+      ) : (
+        <>
+          <FeeTiles totals={fees.data?.totals} loading={fees.loading} supplier />
+          <div className="mb-8 mt-6 grid gap-6 lg:grid-cols-2">
+            <FeeByProduct rows={fees.data?.byProduct ?? []} productHref={(id) => `/vendor/products/${id}`} />
+            <FeeByOrder lines={fees.data?.byOrder ?? []} />
+          </div>
+        </>
+      )}
+      <h2 className="mb-3 text-lg font-bold">المستحقات والدفعات</h2>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="المبيعات" value={formatJOD(t?.salesTotal ?? 0)} sub={`${t?.ordersCount ?? 0} طلب`} loading={q.loading} />
-        <StatTile label="عمولة المنصة" value={formatJOD(t?.commissionTotal ?? 0)} loading={q.loading} />
+        <StatTile label="نسبة فرجار" value={formatJOD(t?.commissionTotal ?? 0)} loading={q.loading} />
         <StatTile label="مستحق لك" value={formatJOD(t?.due ?? 0)} sub={t && t.pending > 0 ? `و${formatJOD(t.pending)} من طلبات قيد التنفيذ` : undefined} tone="warn" loading={q.loading} />
         <StatTile label="استلمت" value={formatJOD(t?.paid ?? 0)} tone="sand" loading={q.loading} />
       </div>
@@ -33,7 +49,7 @@ export default function VendorEarnings() {
                   <span>
                     <span className="block font-medium">طلب #{d.number}</span>
                     <span className="text-xs text-muted">
-                      {formatDate(d.createdAt)} · مبيعات {formatJOD(d.total)} · عمولة {formatJOD(d.commissionTotal)}
+                      {formatDate(d.createdAt)} · مبيعات {formatJOD(d.total)} · فرجار {formatJOD(d.commissionTotal)}
                     </span>
                   </span>
                   <b className="tabular-nums">{formatJOD(d.vendorNet)}</b>

@@ -6,7 +6,7 @@ import { ButtonLink, Icon, SectionHeading, Skeleton } from '../../components/ui'
 import type { IconName } from '../../components/ui/Icon';
 import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
-import type { Category, Product } from '../../lib/types';
+import type { Category, Paged, Product } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
 type AdVendor = { id: string; name: string; slug: string; logoUrl: string | null; verified: boolean; city: string | null; isHouse: boolean; description?: string; plan: { code: string; badge: string | null } | null; awardTitle?: string | null; awardUntil?: string | null };
@@ -43,6 +43,7 @@ export default function MarketHome() {
   const [q, setQ] = useState('');
   const home = useAsync(() => api.get<Home>('/market/home'), [], 'market/home');
   const cats = useAsync(() => api.get<Category[]>('/store/categories'), [], 'store/categories');
+  const latest = useAsync(() => api.get<Paged<Product>>('/store/products', { pageSize: 8 }), [], 'store/latest');
   const h = home.data;
 
   const submit = (e: FormEvent) => {
@@ -129,6 +130,26 @@ export default function MarketHome() {
           )}
         </div>
       </section>
+
+      {/* ——— المنتجات أولًا ——— */}
+      {!latest.error && (latest.loading || (latest.data?.items.length ?? 0) > 0) && (
+        <section className="section pb-4" aria-labelledby="latest-title">
+          <div className="container">
+            <SectionHeading id="latest-title" eyebrow="المنتجات" title="تسوّق المنتجات" link={{ to: '/store?view=all', label: 'كل المنتجات' }} />
+            <div className="mt-8">
+              {latest.loading && !latest.data ? (
+                <ProductGridSkeleton count={8} className={PRODUCT_GRID} />
+              ) : (
+                <div className={PRODUCT_GRID} data-reveal-group>
+                  {latest.data?.items.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ——— التصنيفات ——— */}
       <section className="section pb-8" aria-labelledby="cats-title">

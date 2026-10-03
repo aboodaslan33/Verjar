@@ -15,10 +15,11 @@ import { formLimiter } from '../../middleware/rateLimit';
 import { accountCustomer } from '../../services/customer.service';
 import { effectiveSpecFields, publicProductWhere, specList, visibleCategoryWhere } from '../../services/catalog.service';
 import { customerConfirmationMessage, orderMessage } from '../../services/messages';
-import { splitLine } from '../../services/vendor.service';
+import { lineSplit } from '../../market/fees';
 import { confirmCustomer, notifyAdmin } from '../../services/whatsapp.service';
 import { orderSchema } from '../../validators/order';
 import { bumpStat } from '../../market/stats';
+import { emailSuppliersOfSale } from '../../market/notify';
 
 export const storeRouter = Router();
 
@@ -387,7 +388,7 @@ storeRouter.post(
     const order = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
         where: publicProductWhere({ id: { in: [...qty.keys()] } }),
-        include: { vendor: { select: { id: true, name: true, commissionPercent: true } }, category: { select: { id: true, parentId: true } } },
+        include: { vendor: { select: { id: true, name: true, isHouse: true } }, category: { select: { id: true, parentId: true } } },
       });
       if (products.length !== qty.size) throw badRequest('بعض المنتجات في السلة لم تعد متوفرة، حدّث السلة');
 
@@ -401,12 +402,11 @@ storeRouter.post(
           throw badRequest(p.stock === 0 ? `"${p.name}" غير متوفر حاليًا` : `المتوفر من "${p.name}" ${p.stock} فقط`);
         }
         const unit = toNum(p.price);
-        const unitFinal = toNum(p.finalPrice);
-        const lineTotal = round3(unitFinal * quantity);
+        // نسبة فرجار تُحسب لكل منتج على حدة من بيانات قاعدة البيانات، وتُثبَّت مع البند ولا يُعاد حسابها لاحقًا
+        const split = lineSplit(p, quantity, p.vendor.isHouse);
+        const lineTotal = split.lineTotal;
         subtotal += unit * quantity;
         total += lineTotal;
-        // العمولة تُثبَّت وقت البيع بنسبة المورد الحالية ولا يُعاد حسابها لاحقًا
-        const split = splitLine(lineTotal, toNum(p.vendor.commissionPercent));
         return {
           vendorId: p.vendorId,
           vendorName: p.vendor.name,
@@ -423,6 +423,9 @@ storeRouter.post(
             commissionPercent: new Prisma.Decimal(split.commissionPercent),
             commissionAmount: new Prisma.Decimal(split.commission),
             vendorNet: new Prisma.Decimal(split.vendorNet),
+            supplierUnitPrice: new Prisma.Decimal(split.supplierUnitPrice),
+            platformFeePercent: new Prisma.Decimal(split.feePercent),
+            platformFeeAmount: new Prisma.Decimal(split.feeAmount),
           },
         };
       });
@@ -509,6 +512,8 @@ storeRouter.post(
       entityId: order.id,
     });
     emitAdmin({ type: 'order.created', id: order.id, title: `طلب متجر #${order.number}` });
+    // بريد تلقائي للموردين بما بيع من منتجاتهم (الإشعار داخل الموقع أُنشئ مع الطلب)
+    void emailSuppliersOfSale(order.id).catch((e) => console.error('supplier sale email failed', e));
     await audit({ actorType: 'public', action: 'create', entity: 'order', entityId: order.id });
 
     ok(
@@ -524,7 +529,7 @@ storeRouter.post(
         couponCode: order.couponCode,
         couponDiscount: order.couponDiscount,
         total: order.total,
-        items: order.items.map(({ commissionPercent: _p, commissionAmount: _c, vendorNet: _n, ...it }) => it),
+        items: order.items.map(({ commissionPercent: _p, commissionAmount: _c, vendorNet: _n, supplierUnitPrice: _s, platformFeePercent: _f, platformFeeAmount: _a, ...it }) => it),
         vendorOrders: order.vendorOrders,
         message: order.whatsappText,
         whatsapp: { link: wa.link, sent: wa.sent },

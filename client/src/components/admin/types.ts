@@ -217,6 +217,7 @@ export type AdminCategory = {
   productCount: number;
   childCount: number;
   commissionGroup?: string | null;
+  platformFeePercent?: number | null;
   description?: string | null;
 };
 
@@ -240,6 +241,8 @@ export type AdminVendor = {
   description: string;
   logoUrl: string | null;
   commissionPercent: number;
+  /** نسبة فرجار الافتراضية لمنتجات المورد الجديدة (فارغ = حسب القسم/الافتراضي العام) */
+  platformFeePercent: number | null;
   active: boolean;
   isHouse: boolean;
   createdAt: string;
@@ -310,6 +313,72 @@ export type AdminProduct = {
   keywords: string | null;
   documents: MarketFile[];
   views?: number;
+  /** نسبة فرجار: سعر المورد والنسبة يحسب الخادم منهما سعر العميل */
+  supplierPrice: number;
+  platformFeePercent: number;
+  feeRequestPercent: number | null;
+  feeRequestNote: string | null;
+  feeRequestAt: string | null;
+  pricing?: ProductPricing;
+  soldUnits?: number;
+  soldSales?: number;
+  soldFees?: number;
+  remaining?: number;
+  feePolicy?: FeeEditPolicy;
+};
+
+export type FeeEditPolicy = 'ADMIN_ONLY' | 'SUPPLIER_REQUEST';
+
+export type ProductPricing = {
+  supplierPrice: number;
+  feePercent: number;
+  feeAmount: number;
+  customerPrice: number;
+  finalPrice: number;
+  supplierFinal?: number;
+  feeFinal?: number;
+};
+
+/** تقرير نسبة فرجار (للمورد وللإدارة) */
+export type FeeTotals = { sales: number; supplierNet: number; fees: number; feesSettled: number; feesOutstanding: number; units: number; lines: number };
+export type FeeProductRow = {
+  productId: string;
+  name: string;
+  vendor?: { id: string; name: string } | null;
+  category: string | null;
+  currentFeePercent: number | null;
+  units: number;
+  remaining: number;
+  sales: number;
+  supplierNet: number;
+  fees: number;
+  effectivePercent: number;
+};
+export type FeeLine = {
+  id: string;
+  name: string;
+  productId: string | null;
+  quantity: number;
+  supplierUnitPrice: number;
+  customerUnitPrice: number;
+  feePercent: number;
+  feeAmount: number;
+  lineTotal: number;
+  supplierNet: number;
+  vendor?: { id: string; name: string };
+  orderId: string;
+  orderNumber: number;
+  financialStatus: string | null;
+  vendorOrderNumber: number;
+  status: RequestStatus;
+  settled: boolean;
+  createdAt: string;
+};
+export type FeeOverview = {
+  totals: FeeTotals;
+  byProduct: FeeProductRow[];
+  bySupplier: { vendorId: string; name: string; units: number; sales: number; supplierNet: number; fees: number }[];
+  lines: FeeLine[];
 };
 
 export type ProductionImpact = 'NO_STOP_NEEDED' | 'CANNOT_STOP' | 'PARTIAL_STOP';
@@ -462,7 +531,7 @@ export type SettingsResponse = {
 };
 
 export type AdminEvent = {
-  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending' | 'invoice.proof';
+  type: 'booking.created' | 'order.created' | 'corporate.created' | 'status.changed' | 'product.pending' | 'product.feeRequest' | 'rfq.new' | 'rfq.awarded' | 'supplier.pending' | 'invoice.proof';
   id: string;
   title: string;
   at: string;

@@ -80,7 +80,9 @@ export default function VendorOrderDetail() {
                     <p className="font-medium">{it.name}</p>
                     <p className="text-xs text-muted">
                       {it.quantity} × {formatJOD(it.unitFinalPrice)}
-                      {it.discountPercent > 0 && ` (خصم ${it.discountPercent}%)`} · عمولة {it.commissionPercent}%
+                      {it.discountPercent > 0 && ` (خصم ${it.discountPercent}%)`}
+                      {it.supplierUnitPrice != null && <> · سعرك {formatJOD(it.supplierUnitPrice)}</>} · فرجار{' '}
+                      <span dir="ltr">{it.platformFeePercent ?? it.commissionPercent}%</span> = {formatJOD(it.platformFeeAmount ?? it.commissionAmount)}
                     </p>
                   </div>
                   <b className="tabular-nums">{formatJOD(it.lineTotal)}</b>
@@ -93,7 +95,7 @@ export default function VendorOrderDetail() {
                 <dd className="tabular-nums">{formatJOD(o.total)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted">عمولة المنصة</dt>
+                <dt className="text-muted">نسبة فرجار</dt>
                 <dd className="tabular-nums">− {formatJOD(o.commissionTotal)}</dd>
               </div>
               <div className="flex justify-between border-t border-line pt-2 text-base font-bold">

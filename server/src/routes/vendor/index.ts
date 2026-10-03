@@ -3,9 +3,8 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
 import { emitAdmin } from '../../lib/events';
-import { asyncHandler, badRequest, notFound, ok } from '../../lib/http';
+import { asyncHandler, badRequest, forbidden, notFound, ok } from '../../lib/http';
 import { randomSuffix, slugify } from '../../lib/ids';
-import { applyDiscount } from '../../lib/money';
 import { pageArgs, paged, paginationSchema } from '../../lib/pagination';
 import { prisma } from '../../lib/prisma';
 import { requireVendor } from '../../middleware/auth';
@@ -23,6 +22,8 @@ import { getSettings } from '../../services/settings.service';
 import { notifyCustomer } from '../../services/whatsapp.service';
 import { checkPrice, industrialFields, priceField } from '../../validators/product';
 import { assertProductQuota } from '../../market/plans';
+import { FEE_MAX, pricingData, productPricing, resolveFeePercent } from '../../market/fees';
+import { feeReport } from '../../market/feeReport';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
 import { vendorMarketRouter } from './market';
 
@@ -173,10 +174,15 @@ vendorRouter.get(
 
 // ───────────── المنتجات ─────────────
 
+/**
+ * المورد يدخل سعره هو فقط (supplierPrice، أو price للتوافق مع النسخ السابقة).
+ * نسبة فرجار وسعر العميل لا تُقبل من المتصفح أبدًا — تُحذف هنا وتُحسب في الخادم.
+ */
 const productInput = z.object({
   name: z.string().trim().min(2, 'اسم المنتج مطلوب').max(150),
   description: z.string().trim().min(1, 'الوصف مطلوب').max(5000),
-  price: priceField,
+  supplierPrice: priceField.optional(),
+  price: priceField.optional(),
   ...industrialFields,
   discountPercent: z.coerce.number().int().min(0).max(90, 'الخصم الأقصى 90%').default(0),
   stock: z.coerce.number().int().min(0, 'المخزون لا يكون سالبًا').max(100_000).default(0),
@@ -227,7 +233,70 @@ vendorRouter.get(
       }),
       prisma.product.count({ where }),
     ]);
-    ok(res, paged(items, total, q));
+    const [sold, settings] = await Promise.all([soldUnits(items.map((p) => p.id)), getSettings()]);
+    ok(res, {
+      ...paged(items.map((p) => withFee(p, sold.get(p.id))), total, q),
+      feePolicy: settings.platformFeeEditPolicy,
+    });
+  }),
+);
+
+/** الكميات المباعة لكل منتج (طلبات غير ملغاة) ومبالغها المثبتة وقت البيع */
+async function soldUnits(productIds: string[]) {
+  if (!productIds.length) return new Map<string, { units: number; sales: number; fees: number }>();
+  const rows = await prisma.orderItem.groupBy({
+    by: ['productId'],
+    where: { productId: { in: productIds }, vendorOrder: { status: { not: 'CANCELLED' } }, order: { deletedAt: null } },
+    _sum: { quantity: true, lineTotal: true, platformFeeAmount: true },
+  });
+  return new Map(rows.map((r) => [r.productId!, { units: r._sum.quantity ?? 0, sales: Number(r._sum.lineTotal ?? 0), fees: Number(r._sum.platformFeeAmount ?? 0) }]));
+}
+
+/** تفصيل السعر للمورد: سعره، نسبة فرجار ومبلغها، سعر العميل، والمباع والمتبقي */
+function withFee<T extends { supplierPrice: Prisma.Decimal; platformFeePercent: Prisma.Decimal; discountPercent: number; stock: number }>(
+  p: T,
+  sold?: { units: number; sales: number; fees: number },
+) {
+  const r = productPricing(p.supplierPrice, p.platformFeePercent, p.discountPercent);
+  return {
+    ...p,
+    pricing: { supplierPrice: r.supplierPrice, feePercent: r.feePercent, feeAmount: r.feeAmount, customerPrice: r.price, finalPrice: r.finalPrice, supplierFinal: r.supplierFinal, feeFinal: r.feeFinal },
+    soldUnits: sold?.units ?? 0,
+    soldSales: sold?.sales ?? 0,
+    soldFees: sold?.fees ?? 0,
+    remaining: p.stock,
+  };
+}
+
+/** نسبة فرجار المتوقعة لمنتج جديد في قسم معيّن (للعرض فقط — الحساب الفعلي عند الحفظ) */
+vendorRouter.get(
+  '/fee-preview',
+  asyncHandler(async (req, res) => {
+    const q = z.object({ categoryId: z.string().max(40).optional() }).parse(req.query);
+    const [feePercent, settings] = await Promise.all([resolveFeePercent(prisma, { vendorId: vid(req), categoryId: q.categoryId ?? '' }), getSettings()]);
+    ok(res, { feePercent, policy: settings.platformFeeEditPolicy });
+  }),
+);
+
+/** طلب تغيير نسبة فرجار على منتج — فقط إذا سمحت الإدارة بذلك في الإعدادات */
+vendorRouter.post(
+  '/products/:id/fee-request',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const input = z
+      .object({ percent: z.coerce.number().min(0).max(FEE_MAX, `النسبة القصوى ${FEE_MAX}%`), note: z.string().trim().max(300).optional().nullable() })
+      .parse(req.body);
+    if ((await getSettings()).platformFeeEditPolicy !== 'SUPPLIER_REQUEST') {
+      throw forbidden('تعديل نسبة فرجار متاح للإدارة فقط');
+    }
+    const current = await ownProduct(vid(req), req.params.id);
+    const p = await prisma.product.update({
+      where: { id: current.id },
+      data: { feeRequestPercent: new Prisma.Decimal(input.percent), feeRequestNote: input.note || null, feeRequestAt: new Date() },
+    });
+    emitAdmin({ type: 'product.feeRequest', id: p.id, title: `طلب تغيير نسبة فرجار: ${p.name} (${input.percent}%)` });
+    await audit({ actorType: 'vendor', action: 'fee_request', entity: 'product', entityId: p.id, meta: { vendorId: vid(req), percent: input.percent } });
+    ok(res, { requested: input.percent });
   }),
 );
 
@@ -236,7 +305,8 @@ vendorRouter.get(
   asyncHandler(async (req, res) => {
     const p = await prisma.product.findFirst({ where: { id: req.params.id, vendorId: vid(req), deletedAt: null }, include: productInclude });
     if (!p) throw notFound('المنتج غير موجود');
-    ok(res, p);
+    const [sold, settings] = await Promise.all([soldUnits([p.id]), getSettings()]);
+    ok(res, { ...withFee(p, sold.get(p.id)), feePolicy: settings.platformFeeEditPolicy });
   }),
 );
 
@@ -245,11 +315,14 @@ vendorRouter.post(
   '/products',
   formLimiter,
   asyncHandler(async (req, res) => {
-    const { specs, ...input } = productInput.parse(req.body);
-    const pe = checkPrice(input);
-    if (pe) throw badRequest(pe, { fields: { price: pe } });
+    const { specs, supplierPrice: sp, price: legacyPrice, ...input } = productInput.parse(req.body);
+    const supplierPrice = sp ?? legacyPrice;
+    if (supplierPrice === undefined) throw badRequest('سعر المورد مطلوب', { fields: { supplierPrice: 'اكتب سعرك' } });
+    const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest });
+    if (pe) throw badRequest(pe, { fields: { supplierPrice: pe } });
     await assertProductQuota(vid(req));
     const { fields } = await categoryForProduct(prisma, input.categoryId, { visibleOnly: true });
+    const fee = await resolveFeePercent(prisma, { vendorId: vid(req), categoryId: input.categoryId });
     const p = await prisma.product.create({
       data: {
         ...input,
@@ -257,8 +330,7 @@ vendorRouter.post(
         approvalStatus: 'PENDING',
         specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
-        price: new Prisma.Decimal(input.price),
-        finalPrice: new Prisma.Decimal(applyDiscount(input.price, input.discountPercent)),
+        ...pricingData(supplierPrice, fee, input.discountPercent),
       },
       include: productInclude,
     });
@@ -275,7 +347,7 @@ vendorRouter.post(
 vendorRouter.patch(
   '/products/:id',
   asyncHandler(async (req, res) => {
-    const { specs, ...input } = productInput.partial().parse(req.body);
+    const { specs, supplierPrice: sp, price: legacyPrice, ...input } = productInput.partial().parse(req.body);
     const current = await ownProduct(vid(req), req.params.id);
     const categoryId = input.categoryId ?? current.categoryId;
     const specsData =
@@ -288,9 +360,9 @@ vendorRouter.patch(
       (input.categoryId !== undefined && input.categoryId !== current.categoryId) ||
       (specsData.specs !== undefined && JSON.stringify(specsData.specs) !== JSON.stringify(current.specs));
     const review = contentChanged || current.approvalStatus === 'REJECTED';
-    const price = input.price ?? Number(current.price);
-    const pe = checkPrice({ price, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
-    if (pe) throw badRequest(pe, { fields: { price: pe } });
+    const supplierPrice = sp ?? legacyPrice ?? Number(current.supplierPrice);
+    const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
+    if (pe) throw badRequest(pe, { fields: { supplierPrice: pe } });
     const discount = input.discountPercent ?? current.discountPercent;
     const p = await prisma.product.update({
       where: { id: current.id },
@@ -299,8 +371,8 @@ vendorRouter.patch(
         ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
         ...(review ? { approvalStatus: 'PENDING', rejectionReason: null } : {}),
-        price: new Prisma.Decimal(price),
-        finalPrice: new Prisma.Decimal(applyDiscount(price, discount)),
+        // النسبة الحالية للمنتج كما هي (الإدارة وحدها تغيّرها)
+        ...pricingData(supplierPrice, current.platformFeePercent, discount),
       },
       include: productInclude,
     });
@@ -397,6 +469,9 @@ const vendorOrderSelect = {
       commissionPercent: true,
       commissionAmount: true,
       vendorNet: true,
+      supplierUnitPrice: true,
+      platformFeePercent: true,
+      platformFeeAmount: true,
     },
   },
 } satisfies Prisma.VendorOrderSelect;
@@ -478,6 +553,25 @@ vendorRouter.get(
       }),
     ]);
     ok(res, { totals: totals.get(id) ?? emptyTotals(), payouts, dueOrders: due });
+  }),
+);
+
+/**
+ * مالية المورد مع فرجار: إجمالي المبيعات، إجمالي نسبة فرجار، المسدد (مخصوم في تسويات مدفوعة) والمستحق،
+ * مع التفصيل حسب المنتج وحسب الطلب — من لقطة كل بند وقت البيع.
+ */
+vendorRouter.get(
+  '/fees',
+  asyncHandler(async (req, res) => {
+    const q = z.object({ productId: z.string().max(40).optional() }).parse(req.query);
+    const [report, settings] = await Promise.all([feeReport({ vendorId: vid(req), productId: q.productId }, { lines: 100 }), getSettings()]);
+    // المورد يرى منتجاته فقط — بيانات المورد في كل سطر محذوفة لأنها له
+    ok(res, {
+      totals: report.totals,
+      byProduct: report.byProduct.map(({ vendor: _v, ...r }) => r),
+      byOrder: report.lines.map(({ vendor: _v, ...l }) => l),
+      feePolicy: settings.platformFeeEditPolicy,
+    });
   }),
 );
 

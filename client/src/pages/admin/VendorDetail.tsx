@@ -5,7 +5,7 @@ import { useAdminQuery, useMutation } from '../../components/admin/hooks';
 import { PAYMENT_METHODS } from '../../components/admin/labels';
 import type { AdminVendor, DueVendorOrder, PaymentMethod, VendorPayout, VendorTotals } from '../../components/admin/types';
 import { AdminPage, DefList, DetailSkeleton, Ltr, Panel, StatTile } from '../../components/admin/ui';
-import { Alert, Button, ButtonLink, ErrorState, Input, Modal, Select, Tag } from '../../components/ui';
+import { Alert, Button, ButtonLink, Checkbox, ErrorState, Input, Modal, Select, Tag } from '../../components/ui';
 import { api } from '../../lib/api';
 import { PAYMENT_METHOD_LABEL, formatDate, formatJOD } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
@@ -18,6 +18,7 @@ export default function VendorDetail() {
   useDocumentTitle(q.data?.vendor.name ?? 'المورد');
   const m = useMutation();
   const [commission, setCommission] = useState<string | null>(null);
+  const [applyAll, setApplyAll] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [paying, setPaying] = useState(false);
 
@@ -30,12 +31,21 @@ export default function VendorDetail() {
     );
 
   const { vendor: v, totals: t, payouts, dueOrders } = q.data;
-  const commissionValue = commission ?? String(v.commissionPercent);
+  const commissionValue = commission ?? (v.platformFeePercent == null ? '' : String(v.platformFeePercent));
 
   const saveCommission = async () => {
-    const r = await m.run('commission', () => api.patch(`/admin/vendors/${v.id}`, { commissionPercent: Number(commissionValue) }), 'تم حفظ العمولة — تسري على الطلبات الجديدة');
+    const r = await m.run(
+      'commission',
+      () =>
+        api.patch(`/admin/vendors/${v.id}`, {
+          platformFeePercent: commissionValue.trim() === '' ? null : Number(commissionValue),
+          applyFeeToProducts: applyAll && commissionValue.trim() !== '',
+        }),
+      applyAll ? 'تم حفظ النسبة وتطبيقها على منتجات المورد — تسري على الطلبات الجديدة' : 'تم حفظ النسبة — تُطبّق على منتجات المورد الجديدة',
+    );
     if (r) {
       setCommission(null);
+      setApplyAll(false);
       q.reload();
     }
   };
@@ -167,26 +177,34 @@ export default function VendorDetail() {
               ]}
             />
           </Panel>
-          <Panel title="العمولة">
-            <div className="flex items-end gap-2">
-              <Input
-                label="نسبة العمولة %"
-                type="number"
-                min={0}
-                max={100}
-                step="0.5"
-                className="ltr text-start"
-                wrapperClassName="flex-1"
-                value={commissionValue}
-                onChange={(e) => setCommission(e.target.value)}
-                error={m.fieldErrors.commissionPercent}
-              />
-              <Button size="md" variant="outline" onClick={saveCommission} loading={m.pending === 'commission'} disabled={commission === null}>
-                حفظ
-              </Button>
-            </div>
-            <p className="mt-2 text-xs text-muted">الطلبات السابقة تحتفظ بالعمولة التي بيعت بها.</p>
-          </Panel>
+          {!v.isHouse && (
+            <Panel title="نسبة فرجار">
+              <div className="flex items-end gap-2">
+                <Input
+                  label="النسبة الافتراضية لمنتجات المورد %"
+                  type="number"
+                  min={0}
+                  max={50}
+                  step="0.01"
+                  placeholder="حسب القسم / الافتراضي"
+                  className="ltr text-start"
+                  wrapperClassName="flex-1"
+                  value={commissionValue}
+                  onChange={(e) => setCommission(e.target.value)}
+                  error={m.fieldErrors.platformFeePercent}
+                />
+                <Button size="md" variant="outline" onClick={saveCommission} loading={m.pending === 'commission'} disabled={commission === null && !applyAll}>
+                  حفظ
+                </Button>
+              </div>
+              <div className="mt-3">
+                <Checkbox label="تطبيقها على كل منتجات المورد الحالية" checked={applyAll} onChange={setApplyAll} />
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                تُطبّق على المنتجات الجديدة، ويمكن تعديل نسبة كل منتج من صفحته. الطلبات السابقة تحتفظ بالنسبة التي بيعت بها.
+              </p>
+            </Panel>
+          )}
           {!v.isHouse && (
             <Panel title="الصلاحية">
               {v.active ? (

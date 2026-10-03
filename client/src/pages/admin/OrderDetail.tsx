@@ -91,7 +91,7 @@ export default function OrderDetail() {
                         {vo.vendor.name}
                       </Link>
                       <span className="ms-2 text-xs text-muted">
-                        طلب فرعي #{vo.number} · عمولة {formatJOD(vo.commissionTotal)} · صافي المورد {formatJOD(vo.vendorNet)}
+                        طلب فرعي #{vo.number} · فرجار {formatJOD(vo.commissionTotal)} · صافي المورد {formatJOD(vo.vendorNet)}
                         {vo.payout && ' · تمت التسوية'}
                       </span>
                     </span>
@@ -132,7 +132,12 @@ export default function OrderDetail() {
                                   (<s>{formatJOD(it.unitPrice)}</s> خصم {it.discountPercent}%)
                                 </>
                               )}
-                              {!vo.vendor.isHouse && <> · عمولة {it.commissionPercent}% = {formatJOD(it.commissionAmount)}</>}
+                              {!vo.vendor.isHouse && (
+                                <>
+                                  {' '}
+                                  · فرجار <span dir="ltr">{it.commissionPercent}%</span> = {formatJOD(it.commissionAmount)}
+                                </>
+                              )}
                             </p>
                           </div>
                           <b className="shrink-0 tabular-nums">{formatJOD(it.lineTotal)}</b>

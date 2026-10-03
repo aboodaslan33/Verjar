@@ -173,6 +173,7 @@ function CategoryForm({
   const [parentId, setParentId] = useState(category ? category.parentId ?? '' : defaultParent ?? '');
   const [order, setOrder] = useState(String(category?.sortOrder ?? nextOrder));
   const [group, setGroup] = useState(category?.commissionGroup ?? '');
+  const [feePct, setFeePct] = useState(category?.platformFeePercent != null ? String(category.platformFeePercent) : '');
   const [description, setDescription] = useState(category?.description ?? '');
   const [fields, setFields] = useState<FieldDraft[]>(() => (category?.specFields ?? []).map((f) => ({ ...f, optionsText: f.options.join('، ') })));
   const parentFields = tops.find((t) => t.id === parentId)?.specFields ?? [];
@@ -190,6 +191,7 @@ function CategoryForm({
       parentId: parentId || null,
       sortOrder: Number(order) || 0,
       commissionGroup: group || null,
+      platformFeePercent: feePct.trim() === '' ? null : Number(feePct),
       description: description.trim() || null,
       specFields: fields.map(({ optionsText, ...f }) => ({
         ...f,
@@ -224,6 +226,21 @@ function CategoryForm({
           </Select>
         )}
         <Input label="الترتيب" type="number" className="ltr text-start" value={order} onChange={(e) => setOrder(e.target.value)} />
+        <Input
+          label="نسبة فرجار لمنتجات القسم %"
+          optional
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={50}
+          step="0.01"
+          placeholder="الافتراضي العام"
+          className="ltr text-start"
+          value={feePct}
+          onChange={(e) => setFeePct(e.target.value)}
+          error={fe.platformFeePercent}
+          hint="تُطبّق على المنتجات الجديدة في القسم ما لم يكن للمورد نسبة خاصة"
+        />
         <Select
           label="مجموعة العمولة"
           value={group}
