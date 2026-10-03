@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { marketNotify } from '../market/notify';
 import { getSettings } from '../services/settings.service';
+import { snapshotClosedMonths } from '../insights/metrics';
+import { expireRewards } from '../insights/rewards';
 
 /**
  * مهام السوق اليومية: تذكير المورد قبل انتهاء اشتراكه، إنهاء الاشتراكات والإعلانات المنتهية.
@@ -27,8 +29,17 @@ export async function runMarketJobs(now = new Date()) {
   return { reminded: expiring.length, expired: expired.count, adsEnded: ended.count };
 }
 
+/** أرشفة إحصائيات الأشهر المكتملة (لقطة ثابتة لا تُستبدل) وإنهاء المكافآت المنتهية */
+export async function runInsightJobs() {
+  await snapshotClosedMonths(3);
+  return { rewardsExpired: await expireRewards() };
+}
+
 export function startMarketJobs() {
-  const run = () => runMarketJobs().catch((e) => console.error('market jobs failed', e));
+  const run = () =>
+    runMarketJobs()
+      .then(() => runInsightJobs())
+      .catch((e) => console.error('market jobs failed', e));
   setTimeout(run, 30_000).unref();
   setInterval(run, 24 * 60 * 60_000).unref();
 }

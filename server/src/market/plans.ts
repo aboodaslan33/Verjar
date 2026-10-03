@@ -42,13 +42,19 @@ export async function effectivePlan(vendor: { planId: string | null; planExpires
 
 /** حد المنتجات حسب الباقة */
 export async function assertProductQuota(vendorId: string, db: Db = prisma) {
-  const v = await db.vendor.findUniqueOrThrow({ where: { id: vendorId }, select: { planId: true, planExpiresAt: true, isHouse: true } });
+  const v = await db.vendor.findUniqueOrThrow({
+    where: { id: vendorId },
+    select: { planId: true, planExpiresAt: true, isHouse: true, extraProducts: true, extraProductsUntil: true },
+  });
   if (v.isHouse) return;
   const plan = await effectivePlan(v, db);
   if (plan?.maxProducts == null) return;
+  // مكافأة "منتجات إضافية" تُضاف لحد الباقة حتى انتهاء مدتها
+  const bonus = v.extraProductsUntil && v.extraProductsUntil > new Date() ? v.extraProducts : 0;
+  const limit = plan.maxProducts + bonus;
   const count = await db.product.count({ where: { vendorId, deletedAt: null } });
-  if (count >= plan.maxProducts) {
-    throw new HttpError(403, `وصلت للحد الأقصى من المنتجات في باقة ${plan.name} (${plan.maxProducts}). رقِّ باقتك لإضافة المزيد.`, 'PLAN_LIMIT');
+  if (count >= limit) {
+    throw new HttpError(403, `وصلت للحد الأقصى من المنتجات في باقة ${plan.name} (${limit}). رقِّ باقتك لإضافة المزيد.`, 'PLAN_LIMIT');
   }
 }
 

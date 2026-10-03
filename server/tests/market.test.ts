@@ -362,7 +362,7 @@ describe('السوق الصناعي B2B', () => {
 
     // بيانات الحساب من الإعدادات تظهر للمورد
     const sub = await agent.get('/api/v1/vendor/market/subscription');
-    expect(sub.body.data.account).toMatchObject({ bankName: 'بنك الاتحاد', cliq: '0780192930' });
+    expect(sub.body.data.account).toMatchObject({ bankName: 'بنك الاتحاد', cliq: '0781400353' });
     expect(sub.body.data.invoices).toHaveLength(0);
 
     // الإيصال مطلوب، والملف صورة أو PDF فقط — ولا يُنشأ شيء عند الفشل
@@ -460,7 +460,7 @@ describe('السوق الصناعي B2B', () => {
 
   it('الانضمام بباقة مدفوعة: الإيصال ضمن نموذج التسجيل، والإدارة تعتمد وتؤكد الدفع معًا', async () => {
     const acc = await request(app).get('/api/v1/market/payment-account');
-    expect(acc.body.data).toMatchObject({ bankName: 'بنك الاتحاد', accountName: 'طارق', cliq: '0780192930' });
+    expect(acc.body.data).toMatchObject({ bankName: 'بنك الاتحاد', accountName: 'طارق', cliq: '0781400353' });
 
     const agent = await createCustomer({ name: 'مورد السيور', phone: '0781212121' });
     const data = {

@@ -256,3 +256,31 @@ accountRouter.post(
     ok(res, { verified: true, purpose });
   }),
 );
+
+/** مكافآت العميل: تميزه الشهري وكوبوناته الخاصة الصالحة (بياناته فقط) */
+accountRouter.get(
+  '/rewards',
+  asyncHandler(async (req, res) => {
+    const customerId = req.auth!.sub;
+    const now = new Date();
+    const [recognitions, coupons, rewards] = await Promise.all([
+      prisma.recognition.findMany({ where: { customerId, revokedAt: null }, orderBy: { period: 'desc' }, take: 12, select: { id: true, period: true, title: true, createdAt: true } }),
+      prisma.coupon.findMany({
+        where: { customerId, active: true, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, code: true, name: true, type: true, value: true, maxDiscount: true, minOrder: true, startsAt: true, endsAt: true, usageLimit: true, usedCount: true, perCustomerLimit: true, categoryIds: true, productIds: true },
+      }),
+      prisma.reward.findMany({ where: { customerId, status: { not: 'REVOKED' } }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, type: true, title: true, status: true, endsAt: true, createdAt: true } }),
+    ]);
+    const used = coupons.length
+      ? await prisma.couponRedemption.groupBy({ by: ['couponId'], where: { customerId, couponId: { in: coupons.map((c) => c.id) } }, _count: { _all: true } })
+      : [];
+    ok(res, {
+      recognitions,
+      rewards,
+      coupons: coupons
+        .map((c) => ({ ...c, usedByMe: used.find((u) => u.couponId === c.id)?._count._all ?? 0 }))
+        .filter((c) => c.usedByMe < c.perCustomerLimit && (c.usageLimit == null || c.usedCount < c.usageLimit)),
+    });
+  }),
+);

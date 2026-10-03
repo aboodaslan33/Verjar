@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { evaluateCoupon, redeemCoupon } from '../../insights/coupons';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { audit } from '../../lib/audit';
@@ -43,7 +44,7 @@ const productPublicSelect = {
   leadTimeDays: true,
   warranty: true,
   category: { select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } } },
-  vendor: { select: { id: true, name: true, slug: true, logoUrl: true, isHouse: true, verified: true, city: true, plan: { select: { code: true, badge: true } } } },
+  vendor: { select: { id: true, name: true, slug: true, logoUrl: true, isHouse: true, verified: true, city: true, awardTitle: true, awardUntil: true, plan: { select: { code: true, badge: true } } } },
   media: { orderBy: { sortOrder: 'asc' }, select: { id: true, kind: true, url: true } },
 } satisfies Prisma.ProductSelect;
 
@@ -208,6 +209,8 @@ storeRouter.get(
 const supplierPublicSelect = {
   id: true,
   name: true,
+  awardTitle: true,
+  awardUntil: true,
   slug: true,
   description: true,
   logoUrl: true,
@@ -258,8 +261,19 @@ storeRouter.get(
       }),
       prisma.vendor.count({ where }),
     ]);
-    const r = await ratingsFor(rows.map((v) => v.id));
-    ok(res, paged(rows.map(({ _count, plan, ...v }) => ({ ...v, plan: plan ? { code: plan.code, name: plan.name, badge: plan.badge } : null, productCount: _count.products, rating: r.get(v.id) ?? null })), total, q));
+    // الموردون المميزون (شارة تميز فعّالة يمنحها الـ Super Admin) — تظهر أعلى الدليل في الصفحة الأولى
+    const featured =
+      q.page === 1
+        ? await prisma.vendor.findMany({
+            where: { active: true, status: 'APPROVED', isHouse: false, awardUntil: { gt: new Date() } },
+            orderBy: { awardUntil: 'desc' },
+            take: 6,
+            select: { ...supplierPublicSelect, _count: { select: { products: { where: publicProductWhere() } } } },
+          })
+        : [];
+    const r = await ratingsFor([...rows, ...featured].map((v) => v.id));
+    const shape = ({ _count, plan, ...v }: (typeof rows)[number]) => ({ ...v, plan: plan ? { code: plan.code, name: plan.name, badge: plan.badge } : null, productCount: _count.products, rating: r.get(v.id) ?? null });
+    ok(res, { ...paged(rows.map(shape), total, q), featured: featured.map(shape) });
   }),
 );
 
@@ -329,6 +343,30 @@ storeRouter.get(
   }),
 );
 
+/** معاينة كود الخصم على السلة الحالية قبل إتمام الطلب */
+storeRouter.post(
+  '/coupons/check',
+  requireCustomer,
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const input = z
+      .object({ code: z.string().trim().min(1, 'اكتب كود الخصم').max(30), items: z.array(z.object({ productId: z.string().min(1), quantity: z.coerce.number().int().min(1).max(1000) })).min(1).max(30) })
+      .parse(req.body);
+    const products = await prisma.product.findMany({
+      where: publicProductWhere({ id: { in: input.items.map((i) => i.productId) } }),
+      select: { id: true, finalPrice: true, category: { select: { id: true, parentId: true } } },
+    });
+    const lines = products.map((p) => ({
+      productId: p.id,
+      categoryId: p.category.id,
+      parentCategoryId: p.category.parentId,
+      lineTotal: round3(toNum(p.finalPrice) * input.items.filter((i) => i.productId === p.id).reduce((n, i) => n + i.quantity, 0)),
+    }));
+    const r = await prisma.$transaction((tx) => evaluateCoupon(tx, input.code, req.auth!.sub, lines));
+    ok(res, { code: r.coupon.code, name: r.coupon.name, discount: r.discount, eligible: r.eligible, type: r.coupon.type, value: toNum(r.coupon.value) });
+  }),
+);
+
 /** إنشاء طلب من السلة — الأسعار تُحسب من قاعدة البيانات وليس من المتصفح */
 storeRouter.post(
   '/orders',
@@ -349,7 +387,7 @@ storeRouter.post(
     const order = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
         where: publicProductWhere({ id: { in: [...qty.keys()] } }),
-        include: { vendor: { select: { id: true, name: true, commissionPercent: true } } },
+        include: { vendor: { select: { id: true, name: true, commissionPercent: true } }, category: { select: { id: true, parentId: true } } },
       });
       if (products.length !== qty.size) throw badRequest('بعض المنتجات في السلة لم تعد متوفرة، حدّث السلة');
 
@@ -401,6 +439,17 @@ storeRouter.post(
       const customer = await accountCustomer(tx, req.auth!.sub);
       subtotal = round3(subtotal);
       total = round3(total);
+      // كود الخصم: تتحمله FARJAR من إجمالي الطلب، ومستحقات الموردين وعمولاتهم لا تتغير
+      const applied = input.couponCode
+        ? await evaluateCoupon(
+            tx,
+            input.couponCode,
+            customer.id,
+            products.map((p) => ({ productId: p.id, categoryId: p.category.id, parentCategoryId: p.category.parentId, lineTotal: round3(toNum(p.finalPrice) * qty.get(p.id)!) })),
+          )
+        : null;
+      const productsTotal = total;
+      if (applied) total = round3(Math.max(0, total - applied.discount));
       const created = await tx.order.create({
         data: {
           ref: makeRef('O'),
@@ -410,14 +459,17 @@ storeRouter.post(
           address: input.address,
           notes: input.notes ?? null,
           subtotal: new Prisma.Decimal(subtotal),
-          discountTotal: new Prisma.Decimal(round3(subtotal - total)),
+          discountTotal: new Prisma.Decimal(round3(subtotal - productsTotal)),
           total: new Prisma.Decimal(total),
+          ...(applied ? { couponId: applied.coupon.id, couponCode: applied.coupon.code, couponDiscount: new Prisma.Decimal(applied.discount) } : {}),
           whatsappText: '',
           ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
           // الدفع عند الاستلام: المبلغ المطلوب تحصيله يُثبَّت وقت الطلب
           ...(input.paymentMethod === 'COD' ? { codAmount: new Prisma.Decimal(total), codStatus: 'PENDING' as const } : {}),
         },
       });
+
+      if (applied) await redeemCoupon(tx, applied.coupon, created.id, customer.id, applied.discount);
 
       // طلب فرعي لكل مورد
       const byVendor = new Map<string, typeof lines>();
@@ -469,6 +521,8 @@ storeRouter.post(
         status: order.status,
         subtotal: order.subtotal,
         discountTotal: order.discountTotal,
+        couponCode: order.couponCode,
+        couponDiscount: order.couponDiscount,
         total: order.total,
         items: order.items.map(({ commissionPercent: _p, commissionAmount: _c, vendorNet: _n, ...it }) => it),
         vendorOrders: order.vendorOrders,

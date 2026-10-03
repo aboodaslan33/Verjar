@@ -12,6 +12,7 @@ import { contactsRevealed, getThread, postMessage } from '../../market/messaging
 import { activateSubscription, cancelInvoice, createInvoice, paymentAccount, paymentProvider } from '../../market/payments';
 import { emitAdmin } from '../../lib/events';
 import { storePaymentProof } from '../../market/proof';
+import { activePerks } from '../../insights/rewards';
 import { assertMemberQuota, effectivePlan, planFeatures, rfqQuotaLeft } from '../../market/plans';
 import { OPEN_STATUSES, rfqEvent, submitQuote } from '../../market/rfq';
 import { requireApprovedVendor, requireVendorOwner } from '../../middleware/auth';
@@ -46,6 +47,12 @@ vendorMarketRouter.get(
       prisma.supplierReview.aggregate({ where: { vendorId: v.id, visible: true }, _avg: { overall: true }, _count: { _all: true } }),
       prisma.marketInvoice.count({ where: { vendorId: v.id, status: 'PENDING' } }),
     ]);
+    // التميز والمكافآت الخاصة بالمورد فقط
+    const [recognitions, rewards] = await Promise.all([
+      prisma.recognition.findMany({ where: { vendorId: v.id, revokedAt: null }, orderBy: { period: 'desc' }, take: 6, select: { id: true, period: true, title: true } }),
+      prisma.reward.findMany({ where: { vendorId: v.id, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, select: { id: true, type: true, title: true, endsAt: true } }),
+    ]);
+    const perks = activePerks(v);
     const counts = Object.fromEntries(rfqCounts.map((r) => [r.status, r._count._all]));
     ok(res, {
       vendor: {
@@ -67,6 +74,10 @@ vendorMarketRouter.get(
       deals: { count: deals._count._all, value: toNum(deals._sum.total ?? 0) },
       rating: rating._count._all ? { average: Math.round((rating._avg.overall ?? 0) * 10) / 10, count: rating._count._all } : null,
       pendingInvoices,
+      award: v.awardTitle && v.awardUntil && v.awardUntil > new Date() ? { title: v.awardTitle, until: v.awardUntil } : null,
+      recognitions,
+      rewards,
+      perks,
     });
   }),
 );
@@ -365,7 +376,9 @@ vendorMarketRouter.post(
     const meta = proofMeta.parse(raw);
     const plan = await prisma.supplierPlan.findFirst({ where: { id: planId, active: true } });
     if (!plan) throw notFound('الباقة غير متاحة');
-    const price = toNum(plan.price);
+    // مكافأة "خصم على الاشتراك" (إن كانت فعّالة) تُطبَّق على سعر الباقة
+    const perks = activePerks(await prisma.vendor.findUniqueOrThrow({ where: { id: vid(req) }, select: { extraProducts: true, extraProductsUntil: true, subscriptionDiscountPct: true, subscriptionDiscountUntil: true } }));
+    const price = round3(toNum(plan.price) * (1 - perks.subscriptionDiscountPct / 100));
     const pending = await prisma.vendorSubscription.findFirst({ where: { vendorId: vid(req), status: 'PENDING_PAYMENT' }, include: { invoice: true } });
     if (pending?.invoice?.proofStatus === 'SUBMITTED') throw conflict('لديك طلب اشتراك قيد مراجعة الدفع. انتظر تأكيد الإدارة قبل طلب باقة أخرى.');
     const proof = price > 0 ? await requireProof(req, meta) : null;
@@ -374,10 +387,18 @@ vendorMarketRouter.post(
       if (pending?.invoiceId) await cancelInvoice(tx, pending.invoiceId);
       else if (pending) await tx.vendorSubscription.update({ where: { id: pending.id }, data: { status: 'CANCELLED' } });
       const invoice = proof
-        ? await createInvoice(tx, { purpose: 'SUBSCRIPTION', description: `اشتراك باقة ${plan.name} (${plan.durationDays} يومًا)`, amount: price, vendorId: vid(req), refType: 'plan', refId: plan.id, dueDays: 7 })
+        ? await createInvoice(tx, {
+            purpose: 'SUBSCRIPTION',
+            description: `اشتراك باقة ${plan.name} (${plan.durationDays} يومًا)${perks.subscriptionDiscountPct ? ` — خصم مكافأة ${perks.subscriptionDiscountPct}%` : ''}`,
+            amount: price,
+            vendorId: vid(req),
+            refType: 'plan',
+            refId: plan.id,
+            dueDays: 7,
+          })
         : null;
       const withProof = invoice ? await tx.marketInvoice.update({ where: { id: invoice.id }, data: proof! }) : null;
-      const sub = await tx.vendorSubscription.create({ data: { vendorId: vid(req), planId: plan.id, amount: plan.price, invoiceId: invoice?.id ?? null } });
+      const sub = await tx.vendorSubscription.create({ data: { vendorId: vid(req), planId: plan.id, amount: new Prisma.Decimal(price), invoiceId: invoice?.id ?? null } });
       if (!invoice) await activateSubscription(tx, sub.id);
       return { sub, invoice: withProof };
     });

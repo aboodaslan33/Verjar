@@ -33,6 +33,10 @@ export const PERMISSIONS = [
   'newsletter.manage',
   'audit.view',
   'driver.app',
+  /** إحصائيات المنصة الشهرية ونمو المنصة (Super Admin فقط) */
+  'insights.view',
+  /** التميز الشهري والمكافآت والكوبونات (Super Admin فقط) */
+  'rewards.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -40,7 +44,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 const ALL = [...PERMISSIONS] as Permission[];
 
 /** صلاحيات لا تُمنح إلا للـ Super Admin (منع رفع الصلاحيات) */
-const SUPER_ONLY: Permission[] = ['users.manage'];
+const SUPER_ONLY: Permission[] = ['users.manage', 'insights.view', 'rewards.manage'];
 
 /** ما يمكن منحه لكل دور (الحد الأقصى) */
 const ALLOWED: Record<UserRole, Permission[]> = {

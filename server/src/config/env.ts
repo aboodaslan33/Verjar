@@ -11,7 +11,7 @@ const schema = z.object({
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   /** عدد البروكسيات أمام السيرفر (لمعرفة IP العميل الحقيقي في حدود المحاولات) */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
-  ADMIN_WHATSAPP: z.string().default('962780192930'),
+  ADMIN_WHATSAPP: z.string().default('962781400353'),
   /** link (افتراضي): الموقع يفتح واتساب برسالة جاهزة. cloud: إرسال تلقائي عبر Cloud API (يتطلب WA_TOKEN و WA_PHONE_ID صالحين) */
   WA_MODE: z.enum(['link', 'cloud']).default('link'),
   WA_TOKEN: z.string().optional().default(''),

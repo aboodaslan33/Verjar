@@ -4,8 +4,8 @@ import type { SiteSettings } from '../lib/types';
 
 /** قيم احتياطية تُعرض قبل وصول الإعدادات من السيرفر */
 export const FALLBACK_SETTINGS: SiteSettings = {
-  whatsappNumber: '962780192930',
-  phone: '0780192930',
+  whatsappNumber: '962781400353',
+  phone: '0781400353',
   email: 'farjarweb@gmail.com',
   address: 'عمّان — الأردن',
   inspectionFeeNormal: 25,

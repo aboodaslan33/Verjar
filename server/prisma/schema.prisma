@@ -281,6 +281,9 @@ model Customer {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
+  /// برنامج الولاء (مرحلة لاحقة): REGULAR → SILVER → GOLD → VIP
+  loyaltyTier     String    @default("REGULAR")
+  loyaltyPoints   Int       @default(0)
 
   bookings          Booking[]
   orders            Order[]
@@ -293,6 +296,11 @@ model Customer {
   vendorMemberships VendorMember[]
   rfqs              Rfq[]
   reviews           SupplierReview[]
+  recognitions      Recognition[]
+  rewards           Reward[]
+  coupons           Coupon[]
+  couponRedemptions CouponRedemption[]
+  pointsLedger      LoyaltyPointsLedger[]
 
   @@index([name])
   @@index([deletedAt])
@@ -345,56 +353,68 @@ model Category {
 
 /// المورد (متجر داخل السوق). المورد الافتراضي (isHouse) هو الشركة نفسها وليس له حساب عميل
 model Vendor {
-  id                String       @id @default(cuid())
+  id                        String       @id @default(cuid())
   /// حساب العميل صاحب المتجر (فارغ للمورد الافتراضي)
-  customerId        String?      @unique
-  name              String
-  slug              String       @unique
-  description       String       @default("")
-  logoUrl           String?
-  logoPublicId      String?
+  customerId                String?      @unique
+  name                      String
+  slug                      String       @unique
+  description               String       @default("")
+  logoUrl                   String?
+  logoPublicId              String?
   /// نسبة عمولة المنصة من كل بيع (0–100)
-  commissionPercent Decimal      @default(10) @db.Decimal(5, 2)
+  commissionPercent         Decimal      @default(10) @db.Decimal(5, 2)
   /// سحب صلاحية المورد: لا يدخل اللوحة ولا تظهر منتجاته
-  active            Boolean      @default(true)
-  isHouse           Boolean      @default(false)
+  active                    Boolean      @default(true)
+  isHouse                   Boolean      @default(false)
   /// عنوان الاستلام الافتراضي لطلبات التوصيل
-  phone             String?
-  pickupAddress     String?
-  pickupLat         Float?
-  pickupLng         Float?
+  phone                     String?
+  pickupAddress             String?
+  pickupLat                 Float?
+  pickupLng                 Float?
   // ── السوق الصناعي (B2B) ──
   /// حالة المورد في السوق: بانتظار المراجعة، معتمد، مرفوض، معلّق
-  status            VendorStatus @default(APPROVED)
-  rejectionReason   String?
+  status                    VendorStatus @default(APPROVED)
+  rejectionReason           String?
   /// علامة "مورد موثّق" تمنحها الإدارة بعد التحقق
-  verified          Boolean      @default(false)
-  verifiedAt        DateTime?
-  contactName       String?
-  whatsapp          String?
-  email             String?
-  address           String?
-  city              String?
+  verified                  Boolean      @default(false)
+  verifiedAt                DateTime?
+  contactName               String?
+  whatsapp                  String?
+  email                     String?
+  address                   String?
+  city                      String?
   /// مجال العمل ونوع المنتجات (نص حر يظهر في صفحة المورد ويُبحث فيه)
-  businessField     String?
-  productTypes      String?
-  licenseNumber     String?
+  businessField             String?
+  productTypes              String?
+  licenseNumber             String?
   /// الكتالوج والشهادات: [{ url, name, kind }]
-  catalogFiles      Json         @default("[]")
-  certificates      Json         @default("[]")
+  catalogFiles              Json         @default("[]")
+  certificates              Json         @default("[]")
   /// التصنيفات التي يخدمها (لاقتراحه في طلبات عروض الأسعار)
-  categoryIds       String[]     @default([])
+  categoryIds               String[]     @default([])
   // ── الاشتراك الحالي ──
-  planId            String?
-  planStartedAt     DateTime?
-  planExpiresAt     DateTime?
+  planId                    String?
+  planStartedAt             DateTime?
+  planExpiresAt             DateTime?
+  /// شارة التميز الظاهرة للعامة (مثل "مورد الشهر") حتى تاريخ محدد — تُمنح كمكافأة من الـ Super Admin
+  awardTitle                String?
+  awardUntil                DateTime?
+  /// مكافأة: منتجات إضافية فوق حد الباقة حتى تاريخ محدد
+  extraProducts             Int          @default(0)
+  extraProductsUntil        DateTime?
+  /// مكافأة: نسبة خصم على طلبات الاشتراك حتى تاريخ محدد
+  subscriptionDiscountPct   Int          @default(0)
+  subscriptionDiscountUntil DateTime?
+  /// برنامج الولاء (مرحلة لاحقة): STANDARD → VERIFIED → PREMIUM → FEATURED
+  loyaltyTier               String       @default("STANDARD")
+  loyaltyPoints             Int          @default(0)
   /// عدّاد زيارات صفحة المورد
-  profileViews      Int          @default(0)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  profileViews              Int          @default(0)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
 
-  customer      Customer?            @relation(fields: [customerId], references: [id])
-  plan          SupplierPlan?        @relation(fields: [planId], references: [id])
+  customer      Customer?             @relation(fields: [customerId], references: [id])
+  plan          SupplierPlan?         @relation(fields: [planId], references: [id])
   members       VendorMember[]
   subscriptions VendorSubscription[]
   rfqRecipients RfqRecipient[]
@@ -403,14 +423,17 @@ model Vendor {
   ads           MarketAd[]
   invoices      MarketInvoice[]
   reviews       SupplierReview[]
-  directRfqs    Rfq[]                @relation("RfqDirectVendor")
+  directRfqs    Rfq[]                 @relation("RfqDirectVendor")
   dailyStats    VendorDailyStat[]
   products      Product[]
   vendorOrders  VendorOrder[]
   orderItems    OrderItem[]
   payouts       VendorPayout[]
   tenderOffers  TenderOffer[]
-  orders        Order[]              @relation("OrderSupplier")
+  orders        Order[]               @relation("OrderSupplier")
+  recognitions  Recognition[]
+  rewards       Reward[]
+  pointsLedger  LoyaltyPointsLedger[]
 
   @@index([active])
   @@index([status])
@@ -521,6 +544,10 @@ model Order {
   subtotal          Decimal          @db.Decimal(10, 3)
   discountTotal     Decimal          @db.Decimal(10, 3)
   total             Decimal          @db.Decimal(10, 3)
+  /// خصم الكوبون (تتحمله FARJAR — لا يغيّر مستحقات الموردين)
+  couponId          String?
+  couponCode        String?
+  couponDiscount    Decimal          @default(0) @db.Decimal(10, 3)
   whatsappText      String
   /// طريقة الدفع التي اختارها العميل (فارغة للطلبات القديمة)
   paymentMethod     PaymentMethod?
@@ -554,20 +581,22 @@ model Order {
   updatedAt         DateTime         @updatedAt
   deletedAt         DateTime?
 
-  customer        Customer             @relation(fields: [customerId], references: [id])
-  driver          Driver?              @relation(fields: [driverId], references: [id])
-  deliveryCompany DeliveryCompany?     @relation(fields: [deliveryCompanyId], references: [id])
-  settlement      DeliverySettlement?  @relation(fields: [settlementId], references: [id])
-  supplier        Vendor?              @relation("OrderSupplier", fields: [supplierId], references: [id])
-  collectedBy     User?                @relation("CollectedBy", fields: [collectedById], references: [id])
-  statusEvents    OrderStatusEvent[]
-  assignments     DeliveryAssignment[]
-  proof           DeliveryProof?
-  notifications   Notification[]
-  items           OrderItem[]
-  vendorOrders    VendorOrder[]
-  payments        Payment[]
-  quoteFiles      QuoteFile[]
+  customer         Customer             @relation(fields: [customerId], references: [id])
+  driver           Driver?              @relation(fields: [driverId], references: [id])
+  deliveryCompany  DeliveryCompany?     @relation(fields: [deliveryCompanyId], references: [id])
+  settlement       DeliverySettlement?  @relation(fields: [settlementId], references: [id])
+  supplier         Vendor?              @relation("OrderSupplier", fields: [supplierId], references: [id])
+  collectedBy      User?                @relation("CollectedBy", fields: [collectedById], references: [id])
+  statusEvents     OrderStatusEvent[]
+  assignments      DeliveryAssignment[]
+  proof            DeliveryProof?
+  notifications    Notification[]
+  items            OrderItem[]
+  vendorOrders     VendorOrder[]
+  payments         Payment[]
+  quoteFiles       QuoteFile[]
+  coupon           Coupon?              @relation(fields: [couponId], references: [id])
+  couponRedemption CouponRedemption?
 
   @@index([phone])
   @@index([status])
@@ -1641,25 +1670,25 @@ enum InvoiceStatus {
 
 /// فواتير السوق — مستقلة عن مزود الدفع (provider) ليسهل تغييره لاحقًا
 model MarketInvoice {
-  id          String         @id @default(cuid())
+  id               String         @id @default(cuid())
   /// INV-000001
-  number      String         @unique
-  vendorId    String?
-  customerId  String?
-  purpose     InvoicePurpose
-  description String
-  amount      Decimal        @db.Decimal(12, 3)
-  currency    String         @default("JOD")
-  status      InvoiceStatus  @default(PENDING)
+  number           String         @unique
+  vendorId         String?
+  customerId       String?
+  purpose          InvoicePurpose
+  description      String
+  amount           Decimal        @db.Decimal(12, 3)
+  currency         String         @default("JOD")
+  status           InvoiceStatus  @default(PENDING)
   /// manual | (مستقبلًا: hyperpay, stripe, …)
-  provider    String         @default("manual")
-  providerRef String?
+  provider         String         @default("manual")
+  providerRef      String?
   /// مرجع العنصر (اشتراك/إعلان/طلب…)
-  refType     String?
-  refId       String?
-  dueAt       DateTime?
-  paidAt      DateTime?
-  note        String?
+  refType          String?
+  refId            String?
+  dueAt            DateTime?
+  paidAt           DateTime?
+  note             String?
   /// إثبات الدفع اليدوي (صورة أو PDF للحوالة) يرفعه المورد وتراجعه الإدارة
   proofUrl         String?
   proofPublicId    String?
@@ -1673,8 +1702,8 @@ model MarketInvoice {
   payerNote        String?
   /// سبب رفض الإثبات (يظهر للمورد)
   reviewNote       String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   vendor       Vendor?             @relation(fields: [vendorId], references: [id])
   subscription VendorSubscription?
@@ -1725,4 +1754,205 @@ model VendorDailyStat {
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, day])
+}
+
+// ═════════════ إحصائيات المنصة والتميز والمكافآت ═════════════
+
+/// لقطة إحصائيات شهرية محفوظة (أرشيف دائم لا يُستبدل): الشهر المكتمل يُجمَّد، والشهر الجاري يُحدَّث
+model MonthlySnapshot {
+  id         String   @id @default(cuid())
+  /// YYYY-MM (بتوقيت عمّان)
+  period     String   @unique
+  /// المؤشرات الرقمية (مبيعات، طلبات، عملاء، إيرادات…)
+  metrics    Json
+  /// التفاصيل: أكثر الفئات والمنتجات والمناطق والموردين والعملاء، وإيرادات كل قسم
+  breakdown  Json
+  /// شهر مكتمل (لا يُعاد حسابه إلا بطلب صريح)
+  final      Boolean  @default(false)
+  computedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum RecognitionKind {
+  SUPPLIER
+  CUSTOMER
+}
+
+/// التميز الشهري: يختاره الـ Super Admin يدويًا (النظام يقترح فقط)
+model Recognition {
+  id          String          @id @default(cuid())
+  kind        RecognitionKind
+  /// YYYY-MM
+  period      String
+  title       String
+  vendorId    String?
+  customerId  String?
+  /// مؤشرات المرشح وقت الاختيار (للتوثيق في الأرشيف)
+  score       Json?
+  note        String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  revokedAt   DateTime?
+
+  vendor   Vendor?   @relation(fields: [vendorId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  rewards  Reward[]
+
+  @@unique([kind, period])
+  @@index([period])
+}
+
+enum RewardType {
+  /// اشتراك مجاني بباقة ومدة
+  FREE_SUBSCRIPTION
+  /// ظهور مميز في السوق (مورد مميز)
+  FEATURED_PLACEMENT
+  /// Banner مجاني في الصفحة الرئيسية للسوق (مورد الشهر)
+  HOME_BANNER
+  /// منتجات إضافية فوق حد الباقة
+  EXTRA_PRODUCTS
+  /// خصم مؤقت على الاشتراك
+  SUBSCRIPTION_DISCOUNT
+  /// شارة تميز ظاهرة (Featured Supplier / Customer)
+  BADGE
+  /// كوبون خصم للعميل
+  COUPON
+  /// نقاط ولاء (مرحلة لاحقة)
+  POINTS
+}
+
+enum RewardStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+/// المكافآت الممنوحة — لا تُمنح إلا بقرار الـ Super Admin
+model Reward {
+  id             String       @id @default(cuid())
+  recognitionId  String?
+  vendorId       String?
+  customerId     String?
+  type           RewardType
+  title          String
+  planId         String?
+  durationDays   Int?
+  /// قيمة المكافأة حسب النوع: نسبة خصم، عدد منتجات، نقاط
+  value          Decimal?     @db.Decimal(12, 3)
+  couponId       String?      @unique
+  adId           String?      @unique
+  subscriptionId String?      @unique
+  startsAt       DateTime     @default(now())
+  endsAt         DateTime?
+  status         RewardStatus @default(ACTIVE)
+  note           String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  revokedAt      DateTime?
+
+  recognition Recognition? @relation(fields: [recognitionId], references: [id])
+  vendor      Vendor?      @relation(fields: [vendorId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  coupon      Coupon?      @relation(fields: [couponId], references: [id])
+
+  @@index([vendorId, status])
+  @@index([customerId, status])
+  @@index([createdAt])
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+/// كوبونات الخصم (عامة أو لعميل محدد) — تُطبَّق عند إتمام طلب المتجر
+model Coupon {
+  id               String     @id @default(cuid())
+  /// بأحرف إنجليزية كبيرة
+  code             String     @unique
+  name             String
+  description      String?
+  type             CouponType @default(PERCENT)
+  value            Decimal    @db.Decimal(10, 3)
+  maxDiscount      Decimal?   @db.Decimal(10, 3)
+  minOrder         Decimal?   @db.Decimal(10, 3)
+  startsAt         DateTime   @default(now())
+  endsAt           DateTime?
+  /// إجمالي مرات الاستخدام (فارغ = بدون حد)
+  usageLimit       Int?
+  perCustomerLimit Int        @default(1)
+  usedCount        Int        @default(0)
+  /// مقصور على عميل محدد (كوبون العميل المتميز)
+  customerId       String?
+  /// الفئات/المنتجات المشمولة (فارغ = كل المنتجات)
+  categoryIds      String[]   @default([])
+  productIds       String[]   @default([])
+  active           Boolean    @default(true)
+  createdById      String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  customer    Customer?          @relation(fields: [customerId], references: [id])
+  redemptions CouponRedemption[]
+  orders      Order[]
+  reward      Reward?
+
+  @@index([customerId])
+}
+
+model CouponRedemption {
+  id         String   @id @default(cuid())
+  couponId   String
+  orderId    String   @unique
+  customerId String
+  discount   Decimal  @db.Decimal(10, 3)
+  createdAt  DateTime @default(now())
+
+  coupon   Coupon   @relation(fields: [couponId], references: [id])
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([couponId, customerId])
+}
+
+enum LoyaltyAudience {
+  CUSTOMER
+  SUPPLIER
+}
+
+/// مستويات الولاء (جاهزة للتوسع — غير مفعّلة في المرحلة الأولى)
+model LoyaltyTier {
+  id        String          @id @default(cuid())
+  audience  LoyaltyAudience
+  code      String
+  name      String
+  rank      Int
+  /// الحد الأدنى للنقاط أو قيمة المشتريات/المبيعات خلال 12 شهرًا للوصول للمستوى
+  minPoints Int             @default(0)
+  minSpend  Decimal?        @db.Decimal(12, 3)
+  /// مزايا المستوى (خصم، شحن مجاني، أولوية…) — تُحدَّد لاحقًا
+  benefits  Json            @default("{}")
+  active    Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([audience, code])
+}
+
+/// سجل نقاط الولاء (مرحلة لاحقة) — كل حركة نقاط بسببها ومرجعها
+model LoyaltyPointsLedger {
+  id         String   @id @default(cuid())
+  customerId String?
+  vendorId   String?
+  points     Int
+  reason     String
+  refType    String?
+  refId      String?
+  createdAt  DateTime @default(now())
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+  vendor   Vendor?   @relation(fields: [vendorId], references: [id])
+
+  @@index([customerId])
+  @@index([vendorId])
 }

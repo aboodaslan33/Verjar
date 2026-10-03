@@ -3,6 +3,7 @@ import { requireAccess, requireAdmin, requirePermission } from '../../middleware
 import { bookingsAdminRouter, techniciansRouter } from './bookings';
 import { corporateAdminRouter } from './corporate';
 import { customersRouter } from './customers';
+import { insightsRouter } from './insights';
 import { dashboardRouter } from './dashboard';
 import { filesRouter } from './files';
 import { financeRouter } from './finance';
@@ -40,3 +41,5 @@ adminRouter.use('/tenders', requireAccess('corporate.manage', 'corporate.manage'
 adminRouter.use('/reports', requirePermission('reports.view'), reportsRouter);
 adminRouter.use('/market', requireAccess('market.view', 'market.manage'), marketAdminRouter);
 adminRouter.use('/users', requirePermission('users.manage'), usersRouter);
+// إحصائيات المنصة والتميز والمكافآت والكوبونات: Super Admin فقط
+adminRouter.use('/insights', requirePermission('insights.view'), insightsRouter);

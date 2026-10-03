@@ -42,7 +42,7 @@ services:
       - key: COOKIE_SAMESITE
         value: lax
       - key: ADMIN_WHATSAPP
-        value: "962780192930"
+        value: "962781400353"
       # حساب الأدمن: يُنشأ عند كل تشغيل إن لم يوجد، وتُحدَّث كلمة مروره إن تغيّرت هنا (farjarweb@gmail.com)
       - key: ADMIN_EMAIL
         sync: false
