@@ -14,12 +14,15 @@ export function useReveal(root: HTMLElement | null, key: string) {
     if (!root || typeof IntersectionObserver === 'undefined') return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
+    // العناصر التي جهّزها هذا المراقب ولم تظهر بعد: تُعاد للمراقب التالي عند تغيّر الصفحة
+    const pending = new Set<HTMLElement>();
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           if (!e.isIntersecting) continue;
           const el = e.target as HTMLElement;
           io.unobserve(el);
+          pending.delete(el);
           const show = () => el.classList.add('is-revealed');
           // أثناء شاشة البداية ننتظر انتهاءها حتى لا تضيع الحركة تحتها
           if (document.documentElement.classList.contains('splash-active')) {
@@ -36,6 +39,7 @@ export function useReveal(root: HTMLElement | null, key: string) {
       el.dataset.revealReady = '1';
       el.classList.add('reveal');
       if (delay) el.style.setProperty('--reveal-delay', `${delay}ms`);
+      pending.add(el);
       io.observe(el);
     };
 
@@ -51,8 +55,12 @@ export function useReveal(root: HTMLElement | null, key: string) {
     const mo = new MutationObserver(() => scan());
     mo.observe(root, { childList: true, subtree: true });
     return () => {
-      io.disconnect();
       mo.disconnect();
+      io.disconnect();
+      // عند الانتقال لصفحة جديدة قد يلتقط هذا المراقب (قبل إيقافه) عناصر الصفحة الجديدة،
+      // فنزيل علامة الجاهزية عنها ليجهّزها المراقب الجديد — وإلا بقيت مخفية حتى تحديث الصفحة
+      for (const el of pending) delete el.dataset.revealReady;
+      pending.clear();
     };
   }, [root, key]);
 }
