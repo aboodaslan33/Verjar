@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, ButtonA, Icon, Input, PageHeader, Textarea, type IconName } from '../../components/ui';
+import { SocialLinks } from '../../components/layout/SiteFooter';
 import { useSite } from '../../context/SiteContext';
 import { displayPhone, waLink } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
@@ -73,6 +74,11 @@ export default function Contact() {
             <Method icon="clock" label="ساعات العمل">
               <span className="block py-1">{settings.workingHoursText}</span>
             </Method>
+            {(settings.instagram || settings.facebook) && (
+              <Method icon="instagram" label="تابعنا">
+                <SocialLinks instagram={settings.instagram} facebook={settings.facebook} className="py-2" />
+              </Method>
+            )}
           </ul>
 
           <div className="card p-5">

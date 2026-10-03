@@ -67,6 +67,7 @@ export function SiteFooter() {
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-inverse-fg/60">
             {t('footer.about')}
           </p>
+          <SocialLinks instagram={settings.instagram} facebook={settings.facebook} />
         </div>
 
         <FooterList title={t('footer.services')} items={SERVICES.map((i) => ({ to: i.to, label: t(i.key) }))} className="lg:col-span-2" />
@@ -141,5 +142,31 @@ function ContactLine({ icon, href, external, children }: { icon: IconName; href?
         <span className="flex items-center gap-3">{body}</span>
       )}
     </li>
+  );
+}
+
+/** صفحات التواصل الاجتماعي (تُضبط من إعدادات الأدمن) */
+export function SocialLinks({ instagram, facebook, className = 'mt-5' }: { instagram?: string; facebook?: string; className?: string }) {
+  const links = [
+    { href: instagram, icon: 'instagram' as const, label: 'Instagram' },
+    { href: facebook, icon: 'facebook' as const, label: 'Facebook' },
+  ].filter((l) => l.href);
+  if (!links.length) return null;
+  return (
+    <div className={`flex gap-2 ${className}`}>
+      {links.map((l) => (
+        <a
+          key={l.icon}
+          href={l.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={l.label}
+          title={l.label}
+          className="grid h-10 w-10 place-items-center rounded-lg border border-current/20 opacity-80 transition-[opacity,border-color] hover:border-primary hover:opacity-100"
+        >
+          <Icon name={l.icon} className="h-5 w-5" />
+        </a>
+      ))}
+    </div>
   );
 }

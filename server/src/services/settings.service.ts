@@ -151,8 +151,8 @@ export const DEFAULT_SETTINGS: Settings = {
   heroSubtitle: 'نورّد المنتجات والتجهيزات الصناعية، ونصون الماكينات وخطوط الإنتاج بعقود سنوية أو عند العطل، ونكمل معك أعمال البناء والصيانة في عمّان وكل المحافظات.',
   mapUrl: '',
   workingHoursText: 'السبت – الخميس، 8 صباحًا – 6 مساءً',
-  instagram: '',
-  facebook: '',
+  instagram: 'https://www.instagram.com/farjargroup',
+  facebook: 'https://www.facebook.com/share/1JXBPKT9dz/',
 };
 
 let cache: { value: Settings; at: number } | null = null;
