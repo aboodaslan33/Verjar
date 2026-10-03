@@ -12,6 +12,7 @@ const NAV = [
   { to: '/vendor/rfqs', label: 'عروض الأسعار' },
   { to: '/vendor/products', label: 'المنتجات' },
   { to: '/vendor/orders', label: 'طلبات المتجر' },
+  { to: '/vendor/finance', label: 'اللوحة المالية' },
   { to: '/vendor/delivery', label: 'طلبات التوصيل' },
   { to: '/vendor/stats', label: 'الإحصائيات' },
   { to: '/vendor/subscription', label: 'الاشتراك' },

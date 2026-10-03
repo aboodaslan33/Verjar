@@ -35,6 +35,8 @@ const P = {
   Delivery: () => import('./Delivery'),
   Reports: () => import('./Reports'),
   PlatformFees: () => import('./PlatformFees'),
+  SupplierFinance: () => import('./SupplierFinance'),
+  SupplierFinanceDetail: () => import('./SupplierFinanceDetail'),
   Users: () => import('./Users'),
   DeliveryOrderDetail: () => import('./DeliveryOrderDetail'),
   DeliveryOrderNew: () => import('./DeliveryOrderNew'),
@@ -68,6 +70,8 @@ const CorporateDetail = lazy(P.CorporateDetail);
 const Contracts = lazy(P.Contracts);
 const Finance = lazy(P.Finance);
 const PlatformFees = lazy(P.PlatformFees);
+const SupplierFinance = lazy(P.SupplierFinance);
+const SupplierFinanceDetail = lazy(P.SupplierFinanceDetail);
 const Customers = lazy(P.Customers);
 const CustomerDetail = lazy(P.CustomerDetail);
 const Technicians = lazy(P.Technicians);
@@ -195,6 +199,8 @@ const ADMIN_PREFETCH: [RegExp, () => Promise<unknown>, boolean][] = [
   [/^\/admin\/reports\/?$/, P.Reports, true],
   [/^\/admin\/finance\/?$/, P.Finance, true],
   [/^\/admin\/fees\/?$/, P.PlatformFees, true],
+  [/^\/admin\/supplier-finance\/?$/, P.SupplierFinance, true],
+  [/^\/admin\/supplier-finance\/[^/]+\/?$/, P.SupplierFinanceDetail, false],
   [/^\/admin\/customers\/?$/, P.Customers, true],
   [/^\/admin\/customers\/[^/]+\/?$/, P.CustomerDetail, false],
   [/^\/admin\/technicians\/?$/, P.Technicians, true],
@@ -254,6 +260,8 @@ export default function AdminApp() {
           <Route path="reports" element={s(<Reports />)} />
           <Route path="finance" element={s(<Finance />)} />
           <Route path="fees" element={s(<PlatformFees />)} />
+          <Route path="supplier-finance" element={s(<SupplierFinance />)} />
+          <Route path="supplier-finance/:id" element={s(<SupplierFinanceDetail />)} />
           <Route path="customers" element={s(<Customers />)} />
           <Route path="customers/:id" element={s(<CustomerDetail />)} />
           <Route path="technicians" element={s(<Technicians />)} />

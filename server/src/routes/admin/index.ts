@@ -9,6 +9,7 @@ import { filesRouter } from './files';
 import { financeRouter } from './finance';
 import { ordersRouter } from './orders';
 import { productsRouter } from './products';
+import { supplierFinanceRouter } from './supplierFinance';
 import { newsletterRouter } from './newsletter';
 import { logsRouter, settingsRouter } from './settings';
 import { vendorsAdminRouter } from './vendors';
@@ -30,6 +31,7 @@ adminRouter.use('/technicians', requireAccess('bookings.manage', 'bookings.manag
 adminRouter.use('/corporate', requireAccess('corporate.manage', 'corporate.manage'), corporateAdminRouter);
 adminRouter.use('/files', requireAccess('customers.view', 'customers.manage'), filesRouter);
 adminRouter.use('/finance', requireAccess('payments.view', 'payments.manage'), financeRouter);
+adminRouter.use('/supplier-finance', requireAccess('payments.view', 'payments.manage'), supplierFinanceRouter);
 adminRouter.use('/customers', requireAccess('customers.view', 'customers.manage'), customersRouter);
 adminRouter.use('/settings', requireAccess('settings.manage', 'settings.manage'), settingsRouter);
 adminRouter.use('/logs', requirePermission('audit.view'), logsRouter);

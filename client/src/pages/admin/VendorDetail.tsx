@@ -203,6 +203,9 @@ export default function VendorDetail() {
               <p className="mt-2 text-xs text-muted">
                 تُطبّق على المنتجات الجديدة، ويمكن تعديل نسبة كل منتج من صفحته. الطلبات السابقة تحتفظ بالنسبة التي بيعت بها.
               </p>
+              <Link to={`/admin/supplier-finance/${v.id}`} className="mt-3 inline-block text-sm font-semibold underline">
+                مالية المورد وكشف حساب فرجار
+              </Link>
             </Panel>
           )}
           {!v.isHouse && (

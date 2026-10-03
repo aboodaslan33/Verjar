@@ -12,6 +12,7 @@ import type { DeliveryStatus } from '@prisma/client';
 import { DELIVERED_SET, FAILURES, STATUS_AR } from '../../services/delivery.service';
 import { driverPerformance, orderFilters, orderWhere } from './delivery';
 import { type FeeFilters, feeReport } from '../../market/feeReport';
+import { FEE_STATUSES, type FeeStatus, periodReport } from '../../market/supplierFinance';
 
 /**
  * التقارير: كل تقرير يعيد أعمدة (بالعربية والإنجليزية) وصفوفًا وإجماليات،
@@ -23,7 +24,7 @@ type Col = { key: string; ar: string; en: string; money?: boolean };
 type Report = { columns: Col[]; rows: Record<string, unknown>[]; totals: Record<string, number> };
 
 const KINDS = [
-  'sales', 'orders', 'delivery', 'cod', 'settlements', 'contracts', 'annual', 'pest', 'tenders', 'commissions', 'platform_fees',
+  'sales', 'orders', 'delivery', 'cod', 'settlements', 'contracts', 'annual', 'pest', 'tenders', 'commissions', 'platform_fees', 'supplier_fees',
   // نظام إدارة التوصيل
   'dm_orders', 'dm_delivered', 'dm_failed', 'dm_collections', 'dm_drivers', 'dm_suppliers', 'dm_customers', 'dm_fees',
 ] as const;
@@ -53,6 +54,7 @@ type Query = {
   feeMax?: number;
   financialStatus?: string;
   settled?: 'true' | 'false';
+  groupBy?: 'day' | 'week' | 'month' | 'year';
 };
 
 const STATUSES = ['NEW', 'UNDER_REVIEW', 'PRICED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
@@ -259,6 +261,27 @@ async function build(kind: Kind, q: Query): Promise<Report> {
         totals: { count: rows.length, awarded: rows.filter((x) => x.status === 'AWARDED').length, awardedAmount: sum(rows, 'awardedAmount'), commissionAmount: sum(rows, 'commissionAmount') },
       };
     }
+    case 'supplier_fees': {
+      const r2 = range(q.from, q.to);
+      const status = (FEE_STATUSES as readonly string[]).includes(q.status ?? '') ? (q.status as FeeStatus) : undefined;
+      const rep = await periodReport({ groupBy: q.groupBy ?? 'month', vendorId: q.supplierId || undefined, status, from: r2?.gte, to: r2?.lte });
+      return {
+        columns: [
+          c('period', 'الفترة', 'Period'),
+          c('orders', 'الطلبات', 'Orders'),
+          c('customerSales', 'المبيعات', 'Total sales', true),
+          c('supplierBase', 'قبل نسبة فرجار', 'Supplier base', true),
+          c('fees', 'نسبة فرجار', 'Farjar fees', true),
+          c('paid', 'المدفوع', 'Paid', true),
+          c('outstanding', 'المتبقي', 'Outstanding', true),
+          c('due', 'مستحق', 'Due', true),
+          c('pending', 'معلّق', 'Pending', true),
+          c('disputed', 'متنازع عليه', 'Disputed', true),
+        ],
+        rows: rep.periods,
+        totals: { customerSales: rep.totals.customerSales, fees: rep.totals.fees, paid: rep.totals.paid, outstanding: rep.totals.outstanding },
+      };
+    }
     case 'platform_fees': {
       const rep = await feeReport(feeFilters(q), { lines: 0 });
       const rows = rep.byProduct.map((p) => ({
@@ -346,6 +369,7 @@ reportsRouter.get(
         paymentMethod: z.string().max(20).optional(),
         customer: z.string().trim().max(100).optional(),
         ...feeQuery,
+        groupBy: z.enum(['day', 'week', 'month', 'year']).optional(),
         format: z.enum(['json', 'csv', 'xlsx']).default('json'),
         lang: z.enum(['ar', 'en']).default('ar'),
       })

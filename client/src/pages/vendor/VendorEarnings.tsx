@@ -1,36 +1,29 @@
 import { useAdminQuery } from '../../components/admin/hooks';
-import type { DueVendorOrder, FeeLine, FeeProductRow, FeeTotals, VendorPayout, VendorTotals } from '../../components/admin/types';
-import { FeeByOrder, FeeByProduct, FeeTiles } from '../../components/admin/FeeTables';
+import { Link } from 'react-router-dom';
+import type { DueVendorOrder, VendorPayout, VendorTotals } from '../../components/admin/types';
 import { AdminPage, Ltr, Panel, StatTile } from '../../components/admin/ui';
-import { ErrorState } from '../../components/ui';
+import { ErrorState, Icon } from '../../components/ui';
 import { api } from '../../lib/api';
 import { PAYMENT_METHOD_LABEL, formatDate, formatJOD } from '../../lib/format';
 import { useDocumentTitle } from '../../lib/useAsync';
 
 type Earnings = { totals: VendorTotals; payouts: VendorPayout[]; dueOrders: DueVendorOrder[] };
-type Fees = { totals: FeeTotals; byProduct: FeeProductRow[]; byOrder: FeeLine[] };
 
 export default function VendorEarnings() {
   useDocumentTitle('الأرباح');
   const q = useAdminQuery(() => api.get<Earnings>('/vendor/earnings'), []);
-  const fees = useAdminQuery(() => api.get<Fees>('/vendor/fees'), []);
   if (q.error) return <ErrorState message={q.error.message} onRetry={q.retry} />;
   const t = q.data?.totals;
 
   return (
     <AdminPage title="الأرباح" description="كل بند محسوب بسعرك ونسبة فرجار وقت البيع — تغيير النسبة لاحقًا لا يغيّر الطلبات السابقة">
-      <h2 className="mb-3 text-lg font-bold">نسبة فرجار</h2>
-      {fees.error ? (
-        <ErrorState message={fees.error.message} onRetry={fees.retry} />
-      ) : (
-        <>
-          <FeeTiles totals={fees.data?.totals} loading={fees.loading} supplier />
-          <div className="mb-8 mt-6 grid gap-6 lg:grid-cols-2">
-            <FeeByProduct rows={fees.data?.byProduct ?? []} productHref={(id) => `/vendor/products/${id}`} />
-            <FeeByOrder lines={fees.data?.byOrder ?? []} />
-          </div>
-        </>
-      )}
+      <Link to="/vendor/finance" className="card card-hover mb-6 flex items-center justify-between gap-3 p-4">
+        <span>
+          <span className="block font-semibold">اللوحة المالية وكشف حساب فرجار</span>
+          <span className="text-sm text-muted">نسبة فرجار، المستحق والمدفوع والمتبقي، وكل الطلبات</span>
+        </span>
+        <Icon name="arrowLeft" className="h-5 w-5 text-muted" />
+      </Link>
       <h2 className="mb-3 text-lg font-bold">المستحقات والدفعات</h2>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="المبيعات" value={formatJOD(t?.salesTotal ?? 0)} sub={`${t?.ordersCount ?? 0} طلب`} loading={q.loading} />

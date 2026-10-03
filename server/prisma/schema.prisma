@@ -245,6 +245,7 @@ model User {
   campaigns   EmailCampaign[]
   payments    Payment[]            @relation("PaymentRecordedBy")
   payouts     VendorPayout[]       @relation("PayoutRecordedBy")
+  feePayments FarjarFeePayment[]   @relation("FeePaymentRecordedBy")
   settlements DeliverySettlement[] @relation("SettlementReceivedBy")
   quotes      QuoteFile[]          @relation("QuoteUploadedBy")
 
@@ -433,6 +434,7 @@ model Vendor {
   vendorOrders  VendorOrder[]
   orderItems    OrderItem[]
   payouts       VendorPayout[]
+  feePayments   FarjarFeePayment[]
   tenderOffers  TenderOffer[]
   orders        Order[]               @relation("OrderSupplier")
   recognitions  Recognition[]
@@ -633,15 +635,24 @@ model VendorOrder {
   total           Decimal       @db.Decimal(10, 3)
   commissionTotal Decimal       @db.Decimal(10, 3)
   vendorNet       Decimal       @db.Decimal(10, 3)
-  /// التسوية التي دُفع فيها صافي المورد
+  /// التسوية التي دُفع فيها صافي المورد (فرجار حصّلت المبلغ واحتفظت بنسبتها)
   payoutId        String?
+  /// ما سدده المورد لفرجار من نسبة هذا الطلب (دفعات يدوية يسجلها الأدمن)
+  feePaid         Decimal       @default(0) @db.Decimal(10, 3)
+  /// اعتراض/نزاع على نسبة فرجار لهذا الطلب
+  feeDisputed     Boolean       @default(false)
+  feeDisputeNote  String?
+  feeDisputedAt   DateTime?
+  /// من فتح النزاع: SUPPLIER أو ADMIN
+  feeDisputedBy   String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  order  Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendor Vendor        @relation(fields: [vendorId], references: [id])
-  payout VendorPayout? @relation(fields: [payoutId], references: [id])
-  items  OrderItem[]
+  order          Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor         Vendor                @relation(fields: [vendorId], references: [id])
+  payout         VendorPayout?         @relation(fields: [payoutId], references: [id])
+  items          OrderItem[]
+  feeAllocations FarjarFeeAllocation[]
 
   @@unique([orderId, vendorId])
   @@index([vendorId, status])
@@ -1971,4 +1982,39 @@ model LoyaltyPointsLedger {
 
   @@index([customerId])
   @@index([vendorId])
+}
+
+/// دفعة من المورد لفرجار مقابل نسبة فرجار المستحقة (تسجيل يدوي — لا توجد بوابة دفع حاليًا)
+model FarjarFeePayment {
+  id           String        @id @default(cuid())
+  vendorId     String
+  amount       Decimal       @db.Decimal(12, 3)
+  method       PaymentMethod @default(BANK_TRANSFER)
+  /// رقم المرجع أو الإيصال
+  reference    String?
+  note         String?
+  paidAt       DateTime      @default(now())
+  recordedById String?
+  createdAt    DateTime      @default(now())
+
+  vendor      Vendor                @relation(fields: [vendorId], references: [id])
+  recordedBy  User?                 @relation("FeePaymentRecordedBy", fields: [recordedById], references: [id])
+  allocations FarjarFeeAllocation[]
+
+  @@index([vendorId])
+  @@index([paidAt])
+}
+
+/// توزيع الدفعة على الطلبات (الأقدم استحقاقًا أولًا)
+model FarjarFeeAllocation {
+  id            String  @id @default(cuid())
+  paymentId     String
+  vendorOrderId String
+  amount        Decimal @db.Decimal(10, 3)
+
+  payment     FarjarFeePayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendorOrder VendorOrder      @relation(fields: [vendorOrderId], references: [id])
+
+  @@index([paymentId])
+  @@index([vendorOrderId])
 }

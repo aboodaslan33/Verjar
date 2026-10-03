@@ -12,6 +12,7 @@ const ProductEdit = lazy(() => import('./VendorProductEdit'));
 const Orders = lazy(() => import('./VendorOrders'));
 const OrderDetail = lazy(() => import('./VendorOrderDetail'));
 const Earnings = lazy(() => import('./VendorEarnings'));
+const Finance = lazy(() => import('./VendorFinance'));
 const Tenders = lazy(() => import('./VendorTenders'));
 const M = () => import('./VendorMarket');
 const Rfqs = lazy(() => M().then((m) => ({ default: m.VendorRfqs })));
@@ -69,6 +70,7 @@ export default function VendorApp() {
         <Route path="delivery/new" element={s(<DeliveryNew />)} />
         <Route path="delivery/:id" element={s(<DeliveryDetail />)} />
         <Route path="earnings" element={s(<Earnings />)} />
+        <Route path="finance" element={s(<Finance />)} />
         <Route path="tenders" element={s(<Tenders />)} />
         <Route path="*" element={<Navigate to="/vendor" replace />} />
       </Route>

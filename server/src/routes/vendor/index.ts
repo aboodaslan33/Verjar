@@ -24,6 +24,8 @@ import { checkPrice, industrialFields, priceField } from '../../validators/produ
 import { assertProductQuota } from '../../market/plans';
 import { FEE_MAX, pricingData, productPricing, resolveFeePercent } from '../../market/fees';
 import { feeReport } from '../../market/feeReport';
+import { FEE_STATUSES, paymentsOf, recentActivity, setDispute, statement, supplierSummary } from '../../market/supplierFinance';
+import { ammanToUtc } from '../../lib/time';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
 import { vendorMarketRouter } from './market';
 
@@ -572,6 +574,42 @@ vendorRouter.get(
       byOrder: report.lines.map(({ vendor: _v, ...l }) => l),
       feePolicy: settings.platformFeeEditPolicy,
     });
+  }),
+);
+
+// ───────────── اللوحة المالية (Financial Dashboard) ─────────────
+
+/** ملخص مالي واضح للمورد: المبيعات، نسبة فرجار، المستحق والمدفوع والمتبقي، وآخر العمليات */
+vendorRouter.get(
+  '/finance',
+  asyncHandler(async (req, res) => {
+    const id = vid(req);
+    const [s, activity, payments] = await Promise.all([supplierSummary(id), recentActivity(id), paymentsOf(id)]);
+    ok(res, { ...s, activity, payments: payments.map(({ recordedBy: _r, ...p }) => p) });
+  }),
+);
+
+/** كشف حساب فرجار: الطلبات التي ترتب عليها مبلغ لفرجار */
+vendorRouter.get(
+  '/finance/statement',
+  asyncHandler(async (req, res) => {
+    const q = z
+      .object({ status: z.enum(FEE_STATUSES).optional(), from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })
+      .parse(req.query);
+    ok(res, await statement(vid(req), { status: q.status, from: q.from ? ammanToUtc(q.from, '00:00') : undefined, to: q.to ? ammanToUtc(q.to, '23:59') : undefined }));
+  }),
+);
+
+/** اعتراض المورد على نسبة فرجار لطلب — تراجعه الإدارة */
+vendorRouter.post(
+  '/finance/orders/:id/dispute',
+  formLimiter,
+  asyncHandler(async (req, res) => {
+    const input = z.object({ note: z.string().trim().min(3, 'اكتب سبب الاعتراض').max(500) }).parse(req.body);
+    const vo = await setDispute(prisma, req.params.id, { disputed: true, note: input.note, by: 'SUPPLIER' }, vid(req));
+    emitAdmin({ type: 'status.changed', id: vo.id, title: `اعتراض مورد على نسبة فرجار — طلب #${vo.number}` });
+    await audit({ actorType: 'vendor', action: 'fee_dispute', entity: 'vendorOrder', entityId: vo.id, meta: { vendorId: vid(req), note: input.note } });
+    ok(res, { disputed: true });
   }),
 );
 
