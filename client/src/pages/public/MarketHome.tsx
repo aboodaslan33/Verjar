@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { SupplierLine, VerifiedMark, PlanBadge } from '../../components/market/Badges';
+import { AwardBadge, SupplierLine, VerifiedMark, PlanBadge, activeAward } from '../../components/market/Badges';
 import { PRODUCT_GRID, ProductCard, ProductGridSkeleton, productImage } from '../../components/store/ProductCard';
 import { ButtonLink, Icon, SectionHeading, Skeleton } from '../../components/ui';
 import type { IconName } from '../../components/ui/Icon';
@@ -9,7 +9,7 @@ import { cx, formatJOD } from '../../lib/format';
 import type { Category, Product } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 
-type AdVendor = { id: string; name: string; slug: string; logoUrl: string | null; verified: boolean; city: string | null; isHouse: boolean; description?: string; plan: { code: string; badge: string | null } | null };
+type AdVendor = { id: string; name: string; slug: string; logoUrl: string | null; verified: boolean; city: string | null; isHouse: boolean; description?: string; plan: { code: string; badge: string | null } | null; awardTitle?: string | null; awardUntil?: string | null };
 type Ad = { id: string; type: string; title: string | null; vendor: AdVendor; product: Product | null };
 type SupplierCard = AdVendor & { businessField: string | null; productCount: number };
 type Home = {
@@ -341,7 +341,7 @@ export function SupplierTile({ s, featured, onClick }: { s: SupplierCard | (AdVe
         <span className="flex items-center gap-1.5 font-semibold">
           <span className="truncate">{s.isHouse ? 'FARJAR' : s.name}</span>
           {(s.verified || s.isHouse) && <VerifiedMark />}
-          {!s.isHouse && <PlanBadge plan={s.plan} />}
+          {!s.isHouse && (activeAward(s) ? <AwardBadge title={activeAward(s)!} /> : <PlanBadge plan={s.plan} />)}
         </span>
         <span className="block truncate text-xs text-muted">
           {[s.city, s.businessField].filter(Boolean).join(' · ') || (featured ? 'مورد مميز' : '')}

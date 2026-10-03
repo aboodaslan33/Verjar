@@ -38,6 +38,10 @@ const P = {
   DeliveryOrderDetail: () => import('./DeliveryOrderDetail'),
   DeliveryOrderNew: () => import('./DeliveryOrderNew'),
   MarketOverview: () => import('./market/MarketOverview'),
+  InsightsPerformance: () => import('./insights/Performance'),
+  InsightsRecognition: () => import('./insights/Recognition'),
+  InsightsRewards: () => import('./insights/Rewards'),
+  InsightsArchive: () => import('./insights/Archive'),
   MarketSuppliers: () => import('./market/MarketSuppliers').then((m) => ({ default: m.MarketSuppliers })),
   MarketSupplierDetail: () => import('./market/MarketSuppliers').then((m) => ({ default: m.MarketSupplierDetail })),
   MarketRfqs: () => import('./market/MarketRfqs').then((m) => ({ default: m.MarketRfqs })),
@@ -79,6 +83,10 @@ const Users = lazy(P.Users);
 const DeliveryOrderDetail = lazy(P.DeliveryOrderDetail);
 const DeliveryOrderNew = lazy(P.DeliveryOrderNew);
 const MarketOverview = lazy(P.MarketOverview);
+const InsightsPerformance = lazy(P.InsightsPerformance);
+const InsightsRecognition = lazy(P.InsightsRecognition);
+const InsightsRewards = lazy(P.InsightsRewards);
+const InsightsArchive = lazy(P.InsightsArchive);
 const MarketSuppliers = lazy(P.MarketSuppliers);
 const MarketSupplierDetail = lazy(P.MarketSupplierDetail);
 const MarketRfqs = lazy(P.MarketRfqs);
@@ -193,6 +201,10 @@ const ADMIN_PREFETCH: [RegExp, () => Promise<unknown>, boolean][] = [
   [/^\/admin\/vendors\/?$/, P.Vendors, true],
   [/^\/admin\/vendors\/[^/]+\/?$/, P.VendorDetail, false],
   [/^\/admin\/market\/?$/, P.MarketOverview, true],
+  [/^\/admin\/insights\/?$/, P.InsightsPerformance, true],
+  [/^\/admin\/insights\/recognition\/?$/, P.InsightsRecognition, true],
+  [/^\/admin\/insights\/rewards\/?$/, P.InsightsRewards, true],
+  [/^\/admin\/insights\/archive\/?$/, P.InsightsArchive, false],
   [/^\/admin\/market\/suppliers\/?$/, P.MarketSuppliers, true],
   [/^\/admin\/market\/suppliers\/[^/]+\/?$/, P.MarketSupplierDetail, false],
   [/^\/admin\/market\/rfqs\/?$/, P.MarketRfqs, true],
@@ -247,6 +259,10 @@ export default function AdminApp() {
           <Route path="vendors" element={s(<Vendors />)} />
           <Route path="vendors/:id" element={s(<VendorDetail />)} />
           <Route path="market" element={s(<MarketOverview />)} />
+          <Route path="insights" element={s(<InsightsPerformance />)} />
+          <Route path="insights/recognition" element={s(<InsightsRecognition />)} />
+          <Route path="insights/rewards" element={s(<InsightsRewards />)} />
+          <Route path="insights/archive" element={s(<InsightsArchive />)} />
           <Route path="market/suppliers" element={s(<MarketSuppliers />)} />
           <Route path="market/suppliers/:id" element={s(<MarketSupplierDetail />)} />
           <Route path="market/rfqs" element={s(<MarketRfqs />)} />

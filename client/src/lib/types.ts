@@ -80,6 +80,9 @@ export type VendorBrief = {
   verified?: boolean;
   city?: string | null;
   plan?: { code: string; badge: string | null } | null;
+  /** شارة التميز (مثل "مورد الشهر") حتى تاريخ — يمنحها الـ Super Admin */
+  awardTitle?: string | null;
+  awardUntil?: string | null;
 };
 
 export type VendorStore = VendorBrief & { description: string; createdAt: string; productCount: number };

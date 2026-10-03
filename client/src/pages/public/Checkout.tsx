@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
 import { CheckoutHeader } from '../../components/store/CheckoutSteps';
@@ -51,6 +51,33 @@ export default function Checkout() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [result, setResult] = useState<OrderCreated | null>(null);
   const [payment, setPayment] = useState<'COD' | 'CLIQ' | 'BANK_TRANSFER'>('COD');
+  // كود الخصم: يُتحقق منه على السلة الحالية ويُعاد التحقق نهائيًا عند إرسال الطلب
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<{ code: string; discount: number; name: string } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const cartKey = cart.items.map((i) => `${i.productId}:${i.quantity}`).join(',');
+  useEffect(() => {
+    setCoupon(null);
+  }, [cartKey]);
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setChecking(true);
+    setCouponError(null);
+    try {
+      const r = await api.post<{ code: string; discount: number; name: string }>('/store/coupons/check', {
+        code,
+        items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      });
+      setCoupon(r);
+    } catch (err) {
+      setCoupon(null);
+      setCouponError(err instanceof ApiError ? (err.fields.couponCode ?? err.message) : 'تعذر التحقق من الكود');
+    } finally {
+      setChecking(false);
+    }
+  };
   const { t } = useI18n();
   const refs = useRef<Partial<Record<Field, HTMLInputElement | HTMLTextAreaElement | null>>>({});
 
@@ -105,6 +132,7 @@ export default function Checkout() {
         address: form.address.trim(),
         notes: form.notes.trim() || undefined,
         paymentMethod: payment,
+        couponCode: coupon?.code ?? null,
         items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       });
       setResult(data);
@@ -113,6 +141,10 @@ export default function Checkout() {
       wa.open(data.whatsapp.link);
     } catch (err) {
       wa.cancel();
+      if (err instanceof ApiError && err.fields.couponCode) {
+        setCoupon(null);
+        setCouponError(err.fields.couponCode);
+      }
       if (err instanceof ApiError) {
         const fe: Partial<Record<Field, string>> = {};
         for (const [k, msg] of Object.entries(err.fields)) {
@@ -254,7 +286,42 @@ export default function Checkout() {
                 </li>
               ))}
             </ul>
-            <Totals subtotal={cart.subtotal} discount={cart.discount} total={cart.total} />
+            <div className="mt-3 border-t border-line pt-3">
+              {coupon ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-success/10 px-3 py-2 text-sm">
+                  <span>
+                    كود <span className="ltr font-bold">{coupon.code}</span> مُطبَّق
+                  </span>
+                  <button type="button" className="text-xs font-semibold underline" onClick={() => (setCoupon(null), setCouponInput(''))}>
+                    إزالة
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-end gap-2">
+                  <label className="min-w-0 flex-1">
+                    <span className="mb-1 block text-sm font-medium">كود الخصم</span>
+                    <input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void applyCoupon();
+                        }
+                      }}
+                      className="input ltr uppercase"
+                      placeholder="VIP-XXXX"
+                      aria-invalid={Boolean(couponError)}
+                    />
+                  </label>
+                  <Button type="button" variant="outline" loading={checking} disabled={!couponInput.trim()} onClick={applyCoupon}>
+                    تطبيق
+                  </Button>
+                </div>
+              )}
+              {couponError && <p className="mt-1 text-sm text-danger">{couponError}</p>}
+            </div>
+            <Totals subtotal={cart.subtotal} discount={cart.discount} total={Math.max(0, Math.round((cart.total - (coupon?.discount ?? 0)) * 1000) / 1000)} coupon={coupon?.discount ?? 0} />
             <p className="mt-3 text-xs text-muted">الأسعار النهائية يؤكدها النظام عند الإرسال.</p>
           </div>
         </aside>
@@ -263,7 +330,7 @@ export default function Checkout() {
   );
 }
 
-function Totals({ subtotal, discount, total }: { subtotal: number; discount: number; total: number }) {
+function Totals({ subtotal, discount, total, coupon = 0 }: { subtotal: number; discount: number; total: number; coupon?: number }) {
   return (
     <dl className="mt-3 space-y-2 border-t border-line pt-3 text-[15px]">
       <div className="flex justify-between">
@@ -274,6 +341,12 @@ function Totals({ subtotal, discount, total }: { subtotal: number; discount: num
         <dt className="text-muted">الخصم</dt>
         <dd className={discount > 0 ? 'text-success' : undefined}>{discount > 0 ? `− ${formatJOD(discount)}` : formatJOD(0)}</dd>
       </div>
+      {coupon > 0 && (
+        <div className="flex justify-between">
+          <dt className="text-muted">كود الخصم</dt>
+          <dd className="text-success">− {formatJOD(coupon)}</dd>
+        </div>
+      )}
       <div className="flex items-baseline justify-between border-t border-line-strong pt-3">
         <dt className="font-semibold">الإجمالي</dt>
         <dd className="font-display text-2xl font-semibold">{formatJOD(total)}</dd>

@@ -8,6 +8,8 @@ import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 import { SupplierTile } from './MarketHome';
 
 type Supplier = {
+  awardTitle?: string | null;
+  awardUntil?: string | null;
   id: string;
   name: string;
   slug: string;
@@ -37,7 +39,7 @@ export default function Suppliers() {
   const page = Math.max(1, Number(get('page')) || 1);
   const key = ['q', 'city', 'category', 'verified', 'plan'].map(get).join('|');
   const list = useAsync(
-    () => api.get<Paged<Supplier>>('/store/suppliers', { q: get('q'), city: get('city'), category: get('category'), verified: get('verified'), plan: get('plan'), page, pageSize: 24 }),
+    () => api.get<Paged<Supplier> & { featured?: Supplier[] }>('/store/suppliers', { q: get('q'), city: get('city'), category: get('category'), verified: get('verified'), plan: get('plan'), page, pageSize: 24 }),
     [key, page],
     `suppliers?${key}|${page}`,
   );
@@ -98,6 +100,20 @@ export default function Suppliers() {
             </div>
           ) : list.data && list.data.items.length ? (
             <>
+              {list.data.featured && list.data.featured.length > 0 && !get('q') && (
+                <section className="mb-8" aria-labelledby="featured-suppliers">
+                  <h2 id="featured-suppliers" className="mb-3 flex items-center gap-2 text-lg">
+                    <Icon name="star" className="h-5 w-5 text-primary" /> الموردون المميزون
+                  </h2>
+                  <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {list.data.featured.map((s) => (
+                      <li key={s.id}>
+                        <SupplierTile s={s} featured />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               <p className="mb-4 text-sm text-muted">
                 <span className="num font-semibold text-ink">{list.data.total}</span> مورد
               </p>

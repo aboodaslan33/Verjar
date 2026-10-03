@@ -56,6 +56,8 @@ const PERM_LABEL: Record<string, string> = {
   'market.view': 'السوق الصناعي — عرض',
   'market.manage': 'السوق الصناعي — الموردون وطلبات الأسعار والإعلانات',
   'market.finance': 'السوق الصناعي — الباقات والعمولات والفواتير',
+  'insights.view': 'أداء المنصة والإحصائيات (Super Admin فقط)',
+  'rewards.manage': 'التميز الشهري والمكافآت والكوبونات (Super Admin فقط)',
   'bookings.manage': 'الحجوزات والفنيون',
   'corporate.manage': 'طلبات وعقود وعطاءات الشركات',
   'payments.view': 'عرض المالية والمدفوعات',

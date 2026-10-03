@@ -30,19 +30,34 @@ export function PlanBadge({ plan, className }: { plan?: { code: string; badge?: 
   );
 }
 
+/** شارة التميز الفعّالة (مورد الشهر…) أو null بعد انتهاء مدتها */
+export function activeAward(v: { awardTitle?: string | null; awardUntil?: string | null }) {
+  return v.awardTitle && v.awardUntil && new Date(v.awardUntil).getTime() > Date.now() ? v.awardTitle : null;
+}
+
+export function AwardBadge({ title, className }: { title: string; className?: string }) {
+  return (
+    <span className={cx('inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-primary px-2 text-[10px] font-bold text-primary-fg', className)} title={title}>
+      <Icon name="star" className="h-3 w-3" aria-hidden />
+      {title}
+    </span>
+  );
+}
+
 /** اسم المورد مع التوثيق والباقة (منتجات FARJAR تظهر باسم FARJAR) */
 export function SupplierLine({
   vendor,
   className,
 }: {
-  vendor: { name: string; isHouse: boolean; verified?: boolean; city?: string | null; plan?: { code: string; badge?: string | null } | null };
+  vendor: { name: string; isHouse: boolean; verified?: boolean; city?: string | null; plan?: { code: string; badge?: string | null } | null; awardTitle?: string | null; awardUntil?: string | null };
   className?: string;
 }) {
+  const award = vendor.isHouse ? null : activeAward(vendor);
   return (
     <span className={cx('inline-flex min-w-0 items-center gap-1.5', className)}>
       <span className="truncate">{vendor.isHouse ? 'FARJAR' : vendor.name}</span>
       {(vendor.verified || vendor.isHouse) && <VerifiedMark />}
-      {!vendor.isHouse && <PlanBadge plan={vendor.plan} />}
+      {award ? <AwardBadge title={award} /> : !vendor.isHouse && <PlanBadge plan={vendor.plan} />}
     </span>
   );
 }

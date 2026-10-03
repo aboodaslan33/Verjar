@@ -43,7 +43,7 @@ const adSelect = {
   type: true,
   placement: true,
   title: true,
-  vendor: { select: { id: true, name: true, slug: true, logoUrl: true, verified: true, city: true, isHouse: true, description: true, plan: { select: { code: true, badge: true } } } },
+  vendor: { select: { id: true, name: true, slug: true, logoUrl: true, verified: true, city: true, isHouse: true, description: true, awardTitle: true, awardUntil: true, plan: { select: { code: true, badge: true } } } },
   product: { select: productPublicSelect },
 } satisfies Prisma.MarketAdSelect;
 
@@ -77,7 +77,7 @@ marketRouter.get(
         where: { active: true, status: 'APPROVED' },
         orderBy: [{ isHouse: 'desc' }, { plan: { searchBoost: 'desc' } }, { verified: 'desc' }, { createdAt: 'asc' }],
         take: 8,
-        select: { id: true, name: true, slug: true, logoUrl: true, verified: true, city: true, isHouse: true, businessField: true, plan: { select: { code: true, badge: true } }, _count: { select: { products: { where: publicProductWhere() } } } },
+        select: { id: true, name: true, slug: true, logoUrl: true, verified: true, city: true, isHouse: true, businessField: true, awardTitle: true, awardUntil: true, plan: { select: { code: true, badge: true } }, _count: { select: { products: { where: publicProductWhere() } } } },
       }),
       Promise.all([
         prisma.vendor.count({ where: { active: true, status: 'APPROVED' } }),

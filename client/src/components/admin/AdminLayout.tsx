@@ -18,6 +18,15 @@ type NavItem = { to: string; label: string; k?: MessageKey; end?: boolean; badge
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [{ to: '/admin', label: 'لوحة التحكم', end: true, perm: ['dashboard.view'] }] },
   {
+    group: 'أداء المنصة والتميز',
+    items: [
+      { to: '/admin/insights', label: 'أداء المنصة', end: true, perm: ['insights.view'] },
+      { to: '/admin/insights/recognition', label: 'التميز الشهري', perm: ['insights.view'] },
+      { to: '/admin/insights/rewards', label: 'المكافآت والكوبونات', perm: ['insights.view'] },
+      { to: '/admin/insights/archive', label: 'أرشيف التميز', perm: ['insights.view'] },
+    ],
+  },
+  {
     group: 'العمليات',
     items: [
       { to: '/admin/bookings', label: 'الحجوزات', badge: (s) => s.newBookings, perm: ['bookings.manage'] },

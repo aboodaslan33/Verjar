@@ -6,6 +6,8 @@ import { AdminPage, Panel, StatTile } from '../../components/admin/ui';
 import { URGENCY_LABEL } from '../../components/admin/labels';
 import { ButtonLink, ErrorState, Skeleton, StatusBadge, Tag } from '../../components/ui';
 import { useAdmin } from '../../context/AdminAuth';
+import { hasPerm } from '../../context/Auth';
+import { PlatformOverview } from '../../components/admin/insights/PlatformOverview';
 import { api } from '../../lib/api';
 import { BOOKING_TYPE_LABEL, CORPORATE_TYPE_LABEL, formatDate, formatJOD, formatTime } from '../../lib/format';
 import type { BookingType, CorporateType } from '../../lib/types';
@@ -83,6 +85,7 @@ export default function Dashboard() {
         <ErrorState message={error.message} onRetry={retry} />
       ) : (
         <div className="space-y-6">
+          {hasPerm(admin, 'insights.view') && <PlatformOverview />}
           {recent.length > 0 && (
             <div className="card flex flex-wrap items-center gap-x-4 gap-y-1 border-s-4 border-s-sand-400 px-4 py-3 text-sm">
               <span className="font-semibold">وصل الآن:</span>

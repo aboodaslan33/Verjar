@@ -1,5 +1,5 @@
 import { useParams, useSearchParams } from 'react-router-dom';
-import { PlanBadge, VerifiedMark } from '../../components/market/Badges';
+import { AwardBadge, PlanBadge, VerifiedMark, activeAward } from '../../components/market/Badges';
 import { Stars } from '../../components/market/Stars';
 import { PRODUCT_GRID, ProductCard, ProductGridSkeleton } from '../../components/store/ProductCard';
 import { ButtonLink, EmptyState, ErrorState, Icon, Pagination, Skeleton } from '../../components/ui';
@@ -12,6 +12,8 @@ import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 const PAGE_SIZE = 12;
 
 type Supplier = {
+  awardTitle?: string | null;
+  awardUntil?: string | null;
   id: string;
   name: string;
   slug: string;
@@ -83,6 +85,7 @@ export default function VendorStore() {
               {v && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
                   {(v.verified || v.isHouse) && <VerifiedMark label />}
+                  {!v.isHouse && activeAward(v) && <AwardBadge title={activeAward(v)!} className="h-6 px-2.5 text-xs" />}
                   {v.city && (
                     <span className="inline-flex items-center gap-1">
                       <Icon name="pin" className="h-4 w-4" /> {v.city}

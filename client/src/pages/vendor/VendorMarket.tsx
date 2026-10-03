@@ -37,6 +37,10 @@ export type MarketOverview = {
   deals: { count: number; value: number };
   rating: { average: number; count: number } | null;
   pendingInvoices: number;
+  award?: { title: string; until: string } | null;
+  recognitions?: { id: string; period: string; title: string }[];
+  rewards?: { id: string; type: string; title: string; endsAt: string | null }[];
+  perks?: { extraProducts: number; subscriptionDiscountPct: number };
 };
 
 /** حالة المورد في السوق (قيد المراجعة/مرفوض/معلّق) — تظهر أعلى اللوحة */
@@ -55,6 +59,28 @@ export function VendorStatusBanner({ o }: { o: MarketOverview | null }) {
 export function MarketSummary({ o, loading }: { o: MarketOverview | null; loading: boolean }) {
   return (
     <>
+      {o && (o.award || (o.rewards && o.rewards.length > 0)) && (
+        <div className="mb-6 rounded-2xl bg-ink p-5 text-white">
+          <p className="flex items-center gap-2 text-sm text-white/70">
+            <Icon name="star" className="h-4 w-4 text-primary" /> تكريم من FARJAR
+          </p>
+          {o.award && (
+            <p className="mt-1 font-display text-2xl font-bold">
+              {o.award.title} <span className="text-sm font-normal text-white/70">— الشارة ظاهرة حتى {formatDate(o.award.until)}</span>
+            </p>
+          )}
+          {o.rewards && o.rewards.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {o.rewards.map((r) => (
+                <li key={r.id} className="rounded-full bg-white/10 px-3 py-1 text-sm">
+                  {r.title}
+                  {r.endsAt && <span className="text-white/60"> · حتى {formatDate(r.endsAt)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="طلبات عروض أسعار جديدة" value={o?.rfqs.newCount ?? 0} to="/vendor/rfqs" tone={o?.rfqs.newCount ? 'brand' : 'neutral'} loading={loading} />
         <StatTile label="العروض المقدَّمة" value={o?.rfqs.quoted ?? 0} to="/vendor/rfqs?tab=quoted" loading={loading} />

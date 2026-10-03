@@ -18,6 +18,7 @@ import {
 } from '../../components/ui';
 import { DeliveryStatusTag } from '../../components/delivery/Tags';
 import { RfqTab } from './RfqList';
+import { RewardsTab } from './RewardsTab';
 import { DeliveryTimeline } from '../../components/delivery/Timeline';
 import { NotificationsBell } from '../../components/NotificationsBell';
 import { isAdminUser, useAuth } from '../../context/Auth';
@@ -130,7 +131,7 @@ type Overview = {
 const PROGRESS: RequestStatus[] = ['NEW', 'UNDER_REVIEW', 'PRICED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED'];
 const CONTRACT_STATUS: Record<OContract['status'], string> = { ACTIVE: 'ساري', EXPIRED: 'منتهي', CANCELLED: 'ملغي' };
 
-type TabKey = 'bookings' | 'orders' | 'rfqs' | 'corporate' | 'tenders' | 'files' | 'payments';
+type TabKey = 'bookings' | 'orders' | 'rfqs' | 'corporate' | 'tenders' | 'files' | 'payments' | 'rewards';
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'bookings', label: 'الحجوزات' },
   { key: 'orders', label: 'الطلبات' },
@@ -139,6 +140,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'tenders', label: 'العطاءات' },
   { key: 'files', label: 'الملفات' },
   { key: 'payments', label: 'الدفعات' },
+  { key: 'rewards', label: 'مكافآتي' },
 ];
 
 function linkedLabel(x: { booking?: Linked; order?: Linked; corporateRequest?: Linked; contract?: Linked }): string | null {
@@ -174,6 +176,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
     tenders: 0,
     files: data?.files.length ?? 0,
     payments: data?.payments.length ?? 0,
+    rewards: 0,
   };
 
   return (
@@ -259,6 +262,7 @@ function AccountView({ customer }: { customer: CustomerMe }) {
               {tab === 'rfqs' && <RfqTab />}
               {tab === 'files' && <FilesTab items={data.files} />}
               {tab === 'payments' && <PaymentsTab items={data.payments} />}
+              {tab === 'rewards' && <RewardsTab />}
             </>
           ) : null}
         </div>
