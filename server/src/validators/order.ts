@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { selectionInput } from '../market/options';
 import { nameField, optionalText, phoneField, requiredText } from './common';
 
 export const orderSchema = z.object({
@@ -15,6 +16,8 @@ export const orderSchema = z.object({
       z.object({
         productId: z.string().min(1),
         quantity: z.coerce.number().int().min(1, 'الكمية يجب أن تكون 1 على الأقل').max(20, 'الحد الأقصى 20 قطعة من المنتج في الطلب الواحد. للكميات الأكبر تواصل معنا'),
+        /** الخيار المختار (اللون، المقاس…) — يُتحقق منه في الخادم */
+        options: selectionInput,
       }),
     )
     .min(1, 'السلة فارغة')

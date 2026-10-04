@@ -475,6 +475,8 @@ model Product {
   rejectionReason    String?
   /// المواصفات حسب حقول القسم، مثل { "size": "L", "color": "أسود" }
   specs              Json            @default("{}")
+  /// خيارات يختارها العميل عند الشراء: [{ name: "اللون", values: [{ label: "أحمر", mediaId?: "صورة هذا اللون" }] }]
+  options            Json            @default("[]")
   // ── بيانات صناعية (B2B) ──
   sku                String?
   /// رقم القطعة لدى الشركة المصنعة
@@ -668,6 +670,10 @@ model OrderItem {
   productId          String?
   /// نسخة من اسم المنتج وقت الطلب
   name               String
+  /// الخيار الذي اختاره العميل: [{ name: "اللون", value: "أحمر" }]
+  options            Json?
+  /// نص الخيار للعرض: "اللون: أحمر · المقاس: L"
+  variant            String?
   unitPrice          Decimal  @db.Decimal(10, 3)
   discountPercent    Int      @default(0)
   unitFinalPrice     Decimal  @db.Decimal(10, 3)

@@ -1,3 +1,4 @@
+import { variantText } from '../../lib/types';
 import { BRAND } from '../../lib/brand';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
@@ -66,7 +67,7 @@ export default function Cart() {
                 {group.items.map((i) => {
               const discounted = i.discountPercent > 0 && i.finalPrice < i.price;
               return (
-                <li key={i.productId} className="flex gap-3 p-3 sm:gap-4 sm:p-4">
+                <li key={i.key} className="flex gap-3 p-3 sm:gap-4 sm:p-4">
                   <Link to={`/store/${i.slug}`} className="w-24 shrink-0 overflow-hidden rounded-lg sm:w-28" tabIndex={-1} aria-hidden>
                     <ProductImage src={i.image} alt="" ratio="aspect-square" />
                   </Link>
@@ -76,10 +77,11 @@ export default function Cart() {
                         <Link to={`/store/${i.slug}`} className="underline-offset-4 hover:underline">
                           {i.name}
                         </Link>
+                        {i.options?.length ? <span className="mt-0.5 block text-sm font-normal text-muted">{variantText(i.options)}</span> : null}
                       </h2>
                       <button
                         type="button"
-                        onClick={() => remove(i.productId)}
+                        onClick={() => remove(i.key)}
                         className="-me-2 -mt-2 grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-danger"
                         aria-label={`حذف ${i.name} من السلة`}
                       >
@@ -96,7 +98,7 @@ export default function Cart() {
                       )}
                     </p>
                     <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
-                      <QtyStepper value={i.quantity} max={Math.min(i.stock || 20, 20)} onChange={(v) => setQty(i.productId, v)} size="sm" />
+                      <QtyStepper value={i.quantity} max={Math.min(i.stock || 20, 20)} onChange={(v) => setQty(i.key, v)} size="sm" />
                       <p className="text-end">
                         <span className="sr-only">المجموع: </span>
                         <span className="font-display font-semibold">{formatJOD(i.finalPrice * i.quantity)}</span>

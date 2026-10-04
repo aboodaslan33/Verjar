@@ -27,6 +27,7 @@ import { feeReport } from '../../market/feeReport';
 import { FEE_STATUSES, paymentsOf, recentActivity, setDispute, statement, supplierSummary } from '../../market/supplierFinance';
 import { ammanToUtc } from '../../lib/time';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
+import { cleanOptions, optionsInput } from '../../market/options';
 import { vendorMarketRouter } from './market';
 
 /**
@@ -191,6 +192,8 @@ const productInput = z.object({
   visible: z.boolean().default(true),
   categoryId: z.string().min(1, 'اختر القسم'),
   specs: specsInput,
+  /** خيارات يختارها العميل (اللون، المقاس…) */
+  options: optionsInput.optional(),
 });
 
 async function uniqueProductSlug(name: string, excludeId?: string) {
@@ -317,7 +320,7 @@ vendorRouter.post(
   '/products',
   formLimiter,
   asyncHandler(async (req, res) => {
-    const { specs, supplierPrice: sp, price: legacyPrice, ...input } = productInput.parse(req.body);
+    const { specs, supplierPrice: sp, price: legacyPrice, options, ...input } = productInput.parse(req.body);
     const supplierPrice = sp ?? legacyPrice;
     if (supplierPrice === undefined) throw badRequest('سعر المورد مطلوب', { fields: { supplierPrice: 'اكتب سعرك' } });
     const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest });
@@ -332,6 +335,7 @@ vendorRouter.post(
         approvalStatus: 'PENDING',
         specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
+        options: cleanOptions(options ?? [], new Set()),
         ...pricingData(supplierPrice, fee, input.discountPercent),
       },
       include: productInclude,
@@ -349,7 +353,7 @@ vendorRouter.post(
 vendorRouter.patch(
   '/products/:id',
   asyncHandler(async (req, res) => {
-    const { specs, supplierPrice: sp, price: legacyPrice, ...input } = productInput.partial().parse(req.body);
+    const { specs, supplierPrice: sp, price: legacyPrice, options, ...input } = productInput.partial().parse(req.body);
     const current = await ownProduct(vid(req), req.params.id);
     const categoryId = input.categoryId ?? current.categoryId;
     const specsData =
@@ -373,6 +377,7 @@ vendorRouter.patch(
         ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
         ...(review ? { approvalStatus: 'PENDING', rejectionReason: null } : {}),
+        ...(options !== undefined ? { options: cleanOptions(options, new Set(current.media.map((m) => m.id))) } : {}),
         // النسبة الحالية للمنتج كما هي (الإدارة وحدها تغيّرها)
         ...pricingData(supplierPrice, current.platformFeePercent, discount),
       },
@@ -394,20 +399,25 @@ vendorRouter.delete(
   }),
 );
 
-const mediaUpload = memoryUpload(8, MAX_IMAGES).array('files', MAX_IMAGES);
+const mediaUpload = memoryUpload(60, MAX_IMAGES + 1).array('files', MAX_IMAGES + 1);
 
-/** صور المنتج (Cloudinary). صورة جديدة تعيد المنتج للمراجعة */
+/** صور المنتج وفيديو واحد (Cloudinary). ملف جديد يعيد المنتج للمراجعة */
 vendorRouter.post(
   '/products/:id/media',
   formLimiter,
-  uploadGuard(40),
+  uploadGuard(120),
   mediaUpload,
   asyncHandler(async (req, res) => {
     const product = await ownProduct(vid(req), req.params.id);
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-    if (!files.length) throw badRequest('اختر صورة واحدة على الأقل');
-    if (product.media.length + files.length > MAX_IMAGES) throw badRequest(`الحد الأقصى ${MAX_IMAGES} صور لكل منتج`);
-    const stored = await validateAndStore(files, POLICIES.photos, 'products');
+    if (!files.length) throw badRequest('اختر صورة أو فيديو');
+    const stored = await validateAndStore(files, POLICIES.productMedia, 'products');
+    const images = stored.filter((f) => f.kind === 'IMAGE').length + product.media.filter((m) => m.kind === 'IMAGE').length;
+    const videos = stored.filter((f) => f.kind === 'VIDEO').length + product.media.filter((m) => m.kind === 'VIDEO').length;
+    if (images > MAX_IMAGES || videos > 1) {
+      await Promise.all(stored.map((f) => deleteStored(f.publicId, f.kind)));
+      throw badRequest(videos > 1 ? 'فيديو واحد فقط لكل منتج' : `الحد الأقصى ${MAX_IMAGES} صور لكل منتج`);
+    }
     const start = product.media.length;
     await prisma.$transaction([
       prisma.productMedia.createMany({
@@ -463,6 +473,7 @@ const vendorOrderSelect = {
       id: true,
       productId: true,
       name: true,
+      variant: true,
       quantity: true,
       unitPrice: true,
       unitFinalPrice: true,

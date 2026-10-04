@@ -7,7 +7,7 @@ import { AdminPage, FieldError, Panel } from '../admin/ui';
 import { Alert, Button, ButtonLink, Checkbox, Icon, Input, Select, Tag, Textarea } from '../ui';
 import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
-import type { SpecField } from '../../lib/types';
+import type { ProductOption, SpecField } from '../../lib/types';
 import { AVAILABILITY_LABEL, type Availability, type MarketFile } from '../../lib/market';
 
 function applyDiscount(price: number, pct: number) {
@@ -119,6 +119,7 @@ export function ProductEditorForm({
   const [warranty, setWarranty] = useState(product?.warranty ?? '');
   const [videoUrl, setVideoUrl] = useState(product?.videoUrl ?? '');
   const [keywords, setKeywords] = useState(product?.keywords ?? '');
+  const [options, setOptions] = useState<ProductOption[]>(product?.options ?? []);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -169,6 +170,10 @@ export function ProductEditorForm({
       warranty: warranty.trim() || null,
       videoUrl: videoUrl.trim() || null,
       keywords: keywords.trim() || null,
+      // الخيارات الفارغة لا تُرسل
+      options: options
+        .map((g) => ({ name: g.name.trim(), values: g.values.filter((v) => v.label.trim()).map((v) => ({ label: v.label.trim(), mediaId: v.mediaId ?? null })) }))
+        .filter((g) => g.name && g.values.length),
       ...(isAdmin ? { featured } : {}),
       // فقط حقول القسم الحالي تُرسل
       specs: Object.fromEntries(fields.map((f) => [f.key, specs[f.key] ?? ''])),
@@ -354,9 +359,11 @@ export function ProductEditorForm({
             </Panel>
           )}
 
+          <OptionsEditor value={options} onChange={setOptions} media={product?.media ?? []} errors={fe} />
+
           {product ? (
             <>
-              <MediaManager product={product} apiBase={mode.apiBase} allowVideo={isAdmin} onChanged={onReload} />
+              <MediaManager product={product} apiBase={mode.apiBase} allowVideo review={!isAdmin} onChanged={onReload} />
               <DocumentsManager product={product} apiBase={mode.apiBase} />
             </>
           ) : (
@@ -511,11 +518,14 @@ function MediaManager({
   product,
   apiBase,
   allowVideo,
+  review,
   onChanged,
 }: {
   product: AdminProduct;
   apiBase: string;
   allowVideo: boolean;
+  /** منتج المورد: الملف الجديد يعيده للمراجعة */
+  review?: boolean;
   onChanged: () => void;
 }) {
   const m = useMutation();
@@ -544,7 +554,8 @@ function MediaManager({
     if (videos + (hasVideo ? 1 : 0) > 1) return setError('فيديو واحد فقط لكل منتج');
     const bad = list.find((f) => !f.type.startsWith('image/') && !f.type.startsWith('video/'));
     if (bad) return setError(`الملف ${bad.name} ليس صورة أو فيديو`);
-    if (!allowVideo && media.length + list.length > 8) return setError('الحد الأقصى 8 صور لكل منتج');
+    const images = list.filter((f) => f.type.startsWith('image/')).length + media.filter((x) => x.kind === 'IMAGE').length;
+    if (images > 8) return setError('الحد الأقصى 8 صور لكل منتج');
     const big = list.find((f) => (f.type.startsWith('video/') ? f.size > 60 * 1024 * 1024 : f.size > 8 * 1024 * 1024));
     if (big) return setError(`الملف ${big.name} أكبر من الحد المسموح (الصورة 8MB، الفيديو 60MB)`);
     if (list.length > 10) return setError('الحد الأقصى 10 ملفات في المرة الواحدة');
@@ -557,7 +568,7 @@ function MediaManager({
     const r = await m.run(
       'upload',
       () => api.post<ProductMedia[]>(`${apiBase}/products/${product.id}/media`, fd),
-      allowVideo ? 'تم رفع الملفات' : 'تم رفع الصور — المنتج بانتظار المراجعة',
+      review ? 'تم رفع الملفات — المنتج بانتظار المراجعة' : 'تم رفع الملفات',
     );
     if (r) {
       setMedia(r);
@@ -758,5 +769,146 @@ function FeeRequest({ product, onDone }: { product: AdminProduct; onDone: () => 
         </Button>
       </div>
     </div>
+  );
+}
+
+const OPTION_SUGGESTIONS = ['اللون', 'المقاس', 'الخامة', 'الحجم', 'الموديل'];
+
+/**
+ * خيارات المنتج: العميل يختار قيمة واحدة من كل خيار قبل الإضافة للسلة (مثل: اللون أحمر).
+ * يمكن ربط كل قيمة بصورة من صور المنتج لتظهر عند اختيارها.
+ */
+function OptionsEditor({
+  value,
+  onChange,
+  media,
+  errors,
+}: {
+  value: ProductOption[];
+  onChange: (v: ProductOption[]) => void;
+  media: ProductMedia[];
+  errors: Record<string, string>;
+}) {
+  const images = media.filter((x) => x.kind === 'IMAGE');
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const setGroup = (i: number, g: ProductOption) => onChange(value.map((x, j) => (j === i ? g : x)));
+  const addValues = (i: number) => {
+    const g = value[i];
+    const labels = (drafts[i] ?? '')
+      .split(/[،,\n]/)
+      .map((t) => t.trim())
+      .filter((t) => t && !g.values.some((v) => v.label === t));
+    if (!labels.length) return;
+    setGroup(i, { ...g, values: [...g.values, ...labels.map((label) => ({ label, mediaId: null }))] });
+    setDrafts((d) => ({ ...d, [i]: '' }));
+  };
+  const optionsError = Object.entries(errors).find(([k]) => k.startsWith('options'))?.[1];
+
+  return (
+    <Panel title="خيارات المنتج (اللون، المقاس…)">
+      <p className="mb-4 text-sm text-muted">
+        العميل يختار قيمة من كل خيار قبل الإضافة للسلة، ويظهر اختياره في السلة والطلب والفاتورة. مثال: اللون ← أحمر، أزرق، رمادي.
+      </p>
+      {optionsError && <FieldError message={optionsError} />}
+      <div className="space-y-4">
+        {value.map((g, i) => (
+          <div key={i} className="space-y-3 rounded-xl border border-line p-3 sm:p-4">
+            <div className="flex items-end gap-2">
+              <Input
+                label="اسم الخيار"
+                list="option-names"
+                wrapperClassName="flex-1"
+                value={g.name}
+                placeholder="اللون"
+                onChange={(e) => setGroup(i, { ...g, name: e.target.value })}
+              />
+              <Button type="button" variant="ghost" size="sm" className="text-danger" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+                حذف الخيار
+              </Button>
+            </div>
+            {g.values.length > 0 && (
+              <ul className="space-y-2">
+                {g.values.map((v, k) => (
+                  <li key={k} className="rounded-lg bg-subtle/60 p-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        aria-label="القيمة"
+                        className="input h-10 min-w-0 flex-1"
+                        value={v.label}
+                        onChange={(e) => setGroup(i, { ...g, values: g.values.map((x, j) => (j === k ? { ...x, label: e.target.value } : x)) })}
+                      />
+                      <button
+                        type="button"
+                        aria-label={`حذف ${v.label}`}
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-muted hover:text-danger"
+                        onClick={() => setGroup(i, { ...g, values: g.values.filter((_, j) => j !== k) })}
+                      >
+                        <Icon name="close" className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {images.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={`صورة ${v.label}`}>
+                        <span className="text-xs text-muted">صورته:</span>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={!v.mediaId}
+                          onClick={() => setGroup(i, { ...g, values: g.values.map((x, j) => (j === k ? { ...x, mediaId: null } : x)) })}
+                          className={cx('h-9 rounded-md border px-2 text-xs', !v.mediaId ? 'border-ink' : 'border-line')}
+                        >
+                          بدون
+                        </button>
+                        {images.map((img, n) => (
+                          <button
+                            key={img.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={v.mediaId === img.id}
+                            aria-label={`الصورة ${n + 1}`}
+                            onClick={() => setGroup(i, { ...g, values: g.values.map((x, j) => (j === k ? { ...x, mediaId: img.id } : x)) })}
+                            className={cx('h-9 w-9 overflow-hidden rounded-md ring-offset-1', v.mediaId === img.id ? 'ring-2 ring-ink' : 'opacity-70 hover:opacity-100')}
+                          >
+                            <img src={img.url} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                aria-label={`أضف قيمة لـ ${g.name || 'الخيار'}`}
+                className="input h-10 min-w-0 flex-1"
+                placeholder="أحمر، أزرق، رمادي"
+                value={drafts[i] ?? ''}
+                onChange={(e) => setDrafts((d) => ({ ...d, [i]: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addValues(i);
+                  }
+                }}
+              />
+              <Button type="button" size="sm" variant="outline" onClick={() => addValues(i)}>
+                أضف
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <datalist id="option-names">
+        {OPTION_SUGGESTIONS.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      {value.length < 3 && (
+        <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => onChange([...value, { name: value.length ? '' : 'اللون', values: [] }])}>
+          <Icon name="plus" className="h-4 w-4" /> أضف خيارًا
+        </Button>
+      )}
+      {value.length > 0 && images.length === 0 && <p className="mt-3 text-xs text-muted">ارفع صور المنتج ثم اربط كل لون بصورته (اختياري).</p>}
+    </Panel>
   );
 }

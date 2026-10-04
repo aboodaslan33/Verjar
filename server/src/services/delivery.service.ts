@@ -494,12 +494,12 @@ export async function initStoreOrder(tx: Tx, orderId: string) {
   // إشعار لكل مورد بما بيع من منتجاته (داخل الموقع؛ البريد يُرسل بعد حفظ الطلب — notifySuppliersOfSale)
   const vos = await tx.vendorOrder.findMany({
     where: { orderId, vendor: { isHouse: false } },
-    select: { id: true, vendorId: true, items: { select: { name: true, quantity: true } } },
+    select: { id: true, vendorId: true, items: { select: { name: true, variant: true, quantity: true } } },
   });
   for (const vo of vos) {
     await notify(tx, [{ type: 'VENDOR', vendorId: vo.vendorId }], {
       title: `تم بيع منتجاتك — طلب ${code}`,
-      body: `طلب جديد ${code}: ${vo.items.map((i) => `${i.name} × ${i.quantity}`).join('، ')}.`,
+      body: `طلب جديد ${code}: ${vo.items.map((i) => `${i.name}${i.variant ? ` (${i.variant})` : ''} × ${i.quantity}`).join('، ')}.`,
       orderId,
       link: `/vendor/orders/${vo.id}`,
     });

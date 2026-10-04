@@ -68,7 +68,7 @@ export async function emailSuppliersOfSale(orderId: string) {
           id: true,
           vendorNet: true,
           vendor: { select: { name: true, email: true, customer: { select: { email: true } } } },
-          items: { select: { name: true, quantity: true, supplierUnitPrice: true, vendorNet: true } },
+          items: { select: { name: true, variant: true, quantity: true, supplierUnitPrice: true, vendorNet: true } },
         },
       },
     },
@@ -78,7 +78,7 @@ export async function emailSuppliersOfSale(orderId: string) {
   for (const vo of order.vendorOrders) {
     const to = vo.vendor.email ?? vo.vendor.customer?.email;
     if (!to) continue;
-    const lines = vo.items.map((i) => `${i.name} × ${i.quantity}`).join('، ');
+    const lines = vo.items.map((i) => `${i.name}${i.variant ? ` (${i.variant})` : ''} × ${i.quantity}`).join('، ');
     void sendMarketEmail(to, vo.vendor.name, {
       title: `تم بيع منتجاتك — طلب ${code}`,
       body: `اشترى عميل من متجرك: ${lines}. مستحقك من هذا الطلب ${Number(vo.vendorNet)} د.أ (بعد نسبة فرجار). جهّز الطلب وحدّث حالته من لوحة المورد.`,

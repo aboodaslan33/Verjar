@@ -12,6 +12,7 @@ import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.
 import { HOUSE_VENDOR_ID, ensureHouseVendor } from '../../services/vendor.service';
 import { checkPrice, industrialFields, priceField } from '../../validators/product';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
+import { cleanOptions, optionsInput } from '../../market/options';
 import { FEE_MAX, pricingData, productPricing, resolveFeePercent } from '../../market/fees';
 
 export const productsRouter = Router();
@@ -116,6 +117,8 @@ const productInput = z.object({
   featured: z.boolean().default(false),
   categoryId: z.string().min(1, 'اختر القسم'),
   specs: specsInput,
+  /** خيارات يختارها العميل (اللون، المقاس…) */
+  options: optionsInput.optional(),
   /** منتجات الأدمن للمورد الافتراضي ما لم يُحدَّد مورد */
   vendorId: z.string().min(1).optional(),
 });
@@ -213,7 +216,7 @@ productsRouter.get(
 productsRouter.post(
   '/products',
   asyncHandler(async (req, res) => {
-    const { vendorId, specs, supplierPrice: sp, price: legacyPrice, platformFeePercent, ...input } = productInput.parse(req.body);
+    const { vendorId, specs, supplierPrice: sp, price: legacyPrice, platformFeePercent, options, ...input } = productInput.parse(req.body);
     const supplierPrice = sp ?? legacyPrice;
     if (supplierPrice === undefined) throw badRequest('السعر مطلوب', { fields: { supplierPrice: 'اكتب السعر' } });
     const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest });
@@ -235,6 +238,7 @@ productsRouter.post(
         approvalStatus: 'APPROVED',
         specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
+        options: cleanOptions(options ?? [], new Set()),
         ...pricingData(supplierPrice, fee, input.discountPercent),
       },
       include: { category: true, media: true },
@@ -247,10 +251,13 @@ productsRouter.post(
 productsRouter.patch(
   '/products/:id',
   asyncHandler(async (req, res) => {
-    const { vendorId: _v, specs, supplierPrice: sp, price: legacyPrice, platformFeePercent, ...input } = productInput.partial().parse(req.body);
-    const current = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { vendor: { select: { isHouse: true } } } });
+    const { vendorId: _v, specs, supplierPrice: sp, price: legacyPrice, platformFeePercent, options, ...input } = productInput.partial().parse(req.body);
+    const current = await prisma.product.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      include: { vendor: { select: { isHouse: true } }, media: { select: { id: true } } },
+    });
     if (!current) throw notFound('المنتج غير موجود');
-    const { vendor: currentVendor, ...currentProduct } = current;
+    const { vendor: currentVendor, media: currentMedia, ...currentProduct } = current;
     const supplierPrice = sp ?? legacyPrice ?? Number(current.supplierPrice);
     const pe = checkPrice({ price: supplierPrice, priceOnRequest: input.priceOnRequest ?? current.priceOnRequest });
     if (pe) throw badRequest(pe, { fields: { supplierPrice: pe } });
@@ -270,6 +277,7 @@ productsRouter.patch(
         ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
         ...pricingData(supplierPrice, fee, discount),
+        ...(options !== undefined ? { options: cleanOptions(options, new Set(currentMedia.map((m) => m.id))) } : {}),
         // تعديل الإدارة للنسبة يُغلق أي طلب تغيير معلّق
         ...(platformFeePercent !== undefined ? { feeRequestPercent: null, feeRequestNote: null, feeRequestAt: null } : {}),
       },

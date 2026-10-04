@@ -78,6 +78,7 @@ export default function VendorOrderDetail() {
                 <li key={it.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{it.name}</p>
+                    {it.variant && <p className="text-sm font-semibold">{it.variant}</p>}
                     <p className="text-xs text-muted">
                       {it.quantity} × {formatJOD(it.unitFinalPrice)}
                       {it.discountPercent > 0 && ` (خصم ${it.discountPercent}%)`}

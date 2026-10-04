@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEnsureCustomer } from '../auth/RequireCustomer';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
@@ -60,6 +60,7 @@ export function ProductImage({
  */
 export function ProductCard({ product, headingLevel = 3 }: { product: Product; headingLevel?: 2 | 3 }) {
   const { add } = useCart();
+  const navigate = useNavigate();
   const ensureCustomer = useEnsureCustomer();
   const { toast } = useToast();
   const [added, setAdded] = useState(false);
@@ -78,8 +79,16 @@ export function ProductCard({ product, headingLevel = 3 }: { product: Product; h
   }, [added]);
 
   const onAdd = () => {
+    // منتج بخيارات (لون، مقاس…): يُختار الخيار من صفحة المنتج
+    const choose = product.options?.find((g) => g.values.length > 1);
+    if (choose) {
+      navigate(href);
+      toast(`اختر ${choose.name} لـ «${product.name}»`);
+      return;
+    }
     if (!ensureCustomer()) return;
-    add(product, 1);
+    const single = product.options?.map((g) => ({ name: g.name, value: g.values[0].label }));
+    add(product, 1, single);
     setAdded(true);
     toast(`أُضيف «${product.name}» إلى السلة`);
   };

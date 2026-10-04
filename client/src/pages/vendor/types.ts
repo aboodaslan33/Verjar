@@ -51,6 +51,7 @@ export type VendorOrder = {
     id: string;
     productId: string;
     name: string;
+    variant?: string | null;
     quantity: number;
     unitPrice: number;
     unitFinalPrice: number;

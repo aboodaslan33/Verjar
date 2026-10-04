@@ -1,3 +1,4 @@
+import { variantText } from '../../lib/types';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ProductImage } from '../../components/store/ProductCard';
@@ -56,7 +57,7 @@ export default function Checkout() {
   const [coupon, setCoupon] = useState<{ code: string; discount: number; name: string } | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const cartKey = cart.items.map((i) => `${i.productId}:${i.quantity}`).join(',');
+  const cartKey = cart.items.map((i) => `${i.key}:${i.quantity}`).join(',');
   useEffect(() => {
     setCoupon(null);
   }, [cartKey]);
@@ -68,7 +69,7 @@ export default function Checkout() {
     try {
       const r = await api.post<{ code: string; discount: number; name: string }>('/store/coupons/check', {
         code,
-        items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity, ...(i.options?.length ? { options: i.options } : {}) })),
       });
       setCoupon(r);
     } catch (err) {
@@ -133,7 +134,7 @@ export default function Checkout() {
         notes: form.notes.trim() || undefined,
         paymentMethod: payment,
         couponCode: coupon?.code ?? null,
-        items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity, ...(i.options?.length ? { options: i.options } : {}) })),
       });
       setResult(data);
       cart.clear();
@@ -272,12 +273,13 @@ export default function Checkout() {
             </div>
             <ul className="mt-3 divide-y divide-line">
               {cart.items.map((i) => (
-                <li key={i.productId} className="flex items-center gap-3 py-3">
+                <li key={i.key} className="flex items-center gap-3 py-3">
                   <div className="w-14 shrink-0 overflow-hidden rounded-lg">
                     <ProductImage src={i.image} alt="" ratio="aspect-square" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{i.name}</p>
+                    {i.options?.length ? <p className="truncate text-xs text-muted">{variantText(i.options)}</p> : null}
                     <p className="text-xs text-muted">
                       <span className="ltr">{i.quantity}</span> × {formatJOD(i.finalPrice)}
                     </p>
@@ -397,6 +399,7 @@ function Confirmation({ order }: { order: OrderCreated }) {
             <li key={it.id} className="flex items-start justify-between gap-3 py-3">
               <div className="min-w-0">
                 <p className="font-medium">{it.name}</p>
+                {it.variant && <p className="text-sm text-muted">{it.variant}</p>}
                 <p className="text-sm text-muted">
                   الكمية: <span className="ltr">{it.quantity}</span>
                   {it.discountPercent > 0 && (

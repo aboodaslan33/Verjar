@@ -8,7 +8,7 @@ import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
-import type { Media, Product } from '../../lib/types';
+import { variantText, type Media, type Product } from '../../lib/types';
 import { useAsync, useDocumentTitle } from '../../lib/useAsync';
 import { SupplierLine } from '../../components/market/Badges';
 import { AVAILABILITY_LABEL, leadTimeText } from '../../lib/market';
@@ -57,7 +57,30 @@ function ProductView({ product, related }: ProductResponse) {
   const minQty = Math.max(1, product.minOrderQty ?? 1);
   const ensureCustomer = useEnsureCustomer();
   const buyRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
   const [buyVisible, setBuyVisible] = useState(true);
+  // الخيارات (اللون، المقاس…): الخيار ذو القيمة الوحيدة يُختار تلقائيًا
+  const groups = product.options ?? [];
+  const [sel, setSel] = useState<Record<string, string>>(() =>
+    Object.fromEntries(groups.filter((g) => g.values.length === 1).map((g) => [g.name, g.values[0].label])),
+  );
+  const [focusMedia, setFocusMedia] = useState<string | null>(null);
+  const [optionError, setOptionError] = useState(false);
+  const missing = groups.find((g) => !sel[g.name]);
+  const choose = (group: string, value: string, mediaId?: string | null) => {
+    setSel((s) => ({ ...s, [group]: value }));
+    setOptionError(false);
+    if (mediaId) setFocusMedia(mediaId);
+  };
+  const selection = groups.map((g) => ({ name: g.name, value: sel[g.name] }));
+  /** يتأكد من اختيار كل الخيارات قبل الإضافة للسلة */
+  const ready = () => {
+    if (!missing) return true;
+    setOptionError(true);
+    optionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast(`اختر ${missing.name} أولًا`);
+    return false;
+  };
 
   // شريط الشراء السفلي على الجوال يظهر فقط عندما يختفي زر الإضافة الأساسي عن الشاشة
   useEffect(() => {
@@ -75,14 +98,14 @@ function ProductView({ product, related }: ProductResponse) {
   }, [added]);
 
   const addToCart = () => {
-    if (!ensureCustomer()) return;
-    add(product, qty);
+    if (!ready() || !ensureCustomer()) return;
+    add(product, qty, selection);
     setAdded(true);
-    toast(`أُضيف «${product.name}» إلى السلة`);
+    toast(`أُضيف «${product.name}${groups.length ? ` — ${variantText(selection)}` : ''}» إلى السلة`);
   };
   const buyNow = () => {
-    if (!ensureCustomer()) return;
-    add(product, qty);
+    if (!ready() || !ensureCustomer()) return;
+    add(product, qty, selection);
     navigate('/checkout');
   };
 
@@ -100,7 +123,7 @@ function ProductView({ product, related }: ProductResponse) {
 
         <div className="grid gap-8 lg:grid-cols-12 lg:gap-14">
           <div className="lg:col-span-7">
-            <Gallery media={product.media} name={product.name} />
+            <Gallery media={product.media} name={product.name} focusId={focusMedia} />
           </div>
 
           <div className="lg:col-span-5">
@@ -182,6 +205,43 @@ function ProductView({ product, related }: ProductResponse) {
                     ))}
                   </dl>
                 </section>
+              )}
+
+              {groups.length > 0 && !por && (
+                <div ref={optionsRef} className="mt-7 space-y-5 scroll-mt-32">
+                  {groups.map((g) => (
+                    <fieldset key={g.name}>
+                      <legend className="text-sm font-semibold">
+                        {g.name}
+                        {sel[g.name] ? <span className="font-normal text-muted">: {sel[g.name]}</span> : null}
+                      </legend>
+                      <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={g.name}>
+                        {g.values.map((v) => {
+                          const img = v.mediaId ? product.media.find((m) => m.id === v.mediaId && m.kind === 'IMAGE') : undefined;
+                          const on = sel[g.name] === v.label;
+                          return (
+                            <button
+                              key={v.label}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              onClick={() => choose(g.name, v.label, v.mediaId)}
+                              className={cx(
+                                'inline-flex min-h-[44px] items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-[border-color,box-shadow]',
+                                on ? 'border-ink ring-2 ring-ink' : 'border-line hover:border-ink',
+                                optionError && !sel[g.name] && 'border-danger',
+                              )}
+                            >
+                              {img && <img src={img.url} alt="" className="h-8 w-8 rounded-md object-cover" />}
+                              {v.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {optionError && !sel[g.name] && <p className="mt-1.5 text-sm text-danger">اختر {g.name}</p>}
+                    </fieldset>
+                  ))}
+                </div>
               )}
 
               <div ref={buyRef} className="mt-7 border-t border-line pt-7">
@@ -292,7 +352,7 @@ function ProductView({ product, related }: ProductResponse) {
         >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-muted">{product.name}</p>
+              <p className="truncate text-sm text-muted">{product.name}{groups.length && !missing ? ` — ${variantText(selection)}` : ''}</p>
               <p className="font-display text-lg font-semibold">{formatJOD(product.finalPrice * qty)}</p>
             </div>
             <Button onClick={addToCart} tabIndex={buyVisible ? -1 : 0}>
@@ -323,10 +383,17 @@ function StockLine({ stock }: { stock: number }) {
   );
 }
 
-function Gallery({ media, name }: { media: Media[]; name: string }) {
+function Gallery({ media, name, focusId }: { media: Media[]; name: string; focusId?: string | null }) {
   const items = media.filter((m) => m.kind === 'IMAGE' || m.kind === 'VIDEO');
   const [index, setIndex] = useState(0);
   useEffect(() => setIndex(0), [media]);
+  // اختيار لون له صورة يعرض صورته
+  useEffect(() => {
+    if (!focusId) return;
+    const i = items.findIndex((m) => m.id === focusId);
+    if (i >= 0) setIndex(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
   const current = items[index];
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {

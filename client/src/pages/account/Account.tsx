@@ -71,7 +71,7 @@ type OOrder = {
   discountTotal: Num;
   address: string | null;
   createdAt: string;
-  items: { id: string; name: string; quantity: number; lineTotal: Num; vendorOrderId: string }[];
+  items: { id: string; name: string; variant?: string | null; quantity: number; lineTotal: Num; vendorOrderId: string }[];
   vendorOrders: { id: string; number: number; status: RequestStatus; total: Num; vendor: { name: string; slug: string; isHouse: boolean } }[];
 };
 type OCorporate = {
@@ -427,7 +427,8 @@ function OrdersTab({ items }: { items: OOrder[] }) {
                     .map((it) => (
                       <li key={it.id} className="flex items-center justify-between gap-3 px-3 py-2">
                         <span className="min-w-0">
-                          {it.name} <span className="text-muted">× <span className="ltr">{it.quantity}</span></span>
+                          {it.name}
+                          {it.variant && <span className="text-muted"> ({it.variant})</span>} <span className="text-muted">× <span className="ltr">{it.quantity}</span></span>
                         </span>
                         <span className="shrink-0 font-medium">{formatJOD(it.lineTotal)}</span>
                       </li>

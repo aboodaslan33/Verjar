@@ -165,7 +165,7 @@ export async function statement(vendorId: string, f: StatementFilters = {}, limi
       feeDisputedBy: true,
       order: { select: { id: true, number: true, code: true, deliveryStatus: true, financialStatus: true } },
       items: {
-        select: { id: true, name: true, quantity: true, supplierUnitPrice: true, unitFinalPrice: true, platformFeePercent: true, platformFeeAmount: true, lineTotal: true, vendorNet: true },
+        select: { id: true, name: true, variant: true, quantity: true, supplierUnitPrice: true, unitFinalPrice: true, platformFeePercent: true, platformFeeAmount: true, lineTotal: true, vendorNet: true },
       },
     },
   });
@@ -192,7 +192,7 @@ export async function statement(vendorId: string, f: StatementFilters = {}, limi
         dispute: vo.feeDisputed ? { note: vo.feeDisputeNote, by: vo.feeDisputedBy } : null,
         items: vo.items.map((i) => ({
           id: i.id,
-          product: i.name,
+          product: i.variant ? `${i.name} (${i.variant})` : i.name,
           quantity: i.quantity,
           supplierPrice: round3(toNum(i.supplierUnitPrice)),
           customerPrice: round3(toNum(i.unitFinalPrice)),

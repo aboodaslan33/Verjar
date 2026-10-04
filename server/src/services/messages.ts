@@ -35,7 +35,7 @@ export function orderMessage(order: OrderForMessage): string {
   lines.push('المنتجات:');
   const itemLine = (it: OrderItem) => {
     const disc = it.discountPercent > 0 ? ` (بعد خصم ${it.discountPercent}%)` : '';
-    return `- ${it.name} × ${it.quantity} = ${formatJOD(it.lineTotal)}${disc}`;
+    return `- ${it.name}${it.variant ? ` (${it.variant})` : ''} × ${it.quantity} = ${formatJOD(it.lineTotal)}${disc}`;
   };
   const groups = order.vendorOrders ?? [];
   if (groups.length > 1) {

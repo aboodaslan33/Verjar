@@ -124,6 +124,7 @@ export default function OrderDetail() {
                             <Link to={`/admin/products/${it.productId}`} className="line-clamp-1 font-medium hover:text-accent">
                               {it.name}
                             </Link>
+                            {it.variant && <p className="text-sm font-semibold">{it.variant}</p>}
                             <p className="text-xs text-muted">
                               <span className="tabular-nums">{it.quantity}</span> × {formatJOD(it.unitFinalPrice)}
                               {it.discountPercent > 0 && (

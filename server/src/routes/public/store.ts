@@ -20,6 +20,7 @@ import { confirmCustomer, notifyAdmin } from '../../services/whatsapp.service';
 import { orderSchema } from '../../validators/order';
 import { bumpStat } from '../../market/stats';
 import { emailSuppliersOfSale } from '../../market/notify';
+import { type Selection, resolveSelection, selectionKey, variantText } from '../../market/options';
 
 export const storeRouter = Router();
 
@@ -41,6 +42,7 @@ const productPublicSelect = {
   originCountry: true,
   priceOnRequest: true,
   minOrderQty: true,
+  options: true,
   availability: true,
   leadTimeDays: true,
   warranty: true,
@@ -381,26 +383,41 @@ storeRouter.post(
       throw new HttpError(429, 'لديك 3 طلبات بانتظار التأكيد. انتظر تأكيدها قبل طلب جديد، أو تواصل معنا.', 'TOO_MANY_OPEN');
     }
 
-    // دمج المنتجات المكررة
-    const qty = new Map<string, number>();
-    for (const it of input.items) qty.set(it.productId, (qty.get(it.productId) ?? 0) + it.quantity);
+    const productIds = [...new Set(input.items.map((i) => i.productId))];
 
     const order = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
-        where: publicProductWhere({ id: { in: [...qty.keys()] } }),
+        where: publicProductWhere({ id: { in: productIds } }),
         include: { vendor: { select: { id: true, name: true, isHouse: true } }, category: { select: { id: true, parentId: true } } },
       });
-      if (products.length !== qty.size) throw badRequest('بعض المنتجات في السلة لم تعد متوفرة، حدّث السلة');
+      if (products.length !== productIds.length) throw badRequest('بعض المنتجات في السلة لم تعد متوفرة، حدّث السلة');
+      const byId = new Map(products.map((p) => [p.id, p]));
 
-      let subtotal = 0;
-      let total = 0;
-      const lines = products.map((p) => {
+      // بند لكل منتج + خيار (كنباية حمراء وكنباية زرقاء بندان)، والخيار يُتحقق منه هنا لا في المتصفح
+      const merged = new Map<string, { p: (typeof products)[number]; sel: Selection; quantity: number }>();
+      for (const it of input.items) {
+        const p = byId.get(it.productId)!;
+        const sel = resolveSelection(p.name, p.options, it.options);
+        const k = selectionKey(p.id, sel);
+        const cur = merged.get(k);
+        if (cur) cur.quantity += it.quantity;
+        else merged.set(k, { p, sel, quantity: it.quantity });
+      }
+      // الكمية والمخزون على مستوى المنتج (المخزون مشترك بين خياراته)
+      const qty = new Map<string, number>();
+      for (const l of merged.values()) qty.set(l.p.id, (qty.get(l.p.id) ?? 0) + l.quantity);
+      for (const p of products) {
         const quantity = qty.get(p.id)!;
         if (p.priceOnRequest) throw badRequest(`"${p.name}" بالسعر عند الطلب — اطلب عرض سعر بدل الشراء المباشر`);
         if (quantity < p.minOrderQty) throw badRequest(`الحد الأدنى لطلب "${p.name}" هو ${p.minOrderQty}`);
         if (p.stock < quantity) {
           throw badRequest(p.stock === 0 ? `"${p.name}" غير متوفر حاليًا` : `المتوفر من "${p.name}" ${p.stock} فقط`);
         }
+      }
+
+      let subtotal = 0;
+      let total = 0;
+      const lines = [...merged.values()].map(({ p, sel, quantity }) => {
         const unit = toNum(p.price);
         // نسبة فرجار تُحسب لكل منتج على حدة من بيانات قاعدة البيانات، وتُثبَّت مع البند ولا يُعاد حسابها لاحقًا
         const split = lineSplit(p, quantity, p.vendor.isHouse);
@@ -415,6 +432,7 @@ storeRouter.post(
             productId: p.id,
             vendorId: p.vendorId,
             name: p.name,
+            ...(sel.length ? { options: sel, variant: variantText(sel) } : {}),
             unitPrice: p.price,
             discountPercent: p.discountPercent,
             unitFinalPrice: p.finalPrice,

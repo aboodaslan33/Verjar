@@ -48,7 +48,7 @@ type DriverOrder = {
   createdAt: string;
   deliveredAt: string | null;
   accepted: boolean;
-  items: { name: string; quantity: number }[];
+  items: { name: string; variant?: string | null; quantity: number }[];
   proof: { recipientName: string; deliveredAt: string } | null;
 };
 
@@ -353,7 +353,10 @@ function OrderScreen() {
         <ul className="space-y-1 text-sm">
           {o.items.map((it, i) => (
             <li key={i} className="flex justify-between gap-2">
-              <span>{it.name}</span>
+              <span>
+                {it.name}
+                {it.variant && <span className="text-muted"> ({it.variant})</span>}
+              </span>
               <span className="tabular-nums text-muted">× {it.quantity}</span>
             </li>
           ))}

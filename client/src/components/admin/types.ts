@@ -1,5 +1,6 @@
 import type { Availability, MarketFile } from '../../lib/market';
 /** أنواع بيانات لوحة التحكم — مطابقة لاستجابات /api/v1/admin */
+import type { ProductOption } from '../../lib/types';
 import type { AdminSettings, BookingType, CorporateType, MediaKind, RequestStatus, SpecField } from '../../lib/types';
 
 export type Urgency = 'NORMAL' | 'URGENT' | 'EMERGENCY';
@@ -177,6 +178,7 @@ export type OrderDetail = Omit<OrderRow, 'vendorOrders'> & {
     productId: string;
     vendorOrderId: string;
     name: string;
+    variant?: string | null;
     unitPrice: number;
     discountPercent: number;
     unitFinalPrice: number;
@@ -313,6 +315,8 @@ export type AdminProduct = {
   keywords: string | null;
   documents: MarketFile[];
   views?: number;
+  /** خيارات يختارها العميل (اللون، المقاس…) */
+  options?: ProductOption[];
   /** نسبة فرجار: سعر المورد والنسبة يحسب الخادم منهما سعر العميل */
   supplierPrice: number;
   platformFeePercent: number;

@@ -73,7 +73,7 @@ const driverSelect = {
   updatedAt: true,
   supplier: { select: { name: true, phone: true } },
   vendorOrders: { select: { vendor: { select: { name: true, phone: true, pickupAddress: true } } } },
-  items: { select: { name: true, quantity: true } },
+  items: { select: { name: true, variant: true, quantity: true } },
   assignments: { where: { status: { not: 'UNASSIGNED' } }, select: { status: true, assignedAt: true, acceptedAt: true } },
   proof: { select: { recipientName: true, deliveredAt: true, signatureUrl: true, photoUrl: true, otpVerified: true, amountCollected: true } },
 } satisfies Prisma.OrderSelect;

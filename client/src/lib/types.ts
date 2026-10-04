@@ -120,7 +120,15 @@ export type Product = {
   warranty?: string | null;
   videoUrl?: string | null;
   documents?: { url: string; name: string; kind: string }[];
+  /** خيارات يختارها العميل (اللون، المقاس…) — قيمة واحدة من كل خيار */
+  options?: ProductOption[];
 };
+
+export type ProductOption = { name: string; values: { label: string; mediaId?: string | null }[] };
+/** اختيار العميل: [{ name: "اللون", value: "أحمر" }] */
+export type OptionSelection = { name: string; value: string }[];
+
+export const variantText = (sel: OptionSelection | undefined) => (sel ?? []).map((s) => `${s.name}: ${s.value}`).join(' · ');
 
 export type Slot = { time: string; available: boolean; reason?: 'past' | 'booked' };
 export type DaySlots = {
@@ -150,6 +158,8 @@ export type OrderItem = {
   id: string;
   productId: string;
   name: string;
+  /** الخيار المختار: "اللون: أحمر" */
+  variant?: string | null;
   unitPrice: number;
   discountPercent: number;
   unitFinalPrice: number;

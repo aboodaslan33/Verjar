@@ -1,10 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Product } from '../lib/types';
+import type { OptionSelection, Product } from '../lib/types';
 import { useAuth } from './Auth';
 
 /** عنصر السلة — نسخة مختصرة من المنتج لعرضها دون طلب إضافي. الأسعار النهائية يحسبها السيرفر */
 export type CartItem = {
+  /** مفتاح البند: المنتج + الخيار المختار (كنباية حمراء وكنباية زرقاء بندان منفصلان) */
+  key: string;
   productId: string;
+  /** الخيار المختار — يتحقق منه السيرفر عند الطلب */
+  options?: OptionSelection;
   slug: string;
   name: string;
   image: string | null;
@@ -24,9 +28,9 @@ type CartCtx = {
   subtotal: number;
   total: number;
   discount: number;
-  add: (p: Product, qty?: number) => void;
-  setQty: (productId: string, qty: number) => void;
-  remove: (productId: string) => void;
+  add: (p: Product, qty?: number, options?: OptionSelection) => void;
+  setQty: (key: string, qty: number) => void;
+  remove: (key: string) => void;
   clear: () => void;
 };
 
@@ -37,7 +41,8 @@ function load(): CartItem[] {
   try {
     const raw = localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as CartItem[]) : [];
-    return Array.isArray(parsed) ? parsed.filter((i) => i && i.productId && i.quantity > 0) : [];
+    // سلة محفوظة من قبل الخيارات: المفتاح = المنتج
+    return Array.isArray(parsed) ? parsed.filter((i) => i && i.productId && i.quantity > 0).map((i) => ({ ...i, key: i.key ?? i.productId })) : [];
   } catch {
     return [];
   }
@@ -73,21 +78,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items]);
 
-  const add = useCallback((p: Product, qty = 1) => {
+  const add = useCallback((p: Product, qty = 1, options?: OptionSelection) => {
+    const sel = options?.length ? options : undefined;
+    const key = cartKey(p.id, sel);
     setItems((prev) => {
-      const existing = prev.find((i) => i.productId === p.id);
       // الحد الأقصى 20 قطعة من المنتج في الطلب الواحد (مطابق للسيرفر)
       const cap = Math.min(Math.max(p.stock, 0), 20);
+      const existing = prev.find((i) => i.key === key);
       if (existing) {
-        return prev.map((i) =>
-          i.productId === p.id ? { ...i, stock: cap, quantity: Math.min(i.quantity + qty, cap || 1) } : i,
-        );
+        return prev.map((i) => (i.key === key ? { ...i, stock: cap, quantity: Math.min(i.quantity + qty, cap || 1) } : i));
       }
-      const image = p.media.find((m) => m.kind === 'IMAGE')?.url ?? null;
+      // صورة اللون المختار إن وُجدت، وإلا أول صورة
+      const optionMedia = sel
+        ?.map((s) => p.options?.find((g) => g.name === s.name)?.values.find((v) => v.label === s.value)?.mediaId)
+        .find(Boolean);
+      const image = p.media.find((m) => m.id === optionMedia && m.kind === 'IMAGE')?.url ?? p.media.find((m) => m.kind === 'IMAGE')?.url ?? null;
       return [
         ...prev,
         {
+          key,
           productId: p.id,
+          options: sel,
           slug: p.slug,
           name: p.name,
           image,
@@ -103,13 +114,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const setQty = useCallback((productId: string, qty: number) => {
-    setItems((prev) =>
-      prev.map((i) => (i.productId === productId ? { ...i, quantity: Math.max(1, Math.min(qty, i.stock || 99)) } : i)),
-    );
+  const setQty = useCallback((key: string, qty: number) => {
+    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, quantity: Math.max(1, Math.min(qty, i.stock || 99)) } : i)));
   }, []);
 
-  const remove = useCallback((productId: string) => setItems((prev) => prev.filter((i) => i.productId !== productId)), []);
+  const remove = useCallback((key: string) => setItems((prev) => prev.filter((i) => i.key !== key)), []);
   const clear = useCallback(() => setItems([]), []);
 
   const value = useMemo(() => {
@@ -136,3 +145,6 @@ export function useCart() {
   if (!ctx) throw new Error('useCart outside CartProvider');
   return ctx;
 }
+
+export const cartKey = (productId: string, sel?: OptionSelection) =>
+  sel?.length ? `${productId}|${sel.map((s) => `${s.name}=${s.value}`).join('|')}` : productId;
