@@ -91,4 +91,50 @@ describe('خيارات المنتج (اللون…)', () => {
     const v2 = await vendor.agent.post(`/api/v1/vendor/products/${sofa.id}/media`).attach('files', mp4, { filename: 'again.mp4', contentType: 'video/mp4' });
     expect(v2.status).toBe(400);
   });
+
+  it('مخزون منفصل لكل لون: المجموع مخزون المنتج، والطلب يخصم من لونه، والإلغاء يُرجعه', async () => {
+    const res = await vendor.agent.post('/api/v1/vendor/products').send({
+      name: 'كرسي مكتب',
+      description: 'كرسي',
+      supplierPrice: 50,
+      stock: 999,
+      categoryId,
+      options: [{ name: 'اللون', values: [{ label: 'أحمر', stock: 4 }, { label: 'أزرق', stock: 6 }, { label: 'أسود' }] }],
+    });
+    expect(res.status).toBe(201);
+    // المخزون يُحسب من الألوان، والقيمة بلا رقم = صفر
+    expect(res.body.data.stock).toBe(10);
+    expect(res.body.data.options[0].values.map((v: { stock: number }) => v.stock)).toEqual([4, 6, 0]);
+    const chair = res.body.data as { id: string };
+    // تعديل المخزون مباشرة لا يتجاوز الألوان
+    expect((await vendor.agent.patch(`/api/v1/vendor/products/${chair.id}`).send({ stock: 500 })).body.data.stock).toBe(10);
+    // خيار ثانٍ بمخزون منفصل مرفوض
+    const two = await vendor.agent.patch(`/api/v1/vendor/products/${chair.id}`).send({
+      options: [{ name: 'اللون', values: [{ label: 'أحمر', stock: 1 }] }, { name: 'المقاس', values: [{ label: 'L', stock: 1 }] }],
+    });
+    expect(two.status).toBe(400);
+    await admin.post(`/api/v1/admin/store/products/${chair.id}/approve`);
+
+    const shopper = await createCustomer({ name: 'خالد', phone: '0779990000' });
+    const red = (q: number) => ({ productId: chair.id, quantity: q, options: [{ name: 'اللون', value: 'أحمر' }] });
+    const tooMany = await shopper.post('/api/v1/store/orders').send({ ...buyer, items: [red(5)] });
+    expect(tooMany.status).toBe(400);
+    expect(tooMany.body.error.message).toContain('المتوفر من "كرسي مكتب — أحمر" 4 فقط');
+    const black = await shopper.post('/api/v1/store/orders').send({ ...buyer, items: [{ productId: chair.id, quantity: 1, options: [{ name: 'اللون', value: 'أسود' }] }] });
+    expect(black.body.error.message).toContain('غير متوفر');
+
+    const ok = await shopper.post('/api/v1/store/orders').send({ ...buyer, items: [red(3)] });
+    expect(ok.status).toBe(201);
+    let p = await prisma.product.findUniqueOrThrow({ where: { id: chair.id } });
+    expect(p.stock).toBe(7);
+    expect((p.options as { values: { stock: number }[] }[])[0].values.map((v) => v.stock)).toEqual([1, 6, 0]);
+
+    // إلغاء المورد للطلب يُرجع الأحمر
+    // أحدث طلب فرعي للمورد هو هذا الطلب
+    const vo = (await vendor.agent.get('/api/v1/vendor/orders')).body.data.items[0];
+    expect((await vendor.agent.patch(`/api/v1/vendor/orders/${vo.id}`).send({ status: 'CANCELLED' })).status).toBe(200);
+    p = await prisma.product.findUniqueOrThrow({ where: { id: chair.id } });
+    expect(p.stock).toBe(10);
+    expect((p.options as { values: { stock: number }[] }[])[0].values.map((v) => v.stock)).toEqual([4, 6, 0]);
+  });
 });

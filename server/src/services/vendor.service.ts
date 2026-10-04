@@ -3,6 +3,7 @@ import { badRequest, conflict } from '../lib/http';
 import { randomSuffix, slugify } from '../lib/ids';
 import { round3, toNum } from '../lib/money';
 import { prisma } from '../lib/prisma';
+import { type Selection, adjustOptionStock } from '../market/options';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -70,12 +71,14 @@ export async function setVendorOrderStatus(tx: Prisma.TransactionClient, vo: Ven
       // بنود طلبات التوصيل التي كتبها المورد ليست من مخزون المتجر
       if (!it.productId) continue;
       await tx.product.update({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
+      await adjustItemOptionStock(tx, it, it.quantity);
     }
   } else if (vo.status === 'CANCELLED') {
     for (const it of vo.items) {
       if (!it.productId) continue;
       const r = await tx.product.updateMany({ where: { id: it.productId, stock: { gte: it.quantity } }, data: { stock: { decrement: it.quantity } } });
       if (r.count === 0) throw badRequest(`لا يكفي المخزون لإعادة تفعيل "${it.name}"`);
+      await adjustItemOptionStock(tx, it, -it.quantity);
     }
   }
   return tx.vendorOrder.update({ where: { id: vo.id }, data: { status: next }, include: { items: true } });
@@ -145,3 +148,12 @@ export async function vendorTotals(opts: { vendorId?: string; from?: Date; to?: 
 export const emptyTotals = (): VendorTotals => ({
   salesTotal: 0, commissionTotal: 0, vendorNetTotal: 0, ordersCount: 0, due: 0, dueOrders: 0, pending: 0, paid: 0,
 });
+
+/** إرجاع/خصم مخزون اللون المختار في البند (إن كان للمنتج مخزون لكل لون) */
+async function adjustItemOptionStock(tx: Prisma.TransactionClient, it: { productId: string | null; name: string; options: Prisma.JsonValue | null }, delta: number) {
+  if (!it.productId || !it.options) return;
+  const p = await tx.product.findUnique({ where: { id: it.productId }, select: { options: true } });
+  if (!p) return;
+  const next = adjustOptionStock(it.name, p.options, it.options as Selection, delta);
+  if (next) await tx.product.update({ where: { id: it.productId }, data: { options: next as Prisma.InputJsonValue } });
+}

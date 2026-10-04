@@ -2,7 +2,7 @@ import { DataTable, type Column } from '../../components/admin/DataTable';
 import { useAdminQuery, useFilters } from '../../components/admin/hooks';
 import type { AdminProduct } from '../../components/admin/types';
 import { AdminPage, FilterBar, FilterSelect, SearchInput } from '../../components/admin/ui';
-import { ApprovalTag } from '../../components/store/ProductEditorForm';
+import { ApprovalTag, OptionStock } from '../../components/store/ProductEditorForm';
 import { ButtonLink, Icon, Price } from '../../components/ui';
 import { api } from '../../lib/api';
 import { cx, formatJOD } from '../../lib/format';
@@ -43,6 +43,7 @@ export default function VendorProducts() {
       cell: (p) => (
         <span className="tabular-nums">
           بيع {p.soldUnits ?? 0} · باقي <span className={cx(p.stock <= 3 && 'font-bold text-danger')}>{p.stock}</span>
+          <OptionStock product={p} />
         </span>
       ),
     },

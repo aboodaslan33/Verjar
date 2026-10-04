@@ -27,7 +27,7 @@ import { feeReport } from '../../market/feeReport';
 import { FEE_STATUSES, paymentsOf, recentActivity, setDispute, statement, supplierSummary } from '../../market/supplierFinance';
 import { ammanToUtc } from '../../lib/time';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
-import { cleanOptions, optionsInput } from '../../market/options';
+import { optionsData, optionsInput, trackedGroup } from '../../market/options';
 import { vendorMarketRouter } from './market';
 
 /**
@@ -335,7 +335,7 @@ vendorRouter.post(
         approvalStatus: 'PENDING',
         specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
-        options: cleanOptions(options ?? [], new Set()),
+        ...optionsData(options ?? [], new Set()),
         ...pricingData(supplierPrice, fee, input.discountPercent),
       },
       include: productInclude,
@@ -377,7 +377,12 @@ vendorRouter.patch(
         ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
         ...(review ? { approvalStatus: 'PENDING', rejectionReason: null } : {}),
-        ...(options !== undefined ? { options: cleanOptions(options, new Set(current.media.map((m) => m.id))) } : {}),
+        // مخزون المنتج المتتبع لكل لون يُحسب من مجموع الألوان ولا يُعدّل مباشرة
+        ...(options !== undefined
+          ? optionsData(options, new Set(current.media.map((m) => m.id)))
+          : trackedGroup(current.options)
+            ? { stock: current.stock }
+            : {}),
         // النسبة الحالية للمنتج كما هي (الإدارة وحدها تغيّرها)
         ...pricingData(supplierPrice, current.platformFeePercent, discount),
       },

@@ -82,8 +82,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const sel = options?.length ? options : undefined;
     const key = cartKey(p.id, sel);
     setItems((prev) => {
-      // الحد الأقصى 20 قطعة من المنتج في الطلب الواحد (مطابق للسيرفر)
-      const cap = Math.min(Math.max(p.stock, 0), 20);
+      // الحد الأقصى 20 قطعة من المنتج في الطلب الواحد (مطابق للسيرفر)، ومخزون اللون المختار إن كان منفصلًا
+      const tracked = p.options?.find((g) => g.values.some((v) => v.stock != null));
+      const pick = tracked && sel?.find((x) => x.name === tracked.name);
+      const stock = pick ? tracked.values.find((v) => v.label === pick.value)?.stock ?? 0 : p.stock;
+      const cap = Math.min(Math.max(stock, 0), 20);
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         return prev.map((i) => (i.key === key ? { ...i, stock: cap, quantity: Math.min(i.quantity + qty, cap || 1) } : i));

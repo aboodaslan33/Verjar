@@ -61,14 +61,22 @@ function ProductView({ product, related }: ProductResponse) {
   const [buyVisible, setBuyVisible] = useState(true);
   // الخيارات (اللون، المقاس…): الخيار ذو القيمة الوحيدة يُختار تلقائيًا
   const groups = product.options ?? [];
+  // خيار بمخزون لكل قيمة (مثل الألوان): القيمة التي نفدت لا تُختار
+  const tracked = groups.find((g) => g.values.some((v) => v.stock != null));
+  const soldOut = (g: { name: string }, v: { stock?: number | null }) => g === tracked && (v.stock ?? 0) <= 0;
   const [sel, setSel] = useState<Record<string, string>>(() =>
-    Object.fromEntries(groups.filter((g) => g.values.length === 1).map((g) => [g.name, g.values[0].label])),
+    Object.fromEntries(groups.filter((g) => g.values.length === 1 && !soldOut(g, g.values[0])).map((g) => [g.name, g.values[0].label])),
   );
   const [focusMedia, setFocusMedia] = useState<string | null>(null);
   const [optionError, setOptionError] = useState(false);
   const missing = groups.find((g) => !sel[g.name]);
+  const trackedValue = tracked ? tracked.values.find((v) => v.label === sel[tracked.name]) : undefined;
+  // المخزون المتاح: للون المختار إن كان له مخزون منفصل، وإلا مخزون المنتج
+  const available = trackedValue ? trackedValue.stock ?? 0 : product.stock;
   const choose = (group: string, value: string, mediaId?: string | null) => {
     setSel((s) => ({ ...s, [group]: value }));
+    const v = tracked?.name === group ? tracked.values.find((x) => x.label === value) : undefined;
+    if (v) setQty((q) => Math.max(1, Math.min(q, v.stock ?? 0)));
     setOptionError(false);
     if (mediaId) setFocusMedia(mediaId);
   };
@@ -169,7 +177,7 @@ function ProductView({ product, related }: ProductResponse) {
                   {AVAILABILITY_LABEL[product.availability ?? 'IN_STOCK']}
                 </p>
               ) : (
-                <StockLine stock={product.stock} />
+                <StockLine stock={available} />
               )}
 
               <dl className="mt-6 grid grid-cols-2 gap-2 text-sm">
@@ -219,21 +227,27 @@ function ProductView({ product, related }: ProductResponse) {
                         {g.values.map((v) => {
                           const img = v.mediaId ? product.media.find((m) => m.id === v.mediaId && m.kind === 'IMAGE') : undefined;
                           const on = sel[g.name] === v.label;
+                          const gone = soldOut(g, v);
+                          const few = g === tracked && !gone && (v.stock ?? 0) <= 3;
                           return (
                             <button
                               key={v.label}
                               type="button"
                               role="radio"
                               aria-checked={on}
+                              disabled={gone}
                               onClick={() => choose(g.name, v.label, v.mediaId)}
                               className={cx(
                                 'inline-flex min-h-[44px] items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-[border-color,box-shadow]',
                                 on ? 'border-ink ring-2 ring-ink' : 'border-line hover:border-ink',
-                                optionError && !sel[g.name] && 'border-danger',
+                                optionError && !sel[g.name] && !gone && 'border-danger',
+                                gone && 'cursor-not-allowed opacity-45 hover:border-line',
                               )}
                             >
-                              {img && <img src={img.url} alt="" className="h-8 w-8 rounded-md object-cover" />}
-                              {v.label}
+                              {img && <img src={img.url} alt="" className={cx('h-8 w-8 rounded-md object-cover', gone && 'grayscale')} />}
+                              <span className={cx(gone && 'line-through')}>{v.label}</span>
+                              {gone && <span className="text-xs text-muted">نفد</span>}
+                              {few && <span className="text-xs text-warn">بقي {v.stock}</span>}
                             </button>
                           );
                         })}
@@ -250,7 +264,7 @@ function ProductView({ product, related }: ProductResponse) {
                     <span id="qty-label" className="text-sm font-semibold">
                       الكمية
                     </span>
-                    <QtyStepper value={qty} min={minQty} max={Math.min(product.stock, 20)} onChange={setQty} labelledBy="qty-label" />
+                    <QtyStepper value={qty} min={minQty} max={Math.max(1, Math.min(available, 20))} onChange={setQty} labelledBy="qty-label" />
                   </div>
                 )}
                 {por ? (

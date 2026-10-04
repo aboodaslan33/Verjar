@@ -2,7 +2,7 @@ import { DataTable, type Column } from '../../components/admin/DataTable';
 import { useAdminQuery, useFilters, useMutation } from '../../components/admin/hooks';
 import type { AdminCategory, AdminProduct } from '../../components/admin/types';
 import { AdminPage, FilterBar, FilterSelect, SearchInput, Switch } from '../../components/admin/ui';
-import { ApprovalTag } from '../../components/store/ProductEditorForm';
+import { ApprovalTag, OptionStock } from '../../components/store/ProductEditorForm';
 import type { AdminVendor } from '../../components/admin/types';
 import { editorCategories } from './ProductEditor';
 import { Button, ButtonLink, Icon, Price, Tag } from '../../components/ui';
@@ -103,6 +103,7 @@ export default function Products() {
             {p.stock === 0 ? ' (نفد)' : p.stock <= LOW_STOCK ? ' (منخفض)' : ''}
           </span>
           {!p.vendor?.isHouse && (p.soldFees ?? 0) > 0 && <span className="block text-xs text-muted">لفرجار {formatJOD(p.soldFees ?? 0)}</span>}
+          <OptionStock product={p} />
         </span>
       ),
     },

@@ -2112,6 +2112,11 @@ export const EN_TEXT: Record<string, string> = {
   "المنتجات المصنوعة حسب الطلب أو القياس لا تُسترجع بعد بدء تصنيعها إلا في حال وجود عيب.": "Made-to-order or custom-sized products can't be returned once production starts, unless defective.",
   // ── السوق الصناعي ──
   // ── خيارات المنتج ──
+  "مجموع مخزون": "Total stock of",
+  "— عدّله من خيارات المنتج": "— edit it in the product options",
+  "مخزون منفصل لكل قيمة": "Separate stock per value",
+  "مثل: 4 حمراء و6 زرقاء — القيمة التي تنفد لا يقدر العميل يختارها": "E.g. 4 red and 6 blue — customers can't pick a value that's sold out",
+  "المخزون المنفصل لخيار واحد فقط (مثل اللون)": "Separate stock is allowed for one option only (e.g. color)",
   "تم رفع الملفات — المنتج بانتظار المراجعة": "Files uploaded — product awaiting review",
   "اللون": "Color",
   "الخامة": "Material",
@@ -3859,4 +3864,7 @@ export const EN_PATTERNS: [string, string][] = [
   ["القيمة \"{0}\" مكررة", "Value \"{0}\" is duplicated"],
   ["اختر {0} لـ \"{1}\"", "Choose {0} for \"{1}\""],
   ["\"{0}\" غير متوفر في {1} لـ \"{2}\"", "\"{0}\" isn't available in {1} for \"{2}\""],
+  ["كمية {0}", "Quantity of {0}"],
+  ["\"{0} — {1}\" غير متوفر حاليًا", "\"{0} — {1}\" is currently unavailable"],
+  ["المتوفر من \"{0} — {1}\" {2} فقط", "Only {2} of \"{0} — {1}\" available"],
 ];

@@ -12,7 +12,7 @@ import { POLICIES, deleteStored, validateAndStore } from '../../services/upload.
 import { HOUSE_VENDOR_ID, ensureHouseVendor } from '../../services/vendor.service';
 import { checkPrice, industrialFields, priceField } from '../../validators/product';
 import { MAX_PRODUCT_DOCS, addProductDocs, removeProductDoc } from '../../market/productDocs';
-import { cleanOptions, optionsInput } from '../../market/options';
+import { optionsData, optionsInput, trackedGroup } from '../../market/options';
 import { FEE_MAX, pricingData, productPricing, resolveFeePercent } from '../../market/fees';
 
 export const productsRouter = Router();
@@ -238,7 +238,7 @@ productsRouter.post(
         approvalStatus: 'APPROVED',
         specs: cleanSpecs(fields, specs),
         slug: await uniqueProductSlug(input.name),
-        options: cleanOptions(options ?? [], new Set()),
+        ...optionsData(options ?? [], new Set()),
         ...pricingData(supplierPrice, fee, input.discountPercent),
       },
       include: { category: true, media: true },
@@ -277,7 +277,12 @@ productsRouter.patch(
         ...specsData,
         ...(input.name && input.name !== current.name ? { slug: await uniqueProductSlug(input.name, current.id) } : {}),
         ...pricingData(supplierPrice, fee, discount),
-        ...(options !== undefined ? { options: cleanOptions(options, new Set(currentMedia.map((m) => m.id))) } : {}),
+        // مخزون المنتج المتتبع لكل لون يُحسب من مجموع الألوان ولا يُعدّل مباشرة
+        ...(options !== undefined
+          ? optionsData(options, new Set(currentMedia.map((m) => m.id)))
+          : trackedGroup(currentProduct.options)
+            ? { stock: currentProduct.stock }
+            : {}),
         // تعديل الإدارة للنسبة يُغلق أي طلب تغيير معلّق
         ...(platformFeePercent !== undefined ? { feeRequestPercent: null, feeRequestNote: null, feeRequestAt: null } : {}),
       },

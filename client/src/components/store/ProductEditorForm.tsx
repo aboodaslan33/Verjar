@@ -120,6 +120,9 @@ export function ProductEditorForm({
   const [videoUrl, setVideoUrl] = useState(product?.videoUrl ?? '');
   const [keywords, setKeywords] = useState(product?.keywords ?? '');
   const [options, setOptions] = useState<ProductOption[]>(product?.options ?? []);
+  // خيار بمخزون منفصل لكل قيمة (مثل 4 حمراء و6 زرقاء): مخزون المنتج = المجموع
+  const trackedOption = options.find((g) => g.values.some((v) => v.stock != null));
+  const trackedTotal = trackedOption ? trackedOption.values.reduce((n, v) => n + (Number(v.stock) || 0), 0) : 0;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -172,7 +175,15 @@ export function ProductEditorForm({
       keywords: keywords.trim() || null,
       // الخيارات الفارغة لا تُرسل
       options: options
-        .map((g) => ({ name: g.name.trim(), values: g.values.filter((v) => v.label.trim()).map((v) => ({ label: v.label.trim(), mediaId: v.mediaId ?? null })) }))
+        .map((g) => {
+          const tracked = g.values.some((v) => v.stock != null);
+          return {
+            name: g.name.trim(),
+            values: g.values
+              .filter((v) => v.label.trim())
+              .map((v) => ({ label: v.label.trim(), mediaId: v.mediaId ?? null, ...(tracked ? { stock: Math.max(0, Math.round(Number(v.stock) || 0)) } : {}) })),
+          };
+        })
         .filter((g) => g.name && g.values.length),
       ...(isAdmin ? { featured } : {}),
       // فقط حقول القسم الحالي تُرسل
@@ -470,17 +481,25 @@ export function ProductEditorForm({
                 <Input label="الحد الأدنى للطلب" type="number" inputMode="numeric" min={1} className="ltr text-start" value={minOrderQty} onChange={(e) => setMinOrderQty(e.target.value)} error={fe.minOrderQty} />
                 <Input label="مدة التوريد (يوم)" optional type="number" inputMode="numeric" min={0} className="ltr text-start" value={leadTimeDays} onChange={(e) => setLeadTimeDays(e.target.value)} error={fe.leadTimeDays} />
               </div>
-              <Input
-                label="الكمية في المخزون"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                className="ltr text-start"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                error={fe.stock}
-              />
+              {trackedOption ? (
+                <div className="rounded-xl border border-line bg-subtle/50 p-3 text-sm">
+                  <p className="text-xs text-muted">الكمية في المخزون</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">{trackedTotal}</p>
+                  <p className="mt-1 text-xs text-muted">مجموع مخزون {trackedOption.name} — عدّله من خيارات المنتج</p>
+                </div>
+              ) : (
+                <Input
+                  label="الكمية في المخزون"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  className="ltr text-start"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  error={fe.stock}
+                />
+              )}
             </div>
           </Panel>
           <Panel title="الظهور">
@@ -799,7 +818,8 @@ function OptionsEditor({
       .map((t) => t.trim())
       .filter((t) => t && !g.values.some((v) => v.label === t));
     if (!labels.length) return;
-    setGroup(i, { ...g, values: [...g.values, ...labels.map((label) => ({ label, mediaId: null }))] });
+    const tracked = g.values.some((v) => v.stock != null);
+    setGroup(i, { ...g, values: [...g.values, ...labels.map((label) => ({ label, mediaId: null, ...(tracked ? { stock: 0 } : {}) }))] });
     setDrafts((d) => ({ ...d, [i]: '' }));
   };
   const optionsError = Object.entries(errors).find(([k]) => k.startsWith('options'))?.[1];
@@ -826,6 +846,19 @@ function OptionsEditor({
                 حذف الخيار
               </Button>
             </div>
+            {(() => {
+              const tracked = g.values.some((v) => v.stock != null);
+              const otherTracked = value.some((x, j) => j !== i && x.values.some((v) => v.stock != null));
+              if (otherTracked) return null;
+              return (
+                <Checkbox
+                  label="مخزون منفصل لكل قيمة"
+                  description="مثل: 4 حمراء و6 زرقاء — القيمة التي تنفد لا يقدر العميل يختارها"
+                  checked={tracked}
+                  onChange={(on) => setGroup(i, { ...g, values: g.values.map((v) => ({ ...v, stock: on ? v.stock ?? 0 : null })) })}
+                />
+              );
+            })()}
             {g.values.length > 0 && (
               <ul className="space-y-2">
                 {g.values.map((v, k) => (
@@ -837,6 +870,22 @@ function OptionsEditor({
                         value={v.label}
                         onChange={(e) => setGroup(i, { ...g, values: g.values.map((x, j) => (j === k ? { ...x, label: e.target.value } : x)) })}
                       />
+                      {v.stock != null && (
+                        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted">
+                          الكمية
+                          <input
+                            aria-label={`كمية ${v.label}`}
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            className="input ltr h-10 w-20 text-start"
+                            value={v.stock}
+                            onChange={(e) =>
+                              setGroup(i, { ...g, values: g.values.map((x, j) => (j === k ? { ...x, stock: e.target.value === '' ? 0 : Math.max(0, Math.round(Number(e.target.value) || 0)) } : x)) })
+                            }
+                          />
+                        </label>
+                      )}
                       <button
                         type="button"
                         aria-label={`حذف ${v.label}`}
@@ -910,5 +959,21 @@ function OptionsEditor({
       )}
       {value.length > 0 && images.length === 0 && <p className="mt-3 text-xs text-muted">ارفع صور المنتج ثم اربط كل لون بصورته (اختياري).</p>}
     </Panel>
+  );
+}
+
+/** مخزون كل قيمة في القوائم: "أحمر 4 · أزرق 6" */
+export function OptionStock({ product }: { product: AdminProduct }) {
+  const g = product.options?.find((x) => x.values.some((v) => v.stock != null));
+  if (!g) return null;
+  return (
+    <span className="mt-0.5 block text-xs text-muted">
+      {g.values.map((v, i) => (
+        <span key={v.label}>
+          {i > 0 && ' · '}
+          {v.label} <span className={cx('tabular-nums', (v.stock ?? 0) === 0 && 'font-semibold text-danger')}>{v.stock ?? 0}</span>
+        </span>
+      ))}
+    </span>
   );
 }

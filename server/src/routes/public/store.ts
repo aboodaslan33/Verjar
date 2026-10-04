@@ -20,7 +20,7 @@ import { confirmCustomer, notifyAdmin } from '../../services/whatsapp.service';
 import { orderSchema } from '../../validators/order';
 import { bumpStat } from '../../market/stats';
 import { emailSuppliersOfSale } from '../../market/notify';
-import { type Selection, resolveSelection, selectionKey, variantText } from '../../market/options';
+import { type Selection, adjustOptionStock, resolveSelection, selectionKey, variantText } from '../../market/options';
 
 export const storeRouter = Router();
 
@@ -386,6 +386,8 @@ storeRouter.post(
     const productIds = [...new Set(input.items.map((i) => i.productId))];
 
     const order = await prisma.$transaction(async (tx) => {
+      // قفل صفوف المنتجات: مخزون الألوان (JSON) يُقرأ ويُكتب داخل المعاملة دون تداخل طلبين
+      await tx.$queryRaw`SELECT id FROM "Product" WHERE id IN (${Prisma.join(productIds)}) FOR UPDATE`;
       const products = await tx.product.findMany({
         where: publicProductWhere({ id: { in: productIds } }),
         include: { vendor: { select: { id: true, name: true, isHouse: true } }, category: { select: { id: true, parentId: true } } },
@@ -413,6 +415,13 @@ storeRouter.post(
         if (p.stock < quantity) {
           throw badRequest(p.stock === 0 ? `"${p.name}" غير متوفر حاليًا` : `المتوفر من "${p.name}" ${p.stock} فقط`);
         }
+      }
+
+      // مخزون كل لون (إن كان متتبعًا لكل قيمة): يُتحقق منه ويُحسب الجديد قبل إنشاء الطلب
+      const optionStock = new Map<string, unknown>();
+      for (const { p, sel, quantity } of merged.values()) {
+        const next = adjustOptionStock(p.name, optionStock.get(p.id) ?? p.options, sel, -quantity);
+        if (next) optionStock.set(p.id, next);
       }
 
       let subtotal = 0;
@@ -455,6 +464,9 @@ storeRouter.post(
           data: { stock: { decrement: item.quantity } },
         });
         if (updated.count === 0) throw badRequest(`الكمية المطلوبة من "${item.name}" لم تعد متوفرة`);
+      }
+      for (const [id, options] of optionStock) {
+        await tx.product.update({ where: { id }, data: { options: options as Prisma.InputJsonValue } });
       }
 
       const customer = await accountCustomer(tx, req.auth!.sub);

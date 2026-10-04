@@ -124,7 +124,7 @@ export type Product = {
   options?: ProductOption[];
 };
 
-export type ProductOption = { name: string; values: { label: string; mediaId?: string | null }[] };
+export type ProductOption = { name: string; values: { label: string; mediaId?: string | null; stock?: number | null }[] };
 /** اختيار العميل: [{ name: "اللون", value: "أحمر" }] */
 export type OptionSelection = { name: string; value: string }[];
 
